@@ -1,16 +1,42 @@
-# This is a sample Python script.
-
-# Press ⌃R to execute it or replace it with your code.
-# Press Double ⇧ to search everywhere for classes, files, tool windows, actions, and settings.
+import os
+import numpy as np
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press ⌘F8 to toggle the breakpoint.
+class pipe_run:
+    def __init__(self, num):
+        self.num = int(num)
+        self.parts = []
+        self.dia = None
+
+    def props(self, array):
+        self.dia = array[-1]
 
 
-# Press the green button in the gutter to run the script.
+class pipe_straight:
+    def __init__(self, line):
+        self.dia = line[-1]
+        self.A = lineone
+        self.B = None
+
+
+def collector():
+    pipes = []
+
+    src = './axis.txt'
+    src_array = np.loadtxt(src)
+    for inst in np.unique(src_array[:, 0]):
+        sub = src_array[src_array[:, 0] == inst]
+        this_pipe = pipe_run(inst)
+
+        for line in sub:
+            pipe_run.props(pipe_run, line)
+            this_pipe.dia = line[-1]
+
+        pipes.append(this_pipe)
+        print(inst)
+
+    a = 0
+
+
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    collector()
