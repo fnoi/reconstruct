@@ -45,8 +45,14 @@ def collector():
 
     return pipes
 
+#TODO pipe to model
+#TODO start end switch
+#TODO orientation init for sweep and final re-rotate
+
 
 
 if __name__ == '__main__':
     pipes = collector()
+    #for pipe in pipes:
+    #    freecad_pipetomodel(pipe)
     a = 0
