@@ -1,5 +1,5 @@
-import os
 import numpy as np
+import statistics
 
 
 class pipe_run:
@@ -7,36 +7,46 @@ class pipe_run:
         self.num = int(num)
         self.parts = []
         self.dia = None
+        self.size = None
 
-    def props(self, array):
-        self.dia = array[-1]
+    def calc_run(self):
+        dia = []
+        for part in self.parts:
+            dia.append(part.dia)
+        self.dia = statistics.mean(dia)
+        self.size = len(self.parts)
+
+    #def points_dist(self):
 
 
 class pipe_straight:
     def __init__(self, line):
         self.dia = line[-1]
-        self.A = lineone
-        self.B = None
+        self.A = list(line[1:3])
+        self.B = list(line[3:5])
 
 
 def collector():
     pipes = []
-
     src = './axis.txt'
     src_array = np.loadtxt(src)
+
     for inst in np.unique(src_array[:, 0]):
         sub = src_array[src_array[:, 0] == inst]
         this_pipe = pipe_run(inst)
 
         for line in sub:
-            pipe_run.props(pipe_run, line)
-            this_pipe.dia = line[-1]
+            this_pipe.parts.append(pipe_straight(line))
 
+        this_pipe.calc_run()
         pipes.append(this_pipe)
-        print(inst)
 
-    a = 0
+        print('pipe', int(inst), '- size', this_pipe.size)
+
+    return pipes
+
 
 
 if __name__ == '__main__':
-    collector()
+    pipes = collector()
+    a = 0
