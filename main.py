@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import statistics
 
+# strong limitation: pipe run in (elevated) XY-plane
 
 class pipe_run:
     def __init__(self, num):
@@ -10,21 +11,26 @@ class pipe_run:
         self.parts = []
         self.dia = None
         self.size = None
+        self.z = None
 
     def calc_run(self):
         dia = []
+        z = []
         for part in self.parts:
             dia.append(part.dia)
+            z.append(part.Z)
         self.dia = statistics.mean(dia)
+        self.z = statistics.mean(z)
         self.size = len(self.parts)
-
-        switch_2(self.parts[0], self.parts[1])
+        if self.size > 1:
+            switch_2(self.parts[0], self.parts[1])
 
 
 class pipe_straight:
     def __init__(self, line):
         self.dia = line[-1]
         self.B, self.A = list(line[1:3]), list(line[3:5])
+        self.Z = statistics.mean([line[3], line[6]])
 
 
 def switch_2(straight0, straight1):
