@@ -1,3 +1,5 @@
+import math
+import sys
 import numpy as np
 import statistics
 
@@ -16,14 +18,44 @@ class pipe_run:
         self.dia = statistics.mean(dia)
         self.size = len(self.parts)
 
-    #def points_dist(self):
+        switch_2(self.parts[0], self.parts[1])
 
 
 class pipe_straight:
     def __init__(self, line):
         self.dia = line[-1]
-        self.A = list(line[1:3])
-        self.B = list(line[3:5])
+        self.B, self.A = list(line[1:3]), list(line[3:5])
+
+
+def switch_2(straight0, straight1):
+    start_0 = straight0.A
+    end_0 = straight0.B
+    start_1 = straight1.A
+    end_1 = straight1.B
+    dist_is = \
+        math.sqrt((start_1[0] - end_0[0]) ** 2 + (start_1[1] - end_0[1]) ** 2)
+    dist_cross = min(
+        math.sqrt((start_1[0] - start_0[0]) ** 2 + (start_1[1] - start_0[1]) ** 2),
+        math.sqrt((end_1[0] - end_0[0]) ** 2 + (end_1[1] - end_0[1]) ** 2)
+    )
+    dist_against = \
+        math.sqrt((start_0[0] - end_1[0]) ** 2 + (start_0[1] - end_1[1]) ** 2)
+    if dist_is > dist_cross and dist_is > dist_against:
+        print('no switch required, orientation ok')
+    elif dist_cross > dist_is and dist_cross > dist_against:
+        start_0, end_0 = end_0, start_0
+        print('had to switch one')
+    elif dist_against > dist_cross and dist_against > dist_is:
+        start_0, end_0, start_1, end_1 = end_0, start_0, end_1, start_1
+        print('had to switch both')
+    else:
+        print('you weird')
+        sys.exit()
+
+    straight0.A, straight0.B = start_0, end_0
+    straight1.A, straight1.B = start_1, end_1
+
+    return straight0, straight1
 
 
 def collector():
@@ -46,7 +78,6 @@ def collector():
     return pipes
 
 #TODO pipe to model
-#TODO start end switch
 #TODO orientation init for sweep and final re-rotate
 
 
