@@ -2,6 +2,7 @@ import math
 import sys
 import numpy as np
 import statistics
+import sweeps
 
 # strong limitation: pipe run in (elevated) XY-plane
 
@@ -83,6 +84,8 @@ def collector():
 
     return pipes
 
+
+
 #TODO pipe to model
 #TODO orientation init for sweep and final re-rotate
 
@@ -90,6 +93,14 @@ def collector():
 
 if __name__ == '__main__':
     pipes = collector()
-    #for pipe in pipes:
+    for pipe in pipes:
+        sweeps.init_FC()
+
+        if pipe.size == 1:
+            sweeps.one_line(pipe)
+        elif pipe.size == 2:
+            sweeps.two_lines(pipe)
+        elif pipe.size > 2:
+            print('not solved, more than 2 parts')
     #    freecad_pipetomodel(pipe)
     a = 0
