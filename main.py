@@ -4,10 +4,15 @@ import numpy as np
 import statistics
 import sweeps
 
+
 # strong limitation: pipe run in (elevated) XY-plane
 
 class pipe_run:
     def __init__(self, num):
+        """
+
+        :param num:
+        """
         self.num = int(num)
         self.parts = []
         self.dia = None
@@ -56,7 +61,7 @@ def switch_2(straight0, straight1):
         start_0, end_0, start_1, end_1 = end_0, start_0, end_1, start_1
         print('had to switch both')
     else:
-        print('you weird')
+        print('you weird, I\'m outta here')
         sys.exit()
 
     straight0.A, straight0.B = start_0, end_0
@@ -85,16 +90,14 @@ def collector():
     return pipes
 
 
-
-#TODO pipe to model
-#TODO orientation init for sweep and final re-rotate
-
+# TODO pipe to model
+# TODO orientation init for sweep and final re-rotate
 
 
 if __name__ == '__main__':
     pipes = collector()
     for pipe in pipes:
-        sweeps.init_FC()
+        sweeps.init_FC(pipe)
 
         if pipe.size == 1:
             sweeps.one_line(pipe)
