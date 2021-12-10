@@ -2,11 +2,112 @@ import math
 import sys
 import numpy as np
 import statistics
-import sweeps
+#import sweeps
+
+import sys
+
+pt = '/usr/lib/freecad/lib/'
+sys.path.append(pt)
+
+import FreeCAD
+App = FreeCAD
+import Part
+import Sketcher
+import _PartDesign
+import Mesh
+import os
+
+
+def init_FC(pipe):
+    App = FreeCAD
+    filename = str('freePIPE_' + str(pipe.num))
+    fcdoc = App.newDocument(filename)
+    return fcdoc, filename
+
+
+def one_line(pipe, fcdoc):
+    print('hi1')
+    pta = pipe.parts[0].A
+    ptb = pipe.parts[0].B
+    hgh = pipe.z
+
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'Sketch')
+    fcdoc.getObject('Sketch').Support = (fcdoc.getObject('XZ_Plane'), [''])
+    fcdoc.getObject('Sketch').MapMode = 'FlatFace'
+    fcdoc.recompute()
+    fcdoc.getObject('Sketch').addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 10), False)
+    fcdoc.getObject('Sketch').addConstraint(Sketcher.Constraint('Coincident', 0, 3, -1, 1))
+
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'Sketch001')
+    fcdoc.getObject('Sketch001').Support = (fcdoc.getObject('XY_Plane'), [''])
+    fcdoc.getObject('Sketch001').MapMode = 'FlatFace'
+    fcdoc.getObject('Sketch001').addGeometry(Part.LineSegment(App.Vector(0, 0, 0), App.Vector(0.7, 36, 0)), False)
+    fcdoc.recompute()
+
+    fcdoc.addObject('Part::Sweep', 'Sweep')
+    fcdoc.ActiveObject.Sections = [fcdoc.Sketch, ]
+    fcdoc.ActiveObject.Spine = (fcdoc.getObject('Sketch001'), ['Edge1', ])
+    fcdoc.ActiveObject.Solid = False
+    fcdoc.ActiveObject.Frenet = False
+    fcdoc.recompute()
+
+    return fcdoc
+    STOP = 0
+
+
+def two_lines(pipe, fcdoc):
+    print('hi2')
+    pt0a = pipe.parts[0].A
+    pt0b = pipe.parts[0].B
+    pt1a = pipe.parts[1].A
+    pt1b = pipe.parts[1].B
+    hgh = pipe.z
+
+    pta = pipe.parts[0].A
+    ptb = pipe.parts[0].B
+    hgh = pipe.z
+
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'Sketch')
+    fcdoc.getObject('Sketch').Support = (fcdoc.getObject('XZ_Plane'), [''])
+    fcdoc.getObject('Sketch').MapMode = 'FlatFace'
+    fcdoc.recompute()
+    fcdoc.getObject('Sketch').addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 0, 1), 10), False)
+    fcdoc.getObject('Sketch').addConstraint(Sketcher.Constraint('Coincident', 0, 3, -1, 1))
+
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'Sketch001')
+    fcdoc.getObject('Sketch001').Support = (fcdoc.getObject('XY_Plane'), [''])
+    fcdoc.getObject('Sketch001').MapMode = 'FlatFace'
+    fcdoc.getObject('Sketch001').addGeometry(Part.LineSegment(App.Vector(0, 0, 0), App.Vector(0.7, 36, 0)), False)
+    fcdoc.recompute()
+
+    fcdoc.addObject('Part::Sweep', 'Sweep')
+    fcdoc.ActiveObject.Sections = [fcdoc.Sketch, ]
+    fcdoc.ActiveObject.Spine = (fcdoc.getObject('Sketch001'), ['Edge1', ])
+    fcdoc.ActiveObject.Solid = False
+    fcdoc.ActiveObject.Frenet = False
+    fcdoc.recompute()
+
+    return fcdoc
+
+
+
+
+def multi_lines(pipe):
+    print('himany')
+
+
+def export(fcdoc, filename):
+
+    __objs__ = []
+    savename = '/home/fnoic/Desktop/' + filename + '.stl'
+    __objs__.append(fcdoc.getObject('Sweep'))
+    Mesh.export(__objs__, savename)
+    del __objs__
 
 
 # strong limitation: pipe run in (elevated) XY-plane
-
 class pipe_run:
     def __init__(self, num):
         """
@@ -72,7 +173,7 @@ def switch_2(straight0, straight1):
 
 def collector():
     pipes = []
-    src = './axis.txt'
+    src = '/home/fnoic/PycharmProjects/freecad_base/axis.txt'
     src_array = np.loadtxt(src)
 
     for inst in np.unique(src_array[:, 0]):
@@ -97,13 +198,16 @@ def collector():
 if __name__ == '__main__':
     pipes = collector()
     for pipe in pipes:
-        sweeps.init_FC(pipe)
+        fcdoc, filename = init_FC(pipe)
 
         if pipe.size == 1:
-            sweeps.one_line(pipe)
+            fcdoc = one_line(pipe, fcdoc)
         elif pipe.size == 2:
-            sweeps.two_lines(pipe)
+            fcdoc = two_lines(pipe, fcdoc)
         elif pipe.size > 2:
             print('not solved, more than 2 parts')
+
+        export(fcdoc, filename)
+
     #    freecad_pipetomodel(pipe)
     a = 0
