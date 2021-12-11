@@ -49,7 +49,7 @@ def one_line(pipe, fcdoc):
     print(line_1_oriplac)
 
     rot = App.Rotation(App.Vector(0, 0, 1), alpha)
-    pos = 7
+    pos = line_1.Placement.Base
     ctr = App.Vector(pta[0], pta[1], hgh)
     plc = App.Placement(pos, rot, ctr)
     print(plc)
@@ -88,7 +88,9 @@ def multi_lines(pipe):
 def export(fcdoc, filename):
 
     __objs__ = []
-    savename = '/home/fnoic/Desktop/' + filename + '.stl'
+    # macos
+    savename = '/Users/fnoic/DropBox/DropDrive/freecad_base/results_stl/' + filename + '.stl'
+    #savename = '/home/fnoic/Desktop/' + filename + '.stl'
     __objs__.append(fcdoc.getObject('pipe'))
     Mesh.export(__objs__, savename)
     del __objs__
