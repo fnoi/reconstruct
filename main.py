@@ -2,17 +2,101 @@ import math
 import sys
 import numpy as np
 import statistics
-import sweeps
+#import sweeps
+
+import sys
+
+#pt = '/usr/lib/freecad/lib/'
+pt = '/Applications/FreeCAD.app/Contents/Resources/lib/'
+sys.path.append(pt)
+
+import FreeCAD
+App = FreeCAD
+import Part
+import Sketcher
+import _PartDesign
+import Mesh
+import os
+
+
+def init_FC(pipe):
+    App = FreeCAD
+    filename = str('freePIPE_' + str(pipe.num))
+    fcdoc = App.newDocument(filename)
+    return fcdoc, filename
+
+
+def one_line(pipe, fcdoc):
+    print('hi1')
+    pta = pipe.parts[0].A
+    ptb = pipe.parts[0].B
+    hgh = pipe.z
+    rad = pipe.dia
+
+    x = ptb[0] - pta[0]
+    y = (ptb[1] - pta[1])
+    frac = x / y
+    alpha = math.atan(frac) * 180 / math.pi
+
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
+    line_1 = fcdoc.getObject('line_path')
+    line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+    line_1.MapMode = 'FlatFace'
+    line_1.addGeometry(Part.LineSegment(App.Vector(pta[0], pta[1], hgh), App.Vector(ptb[0], ptb[1], hgh)), False)
+    fcdoc.recompute()
+    line_1_oriplac = line_1.Placement
+    print(line_1_oriplac)
+
+    rot = App.Rotation(App.Vector(0, 0, 1), alpha)
+    pos = 7
+    ctr = App.Vector(pta[0], pta[1], hgh)
+    plc = App.Placement(pos, rot, ctr)
+    print(plc)
+
+    line_1.Placement = plc
+    fcdoc.recompute()
+
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_sec')
+    cross = fcdoc.getObject('cross_sec')
+    cross.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 1, 0), rad), False)
+    fcdoc.recompute()
+
+    fcdoc.addObject('Part::Sweep', 'pipe')
+    fcdoc.ActiveObject.Sections = [cross, ]
+    fcdoc.ActiveObject.Spine = (line_1, ['Edge1', ])
+    fcdoc.ActiveObject.Solid = False
+    fcdoc.ActiveObject.Frenet = False
+
+    fcdoc.ActiveObject.Placement = line_1_oriplac
+    print(fcdoc.ActiveObject.Placement)
+
+    fcdoc.recompute()
+
+    return fcdoc
+    STOP = 0
+
+
+def two_lines(pipe, fcdoc):
+    print('hi2')
+    return fcdoc
+
+def multi_lines(pipe):
+    print('himany')
+
+
+def export(fcdoc, filename):
+
+    __objs__ = []
+    savename = '/home/fnoic/Desktop/' + filename + '.stl'
+    __objs__.append(fcdoc.getObject('pipe'))
+    Mesh.export(__objs__, savename)
+    del __objs__
 
 
 # strong limitation: pipe run in (elevated) XY-plane
-
 class pipe_run:
     def __init__(self, num):
-        """
-
-        :param num:
-        """
         self.num = int(num)
         self.parts = []
         self.dia = None
@@ -72,7 +156,8 @@ def switch_2(straight0, straight1):
 
 def collector():
     pipes = []
-    src = './axis.txt'
+    src = '/Users/fnoic/Dropbox/DropDrive/freecad_base/axis.txt'
+    #src = '/home/fnoic/PycharmProjects/freecad_base/axis.txt'
     src_array = np.loadtxt(src)
 
     for inst in np.unique(src_array[:, 0]):
@@ -97,13 +182,16 @@ def collector():
 if __name__ == '__main__':
     pipes = collector()
     for pipe in pipes:
-        sweeps.init_FC(pipe)
+        fcdoc, filename = init_FC(pipe)
 
         if pipe.size == 1:
-            sweeps.one_line(pipe)
+            fcdoc = one_line(pipe, fcdoc)
         elif pipe.size == 2:
-            sweeps.two_lines(pipe)
+            fcdoc = one_line(pipe, fcdoc)
         elif pipe.size > 2:
             print('not solved, more than 2 parts')
+
+        export(fcdoc, filename)
+
     #    freecad_pipetomodel(pipe)
     a = 0
