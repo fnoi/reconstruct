@@ -44,42 +44,7 @@ def one_line(pipe, fcdoc):
     frac = x / y
     alpha = math.atan(frac) * 180 / math.pi
 
-    fcdoc.addObject('PartDesign::Body', 'Body')
-    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
-    line_1 = fcdoc.getObject('line_path')
-    line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
-    line_1.MapMode = 'FlatFace'
-    line_1.addGeometry(Part.LineSegment(App.Vector(pta[0], pta[1], hgh), App.Vector(ptb[0], ptb[1], hgh)), False)
-    fcdoc.recompute()
 
-    # line_1_oriplac = line_1.Placement
-    # print(line_1_oriplac)
-
-    # rot = App.Rotation(App.Vector(0, 0, 1), alpha)
-    # pos = line_1.Placement.Base
-    # ctr = App.Vector(pta[0], pta[1], hgh)
-    # plc = App.Placement(pos, rot, ctr)
-    # print(plc)
-
-    # line_1.Placement = plc
-    # fcdoc.recompute()
-
-    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_sec')
-    cross = fcdoc.getObject('cross_sec')
-    cross.addGeometry(Part.Circle(App.Vector(0, 0, 0), App.Vector(0, 1, 0), rad), False)
-    rot = App.Rotation(0, 90, alpha)
-    ctr = App.Vector(0, 0, 0)
-    pos = App.Vector(pta[0], pta[1], hgh)
-    plc = App.Placement(pos, rot, ctr)
-    cross.Placement = plc
-
-    fcdoc.recompute()
-
-    fcdoc.addObject('Part::Sweep', 'pipe')
-    fcdoc.ActiveObject.Sections = [cross, ]
-    fcdoc.ActiveObject.Spine = (line_1, ['Edge1', ])
-    fcdoc.ActiveObject.Solid = False
-    fcdoc.ActiveObject.Frenet = False
 
     # fcdoc.ActiveObject.Placement = line_1_oriplac
     # print(fcdoc.ActiveObject.Placement)
@@ -162,7 +127,7 @@ def two_lines(pipe, fcdoc):
     line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
     line_1.MapMode = 'FlatFace'
 
-    trial = 'fillet'  # 'triple' or 'fillet'
+    trial = 'triple'  # 'triple' or 'fillet'
     if trial == 'triple':
         line_1.addGeometry(Part.LineSegment(
             App.Vector(pta0[0], pta0[1], hgh),

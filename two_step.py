@@ -17,10 +17,11 @@ def one_line(pipe):
     frac = x / y
     alpha = math.atan(frac) * 180 / math.pi
 
-    pkl_cont = [hgh, rad,
+    pkl_cont = [hgh, rad, alpha,
                 pta[0], pta[1], ptb[0], ptb[1],
                 None, None, None, None,
                 None, None, None, None]
+    print(pipe.num, '\n', pkl_cont)
     dump2pickle(pkl_cont, pipe.num)
 
     a = 0
@@ -85,11 +86,12 @@ def two_lines(pipe):
     fillet_1.append(float(SP[1] + beta * vec1_n[1]))
     print('\nfillet in:', fillet_0, '\nfillet_out:', fillet_1)
 
-    pkl_cont = [hgh, rad,
-                pta0[0], pta0[1], ptb0[0], ptb0[1],
-                pta1[0], pta1[1], ptb1[0], ptb1[1],
-                fillet_0[0], fillet_0[1], fillet_1[0], fillet_1[1]]
+    pkl_cont = [hgh, rad, alpha, # 0 1 2
+                pta0[0], pta0[1], ptb0[0], ptb0[1], # 3 4 5 6
+                pta1[0], pta1[1], ptb1[0], ptb1[1], # 7 8 9 10
+                fillet_0[0], fillet_0[1], fillet_1[0], fillet_1[1]] # 11 12 13 14
     dump2pickle(pkl_cont, pipe.num)
+    print(pipe.num, '\n', pkl_cont)
 
 
 def multi_lines(pipe):
