@@ -139,21 +139,22 @@ def two_lines(pipe, fcdoc):
     vec0 = [x0, y0]
     vec0_l = math.sqrt(vec0[0] ** 2 + vec0[1] ** 2)
     vec0_n = [veci / vec0_l for veci in vec0]
+    print('vec0n:', vec0_n)
     vec1 = [
         ptb1[0] - pta1[0],
         ptb1[1] - pta1[1]
     ]
     vec1_l = math.sqrt(vec1[0] ** 2 + vec1[1] ** 2)
     #vec1_n = vec1 / vec1_l
-    vec1_n = [veci / vec1_l for veci in vec0]
+    vec1_n = [veci / vec1_l for veci in vec1]
+    print('vec1n', vec1_n)
 
     fillet_0 = []
     fillet_0.append(float(SP[0] - beta * vec0_n[0]))
     fillet_0.append(float(SP[1] - beta * vec0_n[1]))
-    #fillet_1 = []
-    #fillet_1.append(float(SP[0] + beta * vec1_n[0]))
-    #fillet_1.append(float(SP[1] + beta * vec1_n[1]))y<
-    fillet_1 = SP
+    fillet_1 = []
+    fillet_1.append(float(SP[0] + beta * vec1_n[0]))
+    fillet_1.append(float(SP[1] + beta * vec1_n[1]))
     print('\nfillet in:', fillet_0, '\nfillet_out:', fillet_1)
 
     fcdoc.addObject('PartDesign::Body', 'Body')
