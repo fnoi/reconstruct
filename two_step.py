@@ -30,6 +30,7 @@ def one_line(pipe):
 def dump2pickle(pkl_cont, num):
     pkl_name = 'rick__' + str(num)
     with open(pkl_name, 'wb') as pkl:
+        pkl_cont = [round(num, 4) if num is not None else num for num in pkl_cont]
         pickle.dump(pkl_cont, pkl)
 
     a = 0
@@ -180,7 +181,7 @@ def switch_2(straight0, straight1):
 
 def collector():
     pipes = []
-    src = '/Users/fnoic/PycharmProjects/freecad_base/axis.txt'
+    src = '/Users/fnoic/PycharmProjects/freecad_base/axis_healed.txt'
     src_array = np.loadtxt(src)
 
     for inst in np.unique(src_array[:, 0]):
