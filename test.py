@@ -1,11 +1,12 @@
 import numpy as np
 
-from structure.PointCloud import PointCloud
+from structure.CloudSegment import CloudSegment
 
 if __name__ == '__main__':
 
-    pc = PointCloud()
-    pc.load_from_txt('data/point_cloud/pipe_segment_1.txt')
+    cloud = 'data/point_cloud/beam_1.txt'
+    pc = CloudSegment()
+    pc.load_from_txt(cloud)
 
     pca = pc.calc_pca()
 
@@ -13,6 +14,8 @@ if __name__ == '__main__':
 
     pca_o3d = pc.calc_pca_o3d()
 
-    pc_ransac_cyl = pc.find_cylinder()
+    # pc_ransac_cyl = pc.find_cylinder()
+
+    point_on_plane = pc.pts2plane()
 
     a = 0
