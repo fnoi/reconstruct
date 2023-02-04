@@ -87,8 +87,8 @@ class CloudSegment(object):
         pcb_rot = np.dot(self.pcb, self.rot_mat_pca)
         pcc_rot = np.dot(self.pcc, self.rot_mat_pca)
         self.rot_mat_pcb = rotation_matrix_from_vectors(pcb_rot, y_vec)
-        pcb_rot = np.dot(self.pcb, self.rot_mat_pcb)
-        pcc_rot = np.dot(self.pcc, self.rot_mat_pcb)
+        pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb)
+        pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb)
 
         pcab2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
 
@@ -101,15 +101,5 @@ class CloudSegment(object):
         points_rot = np.dot(points_rot, self.rot_mat_pcb)
 
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
-
-        # write the projected points to a file in txt format
-        # with open('data/in/points_proj.txt', 'w') as f:
-        #     for i in range(points_proj.shape[0]):
-        #         f.write(f'{points_proj[i][0]} {points_proj[i][1]} {points_proj[i][2]} \n')
-
-        # write the points to a file in txt format
-        # with open('data/in/points_flat.txt', 'w') as f:
-        #     for i in range(points_rot.shape[0]):
-        #         f.write(f'{points_rot[i][0]} {points_rot[i][1]} {points_rot[i][2]} \n')
 
         return
