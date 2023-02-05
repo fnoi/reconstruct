@@ -84,21 +84,21 @@ class CloudSegment(object):
         y_vec = np.array([0, 1, 0])
 
         self.rot_mat_pca = rotation_matrix_from_vectors(plane_normal, z_vec)
-        pcb_rot = np.dot(self.pcb, self.rot_mat_pca)
-        pcc_rot = np.dot(self.pcc, self.rot_mat_pca)
-        self.rot_mat_pcb = rotation_matrix_from_vectors(pcb_rot, y_vec)
-        pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb)
-        pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb)
+        pcb_rot_a = np.dot(self.pcb, self.rot_mat_pca)
+        pcc_rot_a = np.dot(self.pcc, self.rot_mat_pca)
+        self.rot_mat_pcb = rotation_matrix_from_vectors(pcb_rot_a, y_vec)
+        pcb_rot_b = np.dot(pcb_rot_a, self.rot_mat_pcb.transpose())
+        pcc_rot_b = np.dot(pcc_rot_a, self.rot_mat_pcb.transpose())
 
-        pcab2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
+        pcab2obj(lines=[pcb_rot_b, pcc_rot_b], path=self.outpath, topic='pcbc')
 
         # rotate normal vector using the rotation matrix
         normal_rot = np.dot(plane_normal, self.rot_mat_pca)
-        normal_rot = np.dot(normal_rot, self.rot_mat_pcb)
+        normal_rot = np.dot(normal_rot, self.rot_mat_pcb.transpose())
 
         # rotate the points
         points_rot = np.dot(points_proj, self.rot_mat_pca)
-        points_rot = np.dot(points_rot, self.rot_mat_pcb)
+        points_rot = np.dot(points_rot, self.rot_mat_pcb.transpose())
 
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
