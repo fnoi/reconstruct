@@ -4,12 +4,14 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 
-from tools.IO import points2txt, pcab2obj
+from tools.IO import points2txt, lines2obj
 from structure.geometry import rotation_matrix_from_vectors
 
 
 class CloudSegment(object):
     def __init__(self, name: str = None):
+        self.left = None
+        self.right = None
         self.rot_mat_pcb = None
         self.rot_mat_pca = None
         self.pcc = None
@@ -59,13 +61,13 @@ class CloudSegment(object):
         self.pcb = pc[1][:, 1]
         self.pcc = pc[1][:, 2]
 
-        pcab2obj(lines=[self.pca, self.pcb, self.pcc], path=self.outpath, topic='pca', center=self.center)
+        lines2obj(lines=[self.pca, self.pcb, self.pcc], path=self.outpath, topic='pca', center=self.center)
 
         return pc
 
-    def pts2plane(self):
+    def transform(self):
         """
-        calculate projection of 3d points on the x-y plane using the plane normal
+        calculate projections, rotation matrices, meta information for skeleton
         #TODO: store rotation information and extent (-> towards graph)
         """
 
@@ -77,6 +79,9 @@ class CloudSegment(object):
         plane_point = np.array([0, 0, 0])
         # calculate distance of each point from the plane
         points_dist = np.dot(self.points - plane_point, plane_normal)
+        self.left = self.center + plane_normal * np.min(points_dist)
+        self.right = self.center + plane_normal * np.max(points_dist)
+        lines2obj([(self.left, self.right)], path=self.outpath, topic='skeleton', center=self.center)
         # calculate projection of each point on the plane
         points_proj = self.points - np.outer(points_dist, plane_normal)
         # rotation matrix to rotate the plane normal into the z-axis
@@ -90,7 +95,8 @@ class CloudSegment(object):
         pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb)
         pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb)
 
-        pcab2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
+        lines2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
+
 
         # rotate normal vector using the rotation matrix
         normal_rot = np.dot(plane_normal, self.rot_mat_pca)
@@ -103,3 +109,4 @@ class CloudSegment(object):
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
         return
+

@@ -34,8 +34,8 @@ def init_FC(pipe):
 
 def one_line(pipe, fcdoc):
     print('\none-part pipe')
-    pta = pipe.parts[0].A
-    ptb = pipe.parts[0].B
+    pta = pipe.skeleton[0].A
+    ptb = pipe.skeleton[0].B
     hgh = pipe.z
     rad = pipe.dia
 
@@ -57,10 +57,10 @@ def one_line(pipe, fcdoc):
 def two_lines(pipe, fcdoc):
     print('\ntwo-part pipe')
 
-    pta0 = pipe.parts[0].A
-    ptb0 = pipe.parts[0].B
-    pta1 = pipe.parts[1].A
-    ptb1 = pipe.parts[1].B
+    pta0 = pipe.skeleton[0].A
+    ptb0 = pipe.skeleton[0].B
+    pta1 = pipe.skeleton[1].A
+    ptb1 = pipe.skeleton[1].B
 
     hgh = pipe.z
     rad = pipe.dia

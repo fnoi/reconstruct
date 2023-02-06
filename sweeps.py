@@ -30,17 +30,17 @@ def init_FC(pipe):
 
 def one_line(pipe):
     print('hi1')
-    pta = pipe.parts[0].A
-    ptb = pipe.parts[0].B
+    pta = pipe.skeleton[0].A
+    ptb = pipe.skeleton[0].B
     hgh = pipe.z
 
 
 def two_lines(pipe):
     print('hi2')
-    pt0a = pipe.parts[0].A
-    pt0b = pipe.parts[0].B
-    pt1a = pipe.parts[1].A
-    pt1b = pipe.parts[1].B
+    pt0a = pipe.skeleton[0].A
+    pt0b = pipe.skeleton[0].B
+    pt1a = pipe.skeleton[1].A
+    pt1b = pipe.skeleton[1].B
     hgh = pipe.z
 
 
