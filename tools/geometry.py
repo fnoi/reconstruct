@@ -1,4 +1,5 @@
 import numpy as np
+#from structure.CloudSegment import CloudSegment
 
 
 def rotation_matrix_from_vectors(vec1, vec2):
@@ -108,24 +109,62 @@ def vector_distance(neighbor, seg1, seg2):
 
 
 
-def manipulate_skeleton(segment1, segment2, bridgepoint1, bridgepoint2, case):
+
+def manipulate_skeleton(segment1, segment2,
+                        bridgepoint1: np.ndarray, bridgepoint2: np.ndarray,
+                        case: int):
     if case == 0:
         # segment 1 is dominant
-        if np.linalg.norm(bridgepoint1 - segment2.left) < np.linalg.norm(bridgepoint1 - segment2.right):
-            segment2.left = bridgepoint1
-        elif np.linalg.norm(bridgepoint1 - segment2.left) > np.linalg.norm(bridgepoint1 - segment2.right):
-            segment2.right = bridgepoint1
+        if len(segment1.intermediate_points) > 0:
+            matched = False
+            for point in segment1.intermediate_points:
+                if matched:
+                    break
+                else:
+                    if np.linalg.norm(point - bridgepoint1) < 0.1: # TODO: make this a parameter
+                        print('joining on existent intermediate point')
+                        bridgepoint1 = point
+                        matched = True
+            if not matched:
+                print('adding intermediate point')
+                segment1.intermediate_points.append(bridgepoint1)
         else:
-            raise 'really case 0?'
+            print('adding intermediate point')
+            segment1.intermediate_points.append(bridgepoint1)
+
+            if np.linalg.norm(bridgepoint1 - segment2.left) < np.linalg.norm(bridgepoint1 - segment2.right):
+                segment2.left = bridgepoint1
+            elif np.linalg.norm(bridgepoint1 - segment2.left) > np.linalg.norm(bridgepoint1 - segment2.right):
+                segment2.right = bridgepoint1
+            else:
+                raise 'really case 0?'
 
     elif case == 1:
         # segment 2 is dominant
-        if np.linalg.norm(bridgepoint2 - segment1.left) < np.linalg.norm(bridgepoint2 - segment1.right):
-            segment1.left = bridgepoint2
-        elif np.linalg.norm(bridgepoint2 - segment1.left) > np.linalg.norm(bridgepoint2 - segment1.right):
-            segment1.right = bridgepoint2
+        if len(segment2.intermediate_points) > 0:
+            matched = False
+            for point in segment2.intermediate_points:
+                if matched:
+                    break
+                else:
+                    if np.linalg.norm(point - bridgepoint2) < 0.1: # TODO: make this a parameter
+                        print('joining on existent intermediate point')
+                        bridgepoint2 = point
+                        matched = True
+            if not matched:
+                print('adding intermediate point')
+                segment2.intermediate_points.append(bridgepoint2)
         else:
-            raise 'really case 1?'
+            print('adding intermediate point')
+            segment2.intermediate_points.append(bridgepoint2)
+
+            if np.linalg.norm(bridgepoint2 - segment1.left) < np.linalg.norm(bridgepoint2 - segment1.right):
+                segment1.left = bridgepoint2
+            elif np.linalg.norm(bridgepoint2 - segment1.left) > np.linalg.norm(bridgepoint2 - segment1.right):
+                segment1.right = bridgepoint2
+            else:
+                raise 'really case 1?'
+
     elif case == 2:
         # no dominant segment
         bridgepoint = (bridgepoint1 + bridgepoint2) / 2

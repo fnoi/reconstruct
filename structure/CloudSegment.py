@@ -10,6 +10,7 @@ from tools.geometry import rotation_matrix_from_vectors
 
 class CloudSegment(object):
     def __init__(self, name: str = None):
+        self.intermediate_points = []
         self.left = None
         self.right = None
         self.rot_mat_pcb = None
