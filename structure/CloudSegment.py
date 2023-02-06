@@ -5,7 +5,7 @@ import open3d as o3d
 import pyransac3d as pyrsc
 
 from tools.IO import points2txt, lines2obj
-from structure.geometry import rotation_matrix_from_vectors
+from tools.geometry import rotation_matrix_from_vectors
 
 
 class CloudSegment(object):
