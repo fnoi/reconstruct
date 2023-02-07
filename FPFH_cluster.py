@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import scipy
 
 from sklearn.cluster import KMeans, DBSCAN
+from sklearn.decomposition import PCA
 
 from tools.IO import points2txt
 
@@ -12,7 +13,13 @@ if __name__ == '__main__':
         data = [line.strip().split(' ') for line in data]
         data = np.array(data, dtype=np.float32)
 
-    clustering = KMeans(n_clusters=4, random_state=0).fit(data)
+    pca = PCA(n_components=3).fit(data[:, 4:].transpose())
+    surv = pca.components_.transpose()
+    xyz = data[:, :3]
+
+    data_new = np.hstack((xyz, surv))
+
+    clustering = KMeans(n_clusters=10, random_state=0).fit(data_new)
     #clustering = DBSCAN(eps=0.1, min_samples=5).fit(data)
     labels = clustering.labels_
 
