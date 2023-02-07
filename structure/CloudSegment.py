@@ -10,6 +10,7 @@ from tools.geometry import rotation_matrix_from_vectors
 
 class CloudSegment(object):
     def __init__(self, name: str = None):
+        self.points_cleaned = None
         self.intermediate_points = []
         self.left = None
         self.right = None
@@ -53,10 +54,14 @@ class CloudSegment(object):
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(self.points)
 
-        cov = pcd.compute_mean_and_covariance()
+        # clean up point cloud to improve pca results
+        pcd_clean, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=.75)
+        self.points_cleaned = np.asarray(pcd_clean.points)
+
+        cov = pcd_clean.compute_mean_and_covariance()
         pc = np.linalg.eig(cov[1])
 
-        self.center = pcd.get_center()
+        self.center = pcd_clean.get_center()
 
         self.pca = pc[1][:, 0]
         self.pcb = pc[1][:, 1]
@@ -73,7 +78,7 @@ class CloudSegment(object):
         """
 
         # move points to origin
-        self.points = self.points - self.center
+        self.points = self.points_cleaned - self.center
         # plane normal
         plane_normal = self.pca
         # plane point
@@ -107,6 +112,12 @@ class CloudSegment(object):
         points_rot = np.dot(points_proj, self.rot_mat_pca)
         points_rot = np.dot(points_rot, self.rot_mat_pcb)
 
+        pcd_rot = o3d.geometry.PointCloud()
+        pcd_rot.points = o3d.utility.Vector3dVector(points_rot)
+        cleaned, ind = pcd_rot.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
+        # TODO create new center points in center of gravity of projected points
+        # TODO adapt the centerline accordingly with relative translation
+        #points2txt(pointset=np.asarray(cleaned.points), path=self.outpath, topic='points_rot')
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
         return

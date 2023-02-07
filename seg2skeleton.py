@@ -4,15 +4,16 @@ import os
 import numpy as np
 
 from structure.CloudSegment import CloudSegment
+from structure.SegmentSkeleton import Skeleton
 from tools.geometry import vector_distance, manipulate_skeleton
 from tools.IO import lines2obj
 from tools.utils import update_logbook_checklist
 
 if __name__ == '__main__':
 
-    skeletonpath = f'{str(os.getcwd())}/data/out/0_skeleton'
-    if not os.path.exists(skeletonpath):
-        os.makedirs(skeletonpath)
+    skeleton = Skeleton(f'{str(os.getcwd())}/data/out/0_skeleton')
+    if not os.path.exists(skeleton.path):
+        os.makedirs(skeleton.path)
 
     segments: list = [
         'beam_01',
@@ -37,7 +38,7 @@ if __name__ == '__main__':
 
     # build the initial skeleton
     for bone in skeleton:
-        lines2obj([(bone.left, bone.right)], path=skeletonpath, topic=f'raw_{bone.name}')
+        lines2obj([(bone.left, bone.right)], path=skeleton.path, topic=f'raw_{bone.name}')
 
     # logbook: list of tuples (bone, bone, distance, case) to describe state of skeleton joints
     logbook = {}
