@@ -5,7 +5,7 @@ import numpy as np
 
 from structure.CloudSegment import CloudSegment
 from structure.SegmentSkeleton import Skeleton
-from tools.geometry import vector_distance, manipulate_skeleton
+from tools.geometry import warped_vectors_intersection, manipulate_skeleton
 from tools.IO import lines2obj
 from tools.utils import update_logbook_checklist
 
@@ -28,17 +28,18 @@ if __name__ == '__main__':
         'beam_10'
     ]
 
-    skeleton = []
     for segment in segments:
         cloud = CloudSegment(name=segment)
         cloud.load_from_txt(segment)
         cloud.calc_pca_o3d()
         cloud.transform()
-        skeleton.append(cloud)
+        skeleton.add(cloud)
+    skeleton.find_joints()
 
-    # build the initial skeleton
-    for bone in skeleton:
-        lines2obj([(bone.left, bone.right)], path=skeleton.path, topic=f'raw_{bone.name}')
+
+    # build obj for initial skeleton
+    for bone in skeleton.bones:
+        lines2obj([(bone.left, bone.right)], path=skeleton.path, topic=f'source_{bone.name}')
 
     # logbook: list of tuples (bone, bone, distance, case) to describe state of skeleton joints
     logbook = {}

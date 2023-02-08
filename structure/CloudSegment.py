@@ -22,9 +22,6 @@ class CloudSegment(object):
         self.center = None
         self.pca = None
         self.points = None
-        self.normals = None
-        self.colors = None
-        self.features = None
         self.outpath = f'data/out/{name}'
         # check if directory name exists
         if not os.path.exists(self.outpath):

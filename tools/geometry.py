@@ -29,13 +29,12 @@ def rotation_matrix_from_vectors(vec1, vec2):
     return R
 
 
-def vector_distance(neighbor, seg1, seg2):
+def warped_vectors_intersection(seg1, seg2):
     dir1 = seg1.pca
     dir2 = seg2.pca
     connect = np.cross(dir1, dir2)
-    # print(neighbor, connect)
+
     if np.nonzero(connect) is False:
-        print(neighbor)
         raise 'Vectors are parallel'
     dist = np.abs(np.dot(seg1.center - seg2.center, connect)) / np.linalg.norm(connect)
     # source: https://math.stackexchange.com/questions/2213165/find-shortest-distance-between-lines-in-3d
