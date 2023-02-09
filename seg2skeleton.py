@@ -35,7 +35,9 @@ if __name__ == '__main__':
         cloud.transform_clean()
         cloud.pc2obj(pc_type='initial')
         skeleton.add(cloud)
+
     skeleton.find_joints()
+    skeleton.join_on_passing()
 
 
     # build obj for initial skeleton
