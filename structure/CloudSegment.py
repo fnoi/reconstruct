@@ -8,7 +8,7 @@ from tools.IO import points2txt, lines2obj
 from tools.geometry import rotation_matrix_from_vectors
 
 
-class CloudSegment(object):
+class Segment(object):
     def __init__(self, name: str = None):
         self.points_cleaned = None
         self.intermediate_points = []

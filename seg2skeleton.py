@@ -3,7 +3,7 @@ import os
 
 import numpy as np
 
-from structure.CloudSegment import CloudSegment
+from structure.CloudSegment import Segment
 from structure.SegmentSkeleton import Skeleton
 from tools.geometry import warped_vectors_intersection, manipulate_skeleton
 from tools.IO import lines2obj
@@ -25,11 +25,31 @@ if __name__ == '__main__':
         'beam_07',
         'beam_08',
         'beam_09',
-        'beam_10'
+        'beam_10',
+        'beam_11',
+        'beam_12',
+        'beam_13',
+        'beam_14',
+        'beam_15',
+        'beam_16',
+        'beam_17',
+        'beam_18',
+        'beam_19',
+        'beam_20',
+        'beam_21',
+        'beam_22',
+        'beam_23',
+        'beam_24',
+        'beam_25',
+        'beam_26',
+        'beam_27',
+        'beam_28',
+        'beam_29',
+        'beam_30'
     ]
 
     for segment in segments:
-        cloud = CloudSegment(name=segment)
+        cloud = Segment(name=segment)
         cloud.load_from_txt(segment)
         cloud.calc_pca_o3d()
         cloud.transform_clean()
@@ -38,6 +58,7 @@ if __name__ == '__main__':
 
     skeleton.find_joints()
     skeleton.join_on_passing()
+    skeleton.to_obj(topic='intermediate')
 
 
     # build obj for initial skeleton

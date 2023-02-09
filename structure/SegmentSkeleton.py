@@ -10,7 +10,7 @@ class Skeleton:
         self.joints = None
         self.path = path
         self.bones = []
-        self.threshold_distance_join = 0.2
+        self.threshold_distance_join = 1
         self.bone_count = 0
 
     def add(self, cloud):
@@ -21,6 +21,13 @@ class Skeleton:
                     f'l 1 2 \n')
         self.bone_count += 1
 
+    def to_obj(self, topic: str):
+        for i, bone in enumerate(self.bones):
+            with open(f'{self.path}/{topic}_bone_{i}.obj', 'w') as f:
+                f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
+                        f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
+                        f'l 1 2 \n')
+
     def find_joints(self):
         all_joints = list(itertools.combinations(range(len(self.bones)), 2))
         self.joints_in = []
@@ -29,23 +36,40 @@ class Skeleton:
             bridgepoint1, bridgepoint2, rating, case = warped_vectors_intersection(
                 self.bones[joint[0]],
                 self.bones[joint[1]])
+            print(rating)
             if rating < self.threshold_distance_join:
                 self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case])  # KEY
 
     def join_on_passing(self):
-        joint_array = np.zeros((len(self.joints_in), 4))
+        joint_array = np.zeros((len(self.joints_in), 10))
         for i, joint in enumerate(self.joints_in):
             joint_array[i, 0] = joint[0]  # bone 1
             joint_array[i, 1] = joint[1]  # bone 2
             joint_array[i, 3] = joint[4]  # rating
             joint_array[i, 2] = joint[5]  # case
-        agenda = joint_array[np.where(joint_array[:, 3] == 0)]
 
-        ratings = np.zeros((len(self.joints_in), 1))
-        for i, joint in enumerate(self.joints_in):
-            if joint[-1] == 0:
-                ratings[i] = joint[-2]
-        a = 0
+            joint_array[i, 4] = joint[2][0]  # bridgepoint1x
+            joint_array[i, 5] = joint[2][1]  # bridgepoint1y
+            joint_array[i, 6] = joint[2][2]  # bridgepoint1z
+
+            joint_array[i, 7] = joint[3][0]  # bridgepoint2x
+            joint_array[i, 8] = joint[3][1]  # bridgepoint2y
+            joint_array[i, 9] = joint[3][2]  # bridgepoint2z
+
+        agenda = joint_array[joint_array[:, 2] == 0]
+        agenda = agenda[agenda[:, 3].argsort()]
+        for joint in agenda:
+            passing = joint[0]
+            joining = joint[1]
+            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
+            if dist_left < dist_right:
+                self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
+                self.bones[int(joining)].left_edit = True
+            else:
+                self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
+                self.bones[int(joining)].right_edit = True
+            self.bones[int(passing)].intermediate_points.append(joint[2])
 
         return
 
