@@ -27,9 +27,12 @@ class Skeleton:
                 self.joints_in.append({joint: (bridgepoint1, bridgepoint2, rating, case)})
 
     def join_on_passing(self):
+        return
 
 
     def join_dangling(self):
+        return
 
 
     def update_bones(self, cloud):
+        return

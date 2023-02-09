@@ -98,7 +98,7 @@ def warped_vectors_intersection(seg1, seg2):
         rating = np.max(np.asarray([rating1, rating2]))
         case = 2
 
-    if rating == 0 or rating == np.nan:
+    if rating > 0 is False:
         rating = 1e8
 
     return bridgepoint1, bridgepoint2, rating, case

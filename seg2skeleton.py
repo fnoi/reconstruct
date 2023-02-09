@@ -32,14 +32,15 @@ if __name__ == '__main__':
         cloud = CloudSegment(name=segment)
         cloud.load_from_txt(segment)
         cloud.calc_pca_o3d()
-        cloud.transform()
+        cloud.transform_clean()
+        cloud.pc2obj(pc_type='initial')
         skeleton.add(cloud)
     skeleton.find_joints()
 
 
     # build obj for initial skeleton
     for bone in skeleton.bones:
-        lines2obj([(bone.left, bone.right)], path=skeleton.path, topic=f'source_{bone.name}')
+        lines2obj([(bone.left, bone.right)], path=skeleton.parent_path, topic=f'source_{bone.name}')
 
     # logbook: list of tuples (bone, bone, distance, case) to describe state of skeleton joints
     logbook = {}

@@ -22,6 +22,7 @@ class CloudSegment(object):
         self.center = None
         self.pca = None
         self.points = None
+        self.parent_path = f'data/out/'
         self.outpath = f'data/out/{name}'
         # check if directory name exists
         if not os.path.exists(self.outpath):
@@ -64,22 +65,33 @@ class CloudSegment(object):
         self.pcb = pc[1][:, 1]
         self.pcc = pc[1][:, 2]
 
-        lines2obj(lines=[self.pca, self.pcb, self.pcc], path=self.outpath, topic='pca', center=self.center)
-
-        return pc
-
-    def transform(self):
+    def transform_clean(self):
         """
         calculate projections, rotation matrices, meta information for skeleton
-        #TODO: store rotation information and extent (-> towards graph)
         """
 
         # move points to origin
         self.points = self.points_cleaned - self.center
-        # plane normal
-        plane_normal = self.pca
         # plane point
         plane_point = np.array([0, 0, 0])
+
+        # TODO: here original pca-pcb-pcc can be extracted still
+
+        pc_candidates = [self.pca, self.pcb, self.pcc]
+        extent = []
+        for pc in pc_candidates:
+            points_dist = np.dot(self.points - plane_point, pc)
+            left = self.center + pc * np.min(points_dist)
+            right = self.center + pc * np.max(points_dist)
+            extent.append(np.linalg.norm(left - right))
+
+        # choose pca with largest extent
+        self.pca = pc_candidates[np.argsort(extent)[-1]]
+        self.pcb = pc_candidates[np.argsort(extent)[-2]]
+        self.pcc = pc_candidates[np.argsort(extent)[-3]]
+
+        # plane normal
+        plane_normal = self.pca
         # calculate distance of each point from the plane
         points_dist = np.dot(self.points - plane_point, plane_normal)
         self.left = self.center + plane_normal * np.min(points_dist)
@@ -119,3 +131,14 @@ class CloudSegment(object):
 
         return
 
+    def pc2obj(self, pc_type):
+        if pc_type == 'initial':
+            with open(f'{self.parent_path}/{self.name}_pca_{pc_type}.obj', 'w') as f:
+                f.write(f'v {self.center[0]} {self.center[1]} {self.center[2]} \n'
+                        f'v {self.pca[0] + self.center[0]} {self.pca[1] + self.center[1]} {self.pca[2] + self.center[2]} \n'
+                        f'v {self.pcb[0] + self.center[0]} {self.pcb[1] + self.center[1]} {self.pcb[2] + self.center[2]} \n'
+                        f'v {self.pcc[0] + self.center[0]} {self.pcc[1] + self.center[1]} {self.pcc[2] + self.center[2]} \n'
+                        f'l 1 2 \n'
+                        f'l 1 3 \n'
+                        f'l 1 4')
+        return
