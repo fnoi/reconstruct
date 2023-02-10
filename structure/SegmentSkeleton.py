@@ -12,6 +12,9 @@ class Skeleton:
         self.bones = []
         self.threshold_distance_join = 1
         self.bone_count = 0
+        self.joints_in = None
+        self.joints_array = None
+
 
     def add(self, cloud):
         self.bones.append(cloud)
@@ -36,17 +39,61 @@ class Skeleton:
             bridgepoint1, bridgepoint2, rating, case = warped_vectors_intersection(
                 self.bones[joint[0]],
                 self.bones[joint[1]])
-            print(rating)
+            # print(rating)
             if rating < self.threshold_distance_join:
                 self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case])  # KEY
 
     def join_on_passing(self):
+        self.joints2joint_array()
+        agenda = self.joints_array[self.joints_array[:, 2] == 0]
+        agenda = agenda[agenda[:, 3].argsort()]
+        for joint in agenda:
+            passing = joint[0]
+            joining = joint[1]
+            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
+            if dist_left < dist_right:
+                if self.bones[int(joining)].left_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
+                    self.bones[int(joining)].left_edit = True
+            else:
+                if self.bones[int(joining)].right_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
+                    self.bones[int(joining)].right_edit = True
+            self.bones[int(passing)].intermediate_points.append(joint[2])
+
+        return
+
+    def join_passing(self):
+        # find passing bones #TODO: implementation should pick up where we left off here
+        self.joints2joint_array()
+        passing = np.unique(
+            np.hstack(
+                (np.where(self.joints_array[:, 2] == 0), np.where(self.joints_array[:, 2] == 1))
+            ), return_counts=True
+        )
+
+
+        a = 0
+        # join the most prominent
+        # re-calc joints and dists
+        # repeat until no more joints?
+        return
+
+    def update_bones(self, cloud):
+        return
+
+    def joints2joint_array(self):
         joint_array = np.zeros((len(self.joints_in), 10))
         for i, joint in enumerate(self.joints_in):
             joint_array[i, 0] = joint[0]  # bone 1
             joint_array[i, 1] = joint[1]  # bone 2
-            joint_array[i, 3] = joint[4]  # rating
             joint_array[i, 2] = joint[5]  # case
+            joint_array[i, 3] = joint[4]  # rating
 
             joint_array[i, 4] = joint[2][0]  # bridgepoint1x
             joint_array[i, 5] = joint[2][1]  # bridgepoint1y
@@ -55,26 +102,5 @@ class Skeleton:
             joint_array[i, 7] = joint[3][0]  # bridgepoint2x
             joint_array[i, 8] = joint[3][1]  # bridgepoint2y
             joint_array[i, 9] = joint[3][2]  # bridgepoint2z
-
-        agenda = joint_array[joint_array[:, 2] == 0]
-        agenda = agenda[agenda[:, 3].argsort()]
-        for joint in agenda:
-            passing = joint[0]
-            joining = joint[1]
-            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
-            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
-            if dist_left < dist_right:
-                self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
-                self.bones[int(joining)].left_edit = True
-            else:
-                self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
-                self.bones[int(joining)].right_edit = True
-            self.bones[int(passing)].intermediate_points.append(joint[2])
-
-        return
-
-    def join_dangling(self):
-        return
-
-    def update_bones(self, cloud):
+        self.joints_array = joint_array
         return

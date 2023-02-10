@@ -13,7 +13,9 @@ class Segment(object):
         self.points_cleaned = None
         self.intermediate_points = []
         self.left = None
+        self.left_edit = False
         self.right = None
+        self.right_edit = False
         self.rot_mat_pcb = None
         self.rot_mat_pca = None
         self.pcc = None

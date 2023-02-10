@@ -57,6 +57,7 @@ if __name__ == '__main__':
         skeleton.add(cloud)
 
     skeleton.find_joints()
+    skeleton.join_passing()
     skeleton.join_on_passing()
     skeleton.to_obj(topic='intermediate')
 
