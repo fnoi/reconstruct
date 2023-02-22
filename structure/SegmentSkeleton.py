@@ -7,14 +7,12 @@ from tools.geometry import warped_vectors_intersection
 
 class Skeleton:
     def __init__(self, path: str):
-        self.joints = None
         self.path = path
         self.bones = []
         self.threshold_distance_join = 1
         self.bone_count = 0
         self.joints_in = None
         self.joints_array = None
-
 
     def add(self, cloud):
         self.bones.append(cloud)
@@ -74,9 +72,8 @@ class Skeleton:
         passing = np.unique(
             np.hstack(
                 (np.where(self.joints_array[:, 2] == 0), np.where(self.joints_array[:, 2] == 1))
-            ), return_counts=True
+            )
         )
-
 
         a = 0
         # join the most prominent
