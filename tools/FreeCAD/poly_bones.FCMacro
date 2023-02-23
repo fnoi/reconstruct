@@ -1,7 +1,9 @@
 import os
+import numpy as np
 
 import Part
 import Mesh
+
 
 # import matplotlib.pyplot as plt
 # def plot_polygon(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11):
@@ -44,33 +46,135 @@ def cornerpts(poly_params):
     p10 = (p7[0], p9[1])
     p11 = (p10[0], p0[1])
 
-    return (p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11)
+    array = np.array([
+        [p0[0], p0[1]],
+        [p1[0], p1[1]],
+        [p2[0], p2[1]],
+        [p3[0], p3[1]],
+        [p4[0], p4[1]],
+        [p5[0], p5[1]],
+        [p6[0], p6[1]],
+        [p7[0], p7[1]],
+        [p8[0], p8[1]],
+        [p9[0], p9[1]],
+        [p10[0], p10[1]],
+        [p11[0], p11[1]]
+    ])
+
+    center = (
+        np.min(array[:, 0]) + (np.max(array[:, 0]) - np.min(array[:, 0])) / 2,
+        np.min(array[:, 1]) + (np.max(array[:, 1]) - np.min(array[:, 1])) / 2
+    )
+
+    return (p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11), center
 
 
-def sketch_polygon():
-    a = 0
+def sketch_bone(objlines):
+    start = objlines[0].split(' ')[1:4]
+    end = objlines[1].split(' ')[1:4]
+
+    x_start = float(start[0])
+    y_start = float(start[1])
+    z_start = float(start[2])
+    x_end = float(end[0])
+    y_end = float(end[1])
+    z_end = float(end[2])
+
+    return {
+        'start': (x_start, y_start, z_start),
+        'end': (x_end, y_end, z_end)
+    }
+
+def bone_pose(bone):
+    x_start = bone['start'][0]
+    y_start = bone['start'][1]
+    z_start = bone['start'][2]
+    x_end = bone['end'][0]
+    y_end = bone['end'][1]
+    z_end = bone['end'][2]
+
+    array = np.array([
+        [x_start, y_start, z_start],
+        [x_end, y_end, z_end]
+    ])
+    translate_start = np.array([x_start, y_start, z_start])
+    translate_end = np.array([x_end - x_start, y_end - y_start, z_end - z_start])
+
+    len_bone = np.linalg.norm(translate_end)
+    ax_bone = np.array([len_bone, 0, 0])
+    a = ax_bone / np.linalg.norm(ax_bone)
+    b = translate_end / np.linalg.norm(translate_end)
+
+    # calculate rotation matrix from ax_bone to translate_end
+    v = np.cross(a, b)
+    s = np.linalg.norm(v)
+    c = np.dot(a, b)
+    vx = np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0]
+    ])
+    rot_mat = np.eye(3) + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+
+    # apply rotation matrix to ax_bone
+    translate_end_nu = np.dot(rot_mat, ax_bone)
+
+    bone['rotation'] = rot_mat
+    bone['translate_start'] = translate_start
+    bone['translate_end'] = translate_end_nu
+
+    return bone
 
 
 if __name__ == '__main__':
-
     # 1 get polygon corners
-    # 2 get bone line
-    # store them on the fly? (for dodo, clean intersection at some point i guess)
-    # 3 set up FreeCAD "file"
-    # loop starts here
-    #   4 sketch polygon, move to where it should be
-    #   5 sketch bone line
-    #   6 sweep
-    # clean ups as postprocessing possible?
-    # export to obj
-
     # hardcode_path as FC macro works on different directories and I don't care
     hardcode_path = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+    print(hardcode_path)
 
     with open(hardcode_path, 'r') as f:
         line = f.readlines()
 
-    polygon_corners = cornerpts(line)
-    print(polygon_corners)
+    polygon_corners, polygon_center = cornerpts(poly_params=line)
 
-    print('PyCharm says hi')
+    # 2 get bone line
+    hardcode_path = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
+    print(hardcode_path)
+    with open(hardcode_path, 'r') as f:
+        # read obj file
+        _ = f.readlines()
+
+    bone_dict = sketch_bone(objlines=_)
+    bone_dict = bone_pose(bone=bone_dict)
+    print(bone_dict)
+
+    # store them on the fly? (for dodo, clean intersection at some point i guess)
+
+    # 3 set up FreeCAD "file"
+    App = FreeCAD
+    filename = 'beam_skeleton'
+    App.newDocument(filename)
+    fcdoc = App.getDocument(filename)
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.recompute()
+
+    # loop starts here
+    #   4 sketch bone line
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
+    line_1 = fcdoc.getObject('line_path')
+    line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+    line_1.MapMode = 'FlatFace'
+    line_1.addGeometry(Part.LineSegment(
+        App.Vector(0, 0, 0),
+        App.Vector(bone_dict['translate_end'][0], bone_dict['translate_end'][1], bone_dict['translate_end'][2])),
+        False
+    )
+    fcdoc.recompute()
+
+    #   5 sketch polygon, move to where it should be
+
+    #   6 sweep
+    # clean ups as postprocessing possible?
+    # export to obj
+
+    print('PyCharm says hi and congrats for running the whole macro without errors!')
