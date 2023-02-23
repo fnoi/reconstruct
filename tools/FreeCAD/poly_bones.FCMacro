@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from sys import platform
 
 import Part
 import Mesh
@@ -128,9 +129,17 @@ def bone_pose(bone):
 
 
 if __name__ == '__main__':
+    if platform == 'darwin':
+        path_1 = '/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
+        path_2 = '/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
+    else:
+        path_1 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+        path_2 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
+
     # 1 get polygon corners
     # hardcode_path as FC macro works on different directories and I don't care
-    hardcode_path = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+
+    hardcode_path = path_1
     print(hardcode_path)
 
     with open(hardcode_path, 'r') as f:
@@ -139,7 +148,7 @@ if __name__ == '__main__':
     polygon_corners, polygon_center = cornerpts(poly_params=line)
 
     # 2 get bone line
-    hardcode_path = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
+    hardcode_path = path_2
     print(hardcode_path)
     with open(hardcode_path, 'r') as f:
         # read obj file
@@ -203,6 +212,14 @@ if __name__ == '__main__':
     sweep.Spine = line_1
     sweep.Solid = True
     sweep.Frenet = False
+
+    sweep.Placement = App.Placement(App.Matrix(
+        bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
+        bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
+        bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
+        0, 0, 0, 1
+    ))
+
 
     fcdoc.recompute()
 
