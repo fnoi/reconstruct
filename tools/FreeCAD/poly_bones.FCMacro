@@ -1,3 +1,8 @@
+import os
+
+import Part
+import Mesh
+
 # import matplotlib.pyplot as plt
 # def plot_polygon(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11):
 #     fig = plt.figure()
@@ -17,8 +22,8 @@
 #     ax.set_aspect('equal')
 #     plt.show()
 
-def cornerpts(line):
-    _ = line[0].split(' ')
+def cornerpts(poly_params):
+    _ = poly_params[0].split(' ')
     x0 = float(_[0])
     y0 = float(_[1])
     tf = float(_[2])
@@ -41,11 +46,23 @@ def cornerpts(line):
 
     return (p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11)
 
+
 def sketch_polygon():
     a = 0
 
 
 if __name__ == '__main__':
+
+    # 1 get polygon corners
+    # 2 get bone line
+    # store them on the fly? (for dodo, clean intersection at some point i guess)
+    # 3 set up FreeCAD "file"
+    # loop starts here
+    #   4 sketch polygon, move to where it should be
+    #   5 sketch bone line
+    #   6 sweep
+    # clean ups as postprocessing possible?
+    # export to obj
 
     # hardcode_path as FC macro works on different directories and I don't care
     hardcode_path = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
