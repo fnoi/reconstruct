@@ -121,7 +121,8 @@ def bone_pose(bone):
 
     bone['rotation'] = rot_mat
     bone['translate_start'] = translate_start
-    bone['translate_end'] = translate_end_nu
+    bone['translate_end'] = translate_end
+    bone['ax_bone'] = ax_bone
 
     return bone
 
@@ -146,7 +147,6 @@ if __name__ == '__main__':
 
     bone_dict = sketch_bone(objlines=_)
     bone_dict = bone_pose(bone=bone_dict)
-    print(bone_dict)
 
     # store them on the fly? (for dodo, clean intersection at some point i guess)
 
@@ -166,14 +166,51 @@ if __name__ == '__main__':
     line_1.MapMode = 'FlatFace'
     line_1.addGeometry(Part.LineSegment(
         App.Vector(0, 0, 0),
-        App.Vector(bone_dict['translate_end'][0], bone_dict['translate_end'][1], bone_dict['translate_end'][2])),
+        App.Vector(bone_dict['ax_bone'][0], bone_dict['ax_bone'][1], bone_dict['ax_bone'][2])),
         False
     )
     fcdoc.recompute()
 
     #   5 sketch polygon, move to where it should be
+    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
+    polygon = fcdoc.getObject('cross_section')
+    polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
+    polygon.MapMode = 'FlatFace'
+
+    polygon_edges = []
+    for i in range(12):
+        if i != 11:
+            polygon_edges.append((i, i + 1))
+        else:
+            polygon_edges.append((i, 0))
+
+    print(polygon_edges)
+
+    for edge in polygon_edges:
+        polygon.addGeometry(Part.LineSegment(
+            App.Vector(polygon_corners[edge[0]][0], polygon_corners[edge[0]][1], 0),
+            App.Vector(polygon_corners[edge[1]][0], polygon_corners[edge[1]][1], 0)),
+            False
+        )
+
+    fcdoc.recompute()
+
 
     #   6 sweep
+    fcdoc.addObject('Part::Sweep', 'beam')
+    sweep = fcdoc.getObject('beam')
+    sweep.Sections = polygon
+    sweep.Spine = line_1
+    sweep.Solid = True
+    sweep.Frenet = False
+
+    fcdoc.recompute()
+
+    # clean up sketch things
+    fcdoc.removeObject('line_path')
+    fcdoc.removeObject('cross_section')
+    fcdoc.recompute()
+
     # clean ups as postprocessing possible?
     # export to obj
 
