@@ -4,6 +4,7 @@ from sys import platform
 
 import Part
 import Mesh
+import importOBJ
 
 
 # import matplotlib.pyplot as plt
@@ -129,104 +130,128 @@ def bone_pose(bone):
 
 
 if __name__ == '__main__':
-    if platform == 'darwin':
-        path_1 = '/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
-        path_2 = '/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
-    else:
-        path_1 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
-        path_2 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/old_bone_15.obj'
 
-    # 1 get polygon corners
-    # hardcode_path as FC macro works on different directories and I don't care
+    segments: list = [f'intermediate_bone_{i}.obj' for i in range(0, 29)]
 
-    hardcode_path = path_1
-    print(hardcode_path)
+    for linefile in segments:
 
-    with open(hardcode_path, 'r') as f:
-        line = f.readlines()
-
-    polygon_corners, polygon_center = cornerpts(poly_params=line)
-
-    # 2 get bone line
-    hardcode_path = path_2
-    print(hardcode_path)
-    with open(hardcode_path, 'r') as f:
-        # read obj file
-        _ = f.readlines()
-
-    bone_dict = sketch_bone(objlines=_)
-    bone_dict = bone_pose(bone=bone_dict)
-
-    # store them on the fly? (for dodo, clean intersection at some point i guess)
-
-    # 3 set up FreeCAD "file"
-    App = FreeCAD
-    filename = 'beam_skeleton'
-    App.newDocument(filename)
-    fcdoc = App.getDocument(filename)
-    fcdoc.addObject('PartDesign::Body', 'Body')
-    fcdoc.recompute()
-
-    # loop starts here
-    #   4 sketch bone line
-    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
-    line_1 = fcdoc.getObject('line_path')
-    line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
-    line_1.MapMode = 'FlatFace'
-    line_1.addGeometry(Part.LineSegment(
-        App.Vector(0, 0, 0),
-        App.Vector(bone_dict['ax_bone'][0], bone_dict['ax_bone'][1], bone_dict['ax_bone'][2])),
-        False
-    )
-    fcdoc.recompute()
-
-    #   5 sketch polygon, move to where it should be
-    fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
-    polygon = fcdoc.getObject('cross_section')
-    polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
-    polygon.MapMode = 'FlatFace'
-
-    polygon_edges = []
-    for i in range(12):
-        if i != 11:
-            polygon_edges.append((i, i + 1))
+        if platform == 'darwin':
+            path_1 = '/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
         else:
-            polygon_edges.append((i, 0))
+            path_1 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
 
-    print(polygon_edges)
+        # 1 get polygon corners
+        # hardcode_path as FC macro works on different directories and I don't care
 
-    for edge in polygon_edges:
-        polygon.addGeometry(Part.LineSegment(
-            App.Vector(polygon_corners[edge[0]][0], polygon_corners[edge[0]][1], 0),
-            App.Vector(polygon_corners[edge[1]][0], polygon_corners[edge[1]][1], 0)),
+        hardcode_path = path_1
+        print(hardcode_path)
+
+        with open(hardcode_path, 'r') as f:
+            line = f.readlines()
+
+        polygon_corners, polygon_center = cornerpts(poly_params=line)
+
+        # 2 get bone line
+        hardcode_path = path_2
+        print(hardcode_path)
+        with open(hardcode_path, 'r') as f:
+            # read obj file
+            _ = f.readlines()
+
+        bone_dict = sketch_bone(objlines=_)
+        bone_dict = bone_pose(bone=bone_dict)
+
+        # store them on the fly? (for dodo, clean intersection at some point i guess)
+
+        # 3 set up FreeCAD "file"
+        App = FreeCAD
+        filename = 'beam_skeleton'
+        App.newDocument(filename)
+        fcdoc = App.getDocument(filename)
+        fcdoc.addObject('PartDesign::Body', 'Body')
+        fcdoc.recompute()
+
+        # loop starts here
+        #   4 sketch bone line
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
+        line_1 = fcdoc.getObject('line_path')
+        line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+        line_1.MapMode = 'FlatFace'
+        line_1.addGeometry(Part.LineSegment(
+            App.Vector(0, 0, 0),
+            App.Vector(bone_dict['ax_bone'][0], bone_dict['ax_bone'][1], bone_dict['ax_bone'][2])),
             False
         )
+        fcdoc.recompute()
 
-    fcdoc.recompute()
+        #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
+        polygon = fcdoc.getObject('cross_section')
+        polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
+        polygon.MapMode = 'FlatFace'
+
+        polygon_edges = []
+        for i in range(12):
+            if i != 11:
+                polygon_edges.append((i, i + 1))
+            else:
+                polygon_edges.append((i, 0))
+
+        print(polygon_edges)
+
+        for edge in polygon_edges:
+            polygon.addGeometry(Part.LineSegment(
+                App.Vector(polygon_corners[edge[0]][0], polygon_corners[edge[0]][1], 0),
+                App.Vector(polygon_corners[edge[1]][0], polygon_corners[edge[1]][1], 0)),
+                False
+            )
+
+        fcdoc.recompute()
 
 
-    #   6 sweep
-    fcdoc.addObject('Part::Sweep', 'beam')
-    sweep = fcdoc.getObject('beam')
-    sweep.Sections = polygon
-    sweep.Spine = line_1
-    sweep.Solid = True
-    sweep.Frenet = False
+        #   6 sweep
+        fcdoc.addObject('Part::Sweep', 'beam')
+        sweep = fcdoc.getObject('beam')
+        sweep.Sections = polygon
+        sweep.Spine = line_1
+        sweep.Solid = True
+        sweep.Frenet = False
 
-    sweep.Placement = App.Placement(App.Matrix(
-        bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
-        bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
-        bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
-        0, 0, 0, 1
-    ))
+        #  7.1 rotate
+        sweep.Placement = App.Placement(App.Matrix(
+            bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
+            bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
+            bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
+            0, 0, 0, 1
+        ))
+        fcdoc.recompute()
+
+        # 7.2 translate
+        sweep.Placement.move(App.Vector(
+            bone_dict['translate_start'][0],
+            bone_dict['translate_start'][1],
+            bone_dict['translate_start'][2]
+        ))
+        fcdoc.recompute()
+
+        # 8 export to obj
+        __objs__ = []
+        __objs__.append(fcdoc.getObject('beam'))
+        Mesh.export(__objs__, f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj')
+        del __objs__
+
+        # 9 clean up
+        App.closeDocument(filename)
 
 
-    fcdoc.recompute()
+
 
     # clean up sketch things
-    fcdoc.removeObject('line_path')
-    fcdoc.removeObject('cross_section')
-    fcdoc.recompute()
+    # fcdoc.removeObject('line_path')
+    # fcdoc.removeObject('cross_section')
+    # fcdoc.recompute()
 
     # clean ups as postprocessing possible?
     # export to obj
