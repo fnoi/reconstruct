@@ -1,4 +1,6 @@
 import os
+import pickle
+
 import numpy as np
 from sys import platform
 
@@ -131,16 +133,19 @@ def bone_pose(bone):
 
 if __name__ == '__main__':
 
-    segments: list = [f'intermediate_bone_{i}.obj' for i in range(0, 29)]
+    ids = [i for i in range(1, 30)]
+    segments = [f'intermediate_bone_{i}.obj' for i in ids]
 
-    for linefile in segments:
+    for linefile, no in zip(segments, ids):
 
         if platform == 'darwin':
-            path_1 = '/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
+            path_1 = f'/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
         else:
-            path_1 = 'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+            path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
 
         # 1 get polygon corners
         # hardcode_path as FC macro works on different directories and I don't care
@@ -220,13 +225,43 @@ if __name__ == '__main__':
         sweep.Frenet = False
 
         #  7.1 rotate
+        # sweep.Placement = App.Placement(App.Matrix(
+        #     bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
+        #     bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
+        #     bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
+        #     0, 0, 0, 1
+        # ))
+        # fcdoc.recompute()
+
+        sweep.Placement.move(App.Vector(- bone_dict['ax_bone'][0]/2, - bone_dict['ax_bone'][1]/2, - bone_dict['ax_bone'][2]/2))
+        fcdoc.recompute()
+
+
+        with open(path_3, 'rb') as f:
+            rotations = pickle.load(f)
+            rotation_pca = rotations['rot_mat_pca'].T
+            rotation_pcb = rotations['rot_mat_pcb'].T
+
         sweep.Placement = App.Placement(App.Matrix(
-            bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
-            bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
-            bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
+            rotation_pcb[0][0], rotation_pcb[0][1], rotation_pcb[0][2], 0,
+            rotation_pcb[1][0], rotation_pcb[1][1], rotation_pcb[1][2], 0,
+            rotation_pcb[2][0], rotation_pcb[2][1], rotation_pcb[2][2], 0,
             0, 0, 0, 1
         ))
         fcdoc.recompute()
+
+        sweep.Placement = App.Placement(App.Matrix(
+            rotation_pca[0][0], rotation_pca[0][1], rotation_pca[0][2], 0,
+            rotation_pca[1][0], rotation_pca[1][1], rotation_pca[1][2], 0,
+            rotation_pca[2][0], rotation_pca[2][1], rotation_pca[2][2], 0,
+            0, 0, 0, 1
+        ))
+        fcdoc.recompute()
+
+        sweep.Placement.move(App.Vector(bone_dict['ax_bone'][0]/2, bone_dict['ax_bone'][1]/2, bone_dict['ax_bone'][2]/2))
+        fcdoc.recompute()
+
+
 
         # 7.2 translate
         sweep.Placement.move(App.Vector(

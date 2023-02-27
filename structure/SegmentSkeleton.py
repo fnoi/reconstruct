@@ -24,7 +24,7 @@ class Skeleton:
 
     def to_obj(self, topic: str):
         for i, bone in enumerate(self.bones):
-            with open(f'{self.path}/{topic}_bone_{i}.obj', 'w') as f:
+            with open(f'{self.path}/{topic}_bone_{i + 1}.obj', 'w') as f:
                 f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
                         f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
                         f'l 1 2 \n')

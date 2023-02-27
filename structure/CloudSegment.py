@@ -4,7 +4,7 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 
-from tools.IO import points2txt, lines2obj
+from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors
 
 
@@ -112,6 +112,8 @@ class Segment(object):
         pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb)
         pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb)
 
+        cache_meta(data={'rot_mat_pca': self.rot_mat_pca, 'rot_mat_pcb': self.rot_mat_pcb},
+                   path=self.outpath, topic='rotations')
         lines2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
 
 

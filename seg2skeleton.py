@@ -15,38 +15,7 @@ if __name__ == '__main__':
     if not os.path.exists(skeleton.path):
         os.makedirs(skeleton.path)
 
-    segments: list = [
-        'beam_01',
-        'beam_02',
-        'beam_03',
-        'beam_04',
-        'beam_05',
-        'beam_06',
-        'beam_07',
-        'beam_08',
-        'beam_09',
-        'beam_10',
-        'beam_11',
-        'beam_12',
-        'beam_13',
-        'beam_14',
-        'beam_15',
-        'beam_16',
-        'beam_17',
-        'beam_18',
-        'beam_19',
-        'beam_20',
-        'beam_21',
-        'beam_22',
-        'beam_23',
-        'beam_24',
-        'beam_25',
-        'beam_26',
-        'beam_27',
-        'beam_28',
-        'beam_29',
-        'beam_30'
-    ]
+    segments: list = [f'beam_{i}' for i in range(1, 31)]
 
     for segment in segments:
         cloud = Segment(name=segment)
