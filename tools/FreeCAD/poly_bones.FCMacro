@@ -1,4 +1,5 @@
 import os
+import stat
 import pickle
 
 import numpy as np
@@ -142,10 +143,15 @@ if __name__ == '__main__':
             path_1 = f'/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
             path_3 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXO)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXU)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXG)
         else:
             path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
             path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
 
         # 1 get polygon corners
         # hardcode_path as FC macro works on different directories and I don't care
@@ -274,7 +280,7 @@ if __name__ == '__main__':
         # 8 export to obj
         __objs__ = []
         __objs__.append(fcdoc.getObject('beam'))
-        Mesh.export(__objs__, f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj')
+        Mesh.export(__objs__, path_4)
         del __objs__
 
         # 9 clean up

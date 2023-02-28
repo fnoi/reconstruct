@@ -3,6 +3,7 @@ import os
 import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
+import matplotlib.pyplot as plt
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors
@@ -133,7 +134,21 @@ class Segment(object):
         #points2txt(pointset=np.asarray(cleaned.points), path=self.outpath, topic='points_rot')
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
+        # plot points in xy iwth scatter
+        fig, ax = plt.subplots()
+        ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
+        ax.set_aspect('equal', 'box')
+        plt.show()
+
         return
+
+
+    def plot_flats(self):
+        """
+        plot the points in the xy plane in a scatter plot for each segment in subplot
+        """
+        a = 0
+
 
     def pc2obj(self, pc_type):
         if pc_type == 'initial':
