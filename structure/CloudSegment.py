@@ -105,14 +105,22 @@ class Segment(object):
         # rotation matrix to rotate the plane normal into the z-axis
         z_vec = np.array([0, 0, 1])
         y_vec = np.array([0, 1, 0])
+        x_vec = np.array([1, 0, 0])
 
-        self.rot_mat_pca = rotation_matrix_from_vectors(plane_normal, z_vec)
-        pcb_rot = np.dot(self.pcb, self.rot_mat_pca)
-        pcc_rot = np.dot(self.pcc, self.rot_mat_pca)
+
+        #here pcb_rot and pcc_rot needed?
+        self.rot_mat_pca = rotation_matrix_from_vectors(plane_normal, x_vec)
+        #added transposed because the rotation matrix is on the left of the vector
+        pca_rot = np.dot(self.pca,self.rot_mat_pca.T)
+        pcb_rot = np.dot(self.pcb, self.rot_mat_pca.T)
+        pcc_rot = np.dot(self.pcc, self.rot_mat_pca.T)
         self.rot_mat_pcb = rotation_matrix_from_vectors(pcb_rot, y_vec)
-        pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb)
-        pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb)
-
+        pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb.T)
+        pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb.T)
+        
+        # test
+        self.rot_mat_test=np.matmul(self.rot_mat_pca,self.rot_mat_pcb)
+        
         cache_meta(data={'rot_mat_pca': self.rot_mat_pca, 'rot_mat_pcb': self.rot_mat_pcb},
                    path=self.outpath, topic='rotations')
         lines2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
@@ -135,10 +143,10 @@ class Segment(object):
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
         # plot points in xy iwth scatter
-        fig, ax = plt.subplots()
-        ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
-        ax.set_aspect('equal', 'box')
-        plt.show()
+        # fig, ax = plt.subplots()
+        # ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
+        # ax.set_aspect('equal', 'box')
+        # plt.show()
 
         return
 

@@ -144,6 +144,15 @@ if __name__ == '__main__':
             path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
             path_3 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
             path_4 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXO)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXU)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXG)
+        # not sure if this is stable
+        elif platform == 'win32':
+            path_1 = f'D:/Uni/hiwi/reconstruct/data/first_beam.txt'
+            path_2 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'D:/Uni/hiwi/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
         else:
             path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
@@ -236,33 +245,26 @@ if __name__ == '__main__':
         # ))
         # fcdoc.recompute()
 
-        sweep.Placement.move(App.Vector(- bone_dict['ax_bone'][0]/2, - bone_dict['ax_bone'][1]/2, - bone_dict['ax_bone'][2]/2))
-        fcdoc.recompute()
-
 
         with open(path_3, 'rb') as f:
             rotations = pickle.load(f)
-            rotation_pca = rotations['rot_mat_pca'].T
-            rotation_pcb = rotations['rot_mat_pcb'].T
+            #not sure if inv and transpose is the same in this case
+            rotation_pca = np.linalg.inv(rotations['rot_mat_pca'])
+            rotation_pcb = np.linalg.inv(rotations['rot_mat_pcb'])
 
+		
+        rotation_all=np.matmul(rotation_pca,rotation_pcb)
+
+        # testing
+       
         sweep.Placement = App.Placement(App.Matrix(
-            rotation_pcb[0][0], rotation_pcb[0][1], rotation_pcb[0][2], 0,
-            rotation_pcb[1][0], rotation_pcb[1][1], rotation_pcb[1][2], 0,
-            rotation_pcb[2][0], rotation_pcb[2][1], rotation_pcb[2][2], 0,
+            rotation_all[0][0], rotation_all[0][1], rotation_all[0][2], 0,
+            rotation_all[1][0], rotation_all[1][1], rotation_all[1][2], 0,
+            rotation_all[2][0], rotation_all[2][1], rotation_all[2][2], 0,
             0, 0, 0, 1
         ))
         fcdoc.recompute()
 
-        sweep.Placement = App.Placement(App.Matrix(
-            rotation_pca[0][0], rotation_pca[0][1], rotation_pca[0][2], 0,
-            rotation_pca[1][0], rotation_pca[1][1], rotation_pca[1][2], 0,
-            rotation_pca[2][0], rotation_pca[2][1], rotation_pca[2][2], 0,
-            0, 0, 0, 1
-        ))
-        fcdoc.recompute()
-
-        sweep.Placement.move(App.Vector(bone_dict['ax_bone'][0]/2, bone_dict['ax_bone'][1]/2, bone_dict['ax_bone'][2]/2))
-        fcdoc.recompute()
 
 
 
@@ -274,6 +276,7 @@ if __name__ == '__main__':
         ))
         fcdoc.recompute()
 
+
         # 8 export to obj
         __objs__ = []
         __objs__.append(fcdoc.getObject('beam'))
@@ -282,7 +285,6 @@ if __name__ == '__main__':
 
         # 9 clean up
         App.closeDocument(filename)
-
 
 
 
