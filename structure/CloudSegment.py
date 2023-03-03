@@ -142,11 +142,11 @@ class Segment(object):
         #points2txt(pointset=np.asarray(cleaned.points), path=self.outpath, topic='points_rot')
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
-        # plot points in xy iwth scatter
-        # fig, ax = plt.subplots()
-        # ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
-        # ax.set_aspect('equal', 'box')
-        # plt.show()
+        #plot points in xy iwth scatter
+        fig, ax = plt.subplots()
+        ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
+        ax.set_aspect('equal', 'box')
+        plt.show()
 
         return
 
