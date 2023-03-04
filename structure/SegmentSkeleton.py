@@ -16,6 +16,9 @@ class Skeleton:
             if not os.path.exists(f'{self.path}/{in_type}'):
                 os.makedirs(f'{self.path}/{in_type}')
 
+        self.beams = False
+        self.pipes = False
+
         if 'beams' in types:
             self.beams = True
         if 'pipes' in types:
@@ -36,7 +39,8 @@ class Skeleton:
         self.bone_count += 1
 
     def add_bone(self, bone):
-        a = 0
+        self.bones.append(bone)
+        self.bone_count += 1
 
 
     def to_obj(self, topic: str):

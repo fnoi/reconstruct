@@ -17,6 +17,7 @@ class Segment(object):
         self.left_edit = False
         self.right = None
         self.right_edit = False
+        self.radius = None
         self.rot_mat_pcb = None
         self.rot_mat_pca = None
         self.pcc = None
