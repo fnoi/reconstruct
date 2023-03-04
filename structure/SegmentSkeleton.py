@@ -1,5 +1,6 @@
 import itertools
 import copy
+import os
 
 import numpy as np
 
@@ -7,21 +8,36 @@ from tools.geometry import warped_vectors_intersection
 
 
 class Skeleton:
-    def __init__(self, path: str):
+    def __init__(self, path: str, types: list):
         self.path = path
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+        for in_type in types:
+            if not os.path.exists(f'{self.path}/{in_type}'):
+                os.makedirs(f'{self.path}/{in_type}')
+
+        if 'beams' in types:
+            self.beams = True
+        if 'pipes' in types:
+            self.pipes = True
+
         self.bones = []
         self.threshold_distance_join = 1
         self.bone_count = 0
         self.joints_in = None
         self.joints_array = None
 
-    def add(self, cloud):
+    def add_cloud(self, cloud):
         self.bones.append(cloud)
         with open(f'{self.path}/fresh_bone_{self.bone_count}.obj', 'w') as f:
             f.write(f'v {cloud.left[0]} {cloud.left[1]} {cloud.left[2]} \n'
                     f'v {cloud.right[0]} {cloud.right[1]} {cloud.right[2]} \n'
                     f'l 1 2 \n')
         self.bone_count += 1
+
+    def add_bone(self, bone):
+        a = 0
+
 
     def to_obj(self, topic: str):
         for i, bone in enumerate(self.bones):
