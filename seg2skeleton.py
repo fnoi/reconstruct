@@ -23,24 +23,30 @@ if __name__ == '__main__':
             data = f.readlines()
             data = [line.strip().split(' ') for line in data]
             pipe_ind = -1
+            skeletons = []
             for line in data:
                 if int(line[0]) != pipe_ind:
-                    pipe_ind = int(line[0])
-                    seg = Segment(name=str(pipe_ind))
+                    skeleton_actual = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton', types=['pipes'])
+                    skeletons.append(skeleton_actual)
 
+                pipe_ind = int(line[0])
+                seg = Segment(name=str(pipe_ind))
 
                 seg.left = np.array([float(line[1]), float(line[2]), float(line[3])])
                 seg.right = np.array([float(line[4]), float(line[5]), float(line[6])])
                 seg.center = (seg.left + seg.right) / 2
                 seg.radius = float(line[7])
 
-            for ind in range(pipe_ind + 1):
-                skeleton.add_bone(seg)
+                skeleton_actual.add_bone(seg)
 
+
+            for skeleton in skeletons:
                 skeleton.find_joints()
                 skeleton.join_passing()
                 skeleton.join_on_passing()
                 skeleton.to_obj(topic='intermediate')
+
+                a = 0
 
     if skeleton.beams:
 
