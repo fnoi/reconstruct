@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # does skeleton need to be inside the loop actually?
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes'])  # beams
+                        types=['beams'])  # beams
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
