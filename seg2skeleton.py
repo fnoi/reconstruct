@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # does skeleton need to be inside the loop actually?
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes'])  # beams
+                        types=['beams'])  # beams
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
@@ -43,8 +43,8 @@ if __name__ == '__main__':
 
     if skeleton.beams:
 
-        segments: list = [f'beam_{i}' for i in range(1, 31)]
-
+        segment_files: list = [_ for _ in os.listdir(f'{str(os.getcwd())}/data/in_beam/')]
+        segments: list = [_[:-4] for _ in segment_files]
         for segment in segments:
             cloud = Segment(name=segment)
             cloud.load_from_txt(segment)
