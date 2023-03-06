@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # does skeleton need to be inside the loop actually?
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['beams'])  # beams
+                        types=['pipes'])  # beams
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
@@ -25,8 +25,9 @@ if __name__ == '__main__':
             pipe_ind = -1
             for line in data:
                 if int(line[0]) != pipe_ind:
-                    seg = Segment(name=str(pipe_ind))
                     pipe_ind = int(line[0])
+                    seg = Segment(name=str(pipe_ind))
+
 
                 seg.left = np.array([float(line[1]), float(line[2]), float(line[3])])
                 seg.right = np.array([float(line[4]), float(line[5]), float(line[6])])
