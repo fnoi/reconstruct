@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 if __name__ == '__main__':
 
     color_ind = 0
-    for file in os.listdir('C:/Users/ga25mal/OneDrive - TUM/2023_i3CE/data/semantic/'):
+    for file in os.listdir('C:/Users/ga25mal/OneDrive - TUM/2023_i3CE/data/instances/pipe/'):
     # for file in os.listdir('data/in/'):
 
         color = plt.cm.tab10(color_ind)
         color_rgb = [int(255 * c) for c in color[:3]]
 
-        with open(f'C:/Users/ga25mal/OneDrive - TUM/2023_i3CE/data/semantic/{file}', 'r') as f:
+        with open(f'C:/Users/ga25mal/OneDrive - TUM/2023_i3CE/data/instances/pipe/{file}', 'r') as f:
         # with open(f'data/in/{file}', 'r') as f:
             lines = f.readlines()
             # to np array
