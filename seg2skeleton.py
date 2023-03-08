@@ -41,10 +41,14 @@ if __name__ == '__main__':
 
 
             for i, skeleton in enumerate(skeletons):
+                # skeleton.potential = True
+                # while skeleton.potential:
+
+
                 skeleton.find_joints()
                 # skeleton.join_passing()
-                # skeleton.trim_passing()
-                skeleton.join_on_passing()
+                skeleton.trim_passing()
+                # skeleton.join_on_passing()
                 skeleton.to_obj(topic=f'store_{i}')
 
                 a = 0
