@@ -15,8 +15,10 @@ class Segment(object):
         self.intermediate_points = []
         self.left = None
         self.left_edit = False
+        self.left_joint = False
         self.right = None
         self.right_edit = False
+        self.right_joint = False
         self.radius = None
         self.rot_mat_pcb = None
         self.rot_mat_pca = None

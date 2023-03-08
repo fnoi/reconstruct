@@ -9,6 +9,7 @@ from tools.geometry import warped_vectors_intersection
 
 class Skeleton:
     def __init__(self, path: str, types: list):
+        self.potential = None
         self.path = path
         if not os.path.exists(self.path):
             os.makedirs(self.path)
@@ -63,12 +64,20 @@ class Skeleton:
                 self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case])  # KEY
 
     def join_on_passing(self):
+        log = 0
+        self.find_joints()
         self.joints2joint_array()
-        agenda = self.joints_array[self.joints_array[:, 2] == 0]
+        agenda = self.joints_array
         agenda = agenda[agenda[:, 3].argsort()]
         for joint in agenda:
-            passing = joint[0]
-            joining = joint[1]
+            if joint[2] == 0:
+                passing = joint[0]
+                joining = joint[1]
+            elif joint[2] == 1:
+                passing = joint[1]
+                joining = joint[0]
+            else:
+                continue
             dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
             dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
             if dist_left < dist_right:
@@ -77,17 +86,22 @@ class Skeleton:
                 else:
                     self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
                     self.bones[int(joining)].left_edit = True
+                    log += 1
             else:
                 if self.bones[int(joining)].right_edit:
                     continue
                 else:
                     self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
                     self.bones[int(joining)].right_edit = True
+                    log += 1
             self.bones[int(passing)].intermediate_points.append(joint[2])
-
+        if log == 0:
+            self.potential[0] = 1
         return
 
     def trim_passing(self):
+        log = 0
+        self.find_joints()
         self.joints2joint_array()
         agenda = self.joints_array[self.joints_array[:, 2] == 3]
         agenda = agenda[agenda[:, 3].argsort()]
@@ -104,6 +118,8 @@ class Skeleton:
                     else:
                         raise Exception('bone index out of range')
                     bone.left_edit = True
+                    log += 1
+
                 if protrusion_right < protrusion_left and protrusion_right < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.right_edit:
                     if i == 0:
                         bone.right = np.array([joint[7], joint[8], joint[9]])
@@ -112,10 +128,73 @@ class Skeleton:
                     else:
                         raise Exception('bone index out of range')
                     bone.right_edit = True
+                    log += 1
+                if log == 2:
+                    bone.left_joint = True
+                    bone.right_joint = True
+        if log == 0:
+            self.potential[1] = 1
         return
 
+    def join_passing_new(self):
+        log = 0
+        agenda = [1]
+        while len(agenda) > 0:
+            self.find_joints()
+            self.joints2joint_array()
+            agenda = self.joints_array[self.joints_array[:, 2] == 2]
+            agenda = agenda[agenda[:, 3].argsort()]
+            for joint in agenda:
+                bone_1 = self.bones[int(joint[0])]
+                bone_2 = self.bones[int(joint[1])]
+
+                # what are the relevant ends?
+                midpoint = np.array([joint[4], joint[5], joint[6]]) - np.array([joint[7], joint[8], joint[9]])
+                dists_1 = np.array([
+                    np.linalg.norm(bone_1.left - midpoint),
+                    np.linalg.norm(bone_1.right - midpoint)
+                ])
+                case_1 = np.argmin(dists_1)
+                dists_2 = np.array([
+                    np.linalg.norm(bone_2.left - midpoint),
+                    np.linalg.norm(bone_2.right - midpoint)
+                ])
+                case_2 = np.argmin(dists_2)
+
+                a=0
+
+                if np.linalg.norm(bone_1.left - np.array(joint[4], joint[5], joint[6])) <\
+                        np.linalg.norm(bone_1.right - np.array(joint[4], joint[5], joint[6])):
+                    bone_1_end = 'left'
+                    if bone_1.left_edit:
+                        continue
+                else:
+                    bone_1_end = 'right'
+                    if bone_1.right_edit:
+                        continue
+                if np.linalg.norm(bone_2.left - np.array(joint[7], joint[8], joint[9])) < np.linalg.norm(
+                        bone_2.right - np.array(joint[7], joint[8], joint[9])):
+                    bone_2_end = 'left'
+                    if bone_2.left_edit:
+                        continue
+                else:
+                    bone_2_end = 'right'
+                    if bone_2.right_edit:
+                        continue
+
+                a = 0
+
+
+
+
+
+
+
+
     def join_passing(self):
+        log = 0
         # find passing bones #TODO: implementation should pick up where we left off here
+        self.find_joints()
         self.joints2joint_array()
         # not sure if this is needed because case 0 will be handled by join_on_passing
         # passing = np.unique(
@@ -161,12 +240,14 @@ class Skeleton:
                             else:
                                 listdirection.append("left")
                                 self.bones[int(joints[iter])].left_edit = True
+                                log += 1
                         else:
                             if self.bones[int(joints[iter])].right_edit:
                                 break
                             else:
                                 listdirection.append("right")
                                 self.bones[int(joints[iter])].right_edit = True
+                                log += 1
 
                     # check if ther is a Z connection so every entry needs to be on the same side
                     dist0_left = np.linalg.norm(self.bones[int(joints[0])].left - np.array(
@@ -263,6 +344,10 @@ class Skeleton:
                     return
             agenda_backup = copy.deepcopy(agenda)
         # repeat until no more joints?
+        if log == 0:
+            self.potential[2] = 1
+        if len(agenda) == 0:
+            self.potential[2] = 1
         return
 
     def update_bones(self, cloud):

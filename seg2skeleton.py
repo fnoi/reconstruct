@@ -39,16 +39,18 @@ if __name__ == '__main__':
 
                 skeleton_actual.add_bone(seg)
 
-
             for i, skeleton in enumerate(skeletons):
-                # skeleton.potential = True
-                # while skeleton.potential:
-
-
-                skeleton.find_joints()
-                # skeleton.join_passing()
-                skeleton.trim_passing()
-                # skeleton.join_on_passing()
+                skeleton.potential = np.array([0, 0, 0])
+                counter = 0
+                while np.sum(skeleton.potential) < 3:
+                    print(f'Iteration {counter +1}')
+                    skeleton.join_passing_new()
+                    skeleton.trim_passing()
+                    skeleton.join_on_passing()
+                    print(skeleton.potential)
+                    counter += 1
+                    if counter > 10:
+                        break
                 skeleton.to_obj(topic=f'store_{i}')
 
                 a = 0
