@@ -40,11 +40,12 @@ if __name__ == '__main__':
                 skeleton_actual.add_bone(seg)
 
 
-            for skeleton in skeletons:
+            for i, skeleton in enumerate(skeletons):
                 skeleton.find_joints()
-                skeleton.join_passing()
+                # skeleton.join_passing()
+                # skeleton.trim_passing()
                 skeleton.join_on_passing()
-                skeleton.to_obj(topic='intermediate')
+                skeleton.to_obj(topic=f'store_{i}')
 
                 a = 0
 

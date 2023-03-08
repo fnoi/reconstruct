@@ -100,6 +100,11 @@ def warped_vectors_intersection(seg1, seg2):
         rating = np.max(np.asarray([rating1, rating2]))
         case = 2
 
+    # case 3: both segments continuous: intersecting
+    if check1 and check2:
+        rating = np.linalg.norm(bridgepoint1 - bridgepoint2)
+        case = 3
+
     if rating == 0 or rating > 0 is False:
     # if rating > 0 is False:
         rating = 1e8

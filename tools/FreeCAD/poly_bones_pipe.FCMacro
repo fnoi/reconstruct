@@ -10,7 +10,6 @@ import Mesh
 import importOBJ
 
 
-
 def sketch_bone(objlines):
     start = objlines[0].split(' ')[1:4]
     end = objlines[1].split(' ')[1:4]
@@ -26,6 +25,7 @@ def sketch_bone(objlines):
         'start': (x_start, y_start, z_start),
         'end': (x_end, y_end, z_end)
     }
+
 
 def bone_pose(bone):
     x_start = bone['start'][0]
@@ -164,7 +164,6 @@ if __name__ == '__main__':
 
         fcdoc.recompute()
 
-
         #   6 sweep
         fcdoc.addObject('Part::Sweep', 'beam')
         sweep = fcdoc.getObject('beam')
@@ -182,18 +181,16 @@ if __name__ == '__main__':
         # ))
         # fcdoc.recompute()
 
-
         with open(path_3, 'rb') as f:
             rotations = pickle.load(f)
-            #not sure if inv and transpose is the same in this case
+            # not sure if inv and transpose is the same in this case
             rotation_pca = np.linalg.inv(rotations['rot_mat_pca'])
             rotation_pcb = np.linalg.inv(rotations['rot_mat_pcb'])
 
-		
-        rotation_all=np.matmul(rotation_pca,rotation_pcb)
+        rotation_all = np.matmul(rotation_pca, rotation_pcb)
 
         # testing
-       
+
         sweep.Placement = App.Placement(App.Matrix(
             rotation_all[0][0], rotation_all[0][1], rotation_all[0][2], 0,
             rotation_all[1][0], rotation_all[1][1], rotation_all[1][2], 0,
@@ -201,9 +198,6 @@ if __name__ == '__main__':
             0, 0, 0, 1
         ))
         fcdoc.recompute()
-
-
-
 
         # 7.2 translate
         sweep.Placement.move(App.Vector(
@@ -213,7 +207,6 @@ if __name__ == '__main__':
         ))
         fcdoc.recompute()
 
-
         # 8 export to obj
         __objs__ = []
         __objs__.append(fcdoc.getObject('beam'))
@@ -222,8 +215,6 @@ if __name__ == '__main__':
 
         # 9 clean up
         App.closeDocument(filename)
-
-
 
     # clean up sketch things
     # fcdoc.removeObject('line_path')
