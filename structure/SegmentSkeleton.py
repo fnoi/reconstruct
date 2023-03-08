@@ -26,7 +26,7 @@ class Skeleton:
             self.pipes = True
 
         self.bones = []
-        self.threshold_distance_join = 1
+        self.threshold_distance_join = 0.5
         self.threshold_distance_trim = 0.2
         self.bone_count = 0
         self.joints_in = None
@@ -86,6 +86,7 @@ class Skeleton:
                 else:
                     self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
                     self.bones[int(joining)].left_edit = True
+                    print('did sth')
                     log += 1
             else:
                 if self.bones[int(joining)].right_edit:
@@ -93,6 +94,7 @@ class Skeleton:
                 else:
                     self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
                     self.bones[int(joining)].right_edit = True
+                    print('did sth')
                     log += 1
             self.bones[int(passing)].intermediate_points.append(joint[2])
         if log == 0:
@@ -118,6 +120,7 @@ class Skeleton:
                     else:
                         raise Exception('bone index out of range')
                     bone.left_edit = True
+                    print('did sth')
                     log += 1
 
                 if protrusion_right < protrusion_left and protrusion_right < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.right_edit:
@@ -128,6 +131,7 @@ class Skeleton:
                     else:
                         raise Exception('bone index out of range')
                     bone.right_edit = True
+                    print('did sth')
                     log += 1
                 if log == 2:
                     bone.left_joint = True
@@ -145,51 +149,56 @@ class Skeleton:
             agenda = self.joints_array[self.joints_array[:, 2] == 2]
             agenda = agenda[agenda[:, 3].argsort()]
             for joint in agenda:
-                bone_1 = self.bones[int(joint[0])]
-                bone_2 = self.bones[int(joint[1])]
 
                 # what are the relevant ends?
-                midpoint = np.array([joint[4], joint[5], joint[6]]) - np.array([joint[7], joint[8], joint[9]])
+                midpoint = np.array([joint[4], joint[5], joint[6]])\
+                           + (
+                                   np.array([joint[4], joint[5], joint[6]])
+                                   - np.array([joint[7], joint[8], joint[9]]))\
+                           / 2
+
                 dists_1 = np.array([
-                    np.linalg.norm(bone_1.left - midpoint),
-                    np.linalg.norm(bone_1.right - midpoint)
+                    np.linalg.norm(self.bones[int(joint[0])].left - midpoint),
+                    np.linalg.norm(self.bones[int(joint[0])].right - midpoint)
                 ])
-                case_1 = np.argmin(dists_1)
+                case_1 = np.argmin(dists_1)  # 0 = left, 1 = right
                 dists_2 = np.array([
-                    np.linalg.norm(bone_2.left - midpoint),
-                    np.linalg.norm(bone_2.right - midpoint)
+                    np.linalg.norm(self.bones[int(joint[1])].left - midpoint),
+                    np.linalg.norm(self.bones[int(joint[1])].right - midpoint)
                 ])
-                case_2 = np.argmin(dists_2)
+                case_2 = np.argmin(dists_2)  # 0 = left, 1 = right
 
-                a=0
-
-                if np.linalg.norm(bone_1.left - np.array(joint[4], joint[5], joint[6])) <\
-                        np.linalg.norm(bone_1.right - np.array(joint[4], joint[5], joint[6])):
-                    bone_1_end = 'left'
-                    if bone_1.left_edit:
-                        continue
-                else:
-                    bone_1_end = 'right'
-                    if bone_1.right_edit:
-                        continue
-                if np.linalg.norm(bone_2.left - np.array(joint[7], joint[8], joint[9])) < np.linalg.norm(
-                        bone_2.right - np.array(joint[7], joint[8], joint[9])):
-                    bone_2_end = 'left'
-                    if bone_2.left_edit:
-                        continue
-                else:
-                    bone_2_end = 'right'
-                    if bone_2.right_edit:
-                        continue
-
-                a = 0
-
-
-
-
-
-
-
+                if dists_1[case_1] < self.threshold_distance_trim and dists_2[case_2] < self.threshold_distance_trim:
+                    if case_1 == 0:
+                        if self.bones[int(joint[0])].left_edit:
+                            continue
+                        self.bones[int(joint[0])].left = midpoint
+                        self.bones[int(joint[0])].left_edit = True
+                        print('did sth')
+                    else:
+                        if self.bones[int(joint[0])].right_edit:
+                            continue
+                        self.bones[int(joint[0])].right = midpoint
+                        self.bones[int(joint[0])].right_edit = True
+                        print('did sth')
+                    if case_2 == 0:
+                        if self.bones[int(joint[1])].left_edit:
+                            continue
+                        self.bones[int(joint[1])].left = midpoint
+                        self.bones[int(joint[1])].left_edit = True
+                        print('did sth')
+                    else:
+                        if self.bones[int(joint[1])].right_edit:
+                            continue
+                        self.bones[int(joint[1])].right = midpoint
+                        self.bones[int(joint[1])].right_edit = True
+                        print('did sth')
+                    log += 1
+                    break
+            if log == 0:
+                self.potential[0] = 1
+                break
+        return
 
     def join_passing(self):
         log = 0

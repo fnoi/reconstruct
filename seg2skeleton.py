@@ -10,6 +10,7 @@ from structure.SegmentSkeleton import Skeleton
 from tools.geometry import warped_vectors_intersection, manipulate_skeleton
 from tools.IO import lines2obj
 from tools.utils import update_logbook_checklist
+from tools.test_plots import plot_test_in, plot_test_out
 
 if __name__ == '__main__':
 
@@ -19,9 +20,14 @@ if __name__ == '__main__':
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
-        with open(f'{str(os.getcwd())}/data/in_pipe/axis.txt', 'r') as f:
+        pth = f'{str(os.getcwd())}/data/test/test_2.txt'
+        with open(pth, 'r') as f:
+            test = True
+        # with open(f'{str(os.getcwd())}/data/in_pipe/axis.txt', 'r') as f:
             data = f.readlines()
             data = [line.strip().split(' ') for line in data]
+            if test:
+                plot_test_in(data, pth)
             pipe_ind = -1
             skeletons = []
             for line in data:
@@ -42,15 +48,17 @@ if __name__ == '__main__':
             for i, skeleton in enumerate(skeletons):
                 skeleton.potential = np.array([0, 0, 0])
                 counter = 0
-                while np.sum(skeleton.potential) < 3:
+                while np.sum(skeleton.potential) < 1: #testing !
                     print(f'Iteration {counter +1}')
                     skeleton.join_passing_new()
-                    skeleton.trim_passing()
-                    skeleton.join_on_passing()
+                    # skeleton.trim_passing()
+                    # skeleton.join_on_passing()
                     print(skeleton.potential)
                     counter += 1
                     if counter > 10:
                         break
+                if test:
+                    plot_test_out(skeleton, pth)
                 skeleton.to_obj(topic=f'store_{i}')
 
                 a = 0
