@@ -109,6 +109,8 @@ def warped_vectors_intersection(seg1, seg2):
     # if rating > 0 is False:
         rating = 1e8
 
+    print(case)
+
     return bridgepoint1, bridgepoint2, rating, case
 
 

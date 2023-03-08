@@ -20,10 +20,10 @@ if __name__ == '__main__':
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
-        pth = f'{str(os.getcwd())}/data/test/test_2.txt'
+        pth = f'{str(os.getcwd())}/data/in_pipe/axis.txt'
+        # pth = f'{str(os.getcwd())}/data/test/test_x.txt'
         with open(pth, 'r') as f:
-            test = True
-        # with open(f'{str(os.getcwd())}/data/in_pipe/axis.txt', 'r') as f:
+            test = False
             data = f.readlines()
             data = [line.strip().split(' ') for line in data]
             if test:
@@ -48,11 +48,11 @@ if __name__ == '__main__':
             for i, skeleton in enumerate(skeletons):
                 skeleton.potential = np.array([0, 0, 0])
                 counter = 0
-                while np.sum(skeleton.potential) < 1: #testing !
+                while np.sum(skeleton.potential) < 3: #testing is 1 !
                     print(f'Iteration {counter +1}')
                     skeleton.join_passing_new()
-                    # skeleton.trim_passing()
-                    # skeleton.join_on_passing()
+                    skeleton.trim_passing()
+                    skeleton.join_on_passing()
                     print(skeleton.potential)
                     counter += 1
                     if counter > 10:

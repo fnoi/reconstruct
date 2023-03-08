@@ -108,34 +108,77 @@ class Skeleton:
         agenda = self.joints_array[self.joints_array[:, 2] == 3]
         agenda = agenda[agenda[:, 3].argsort()]
         for joint in agenda:
-            for i in [0, 1]:
-                bone = self.bones[i]
-                protrusion_left = np.linalg.norm(bone.left - np.array([joint[4], joint[5], joint[6]]))
-                protrusion_right = np.linalg.norm(bone.right - np.array([joint[4], joint[5], joint[6]]))
-                if protrusion_left < protrusion_right and protrusion_left < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.left_edit:
-                    if i == 0:
-                        bone.left = np.array([joint[7], joint[8], joint[9]])
-                    elif i == 1:
-                        bone.left = np.array([joint[4], joint[5], joint[6]])
-                    else:
-                        raise Exception('bone index out of range')
-                    bone.left_edit = True
+            # trim both
+            protrusions_1 = np.array([
+                np.linalg.norm(self.bones[int(joint[0])].left - np.array([joint[4], joint[5], joint[6]])),
+                np.linalg.norm(self.bones[int(joint[0])].right - np.array([joint[4], joint[5], joint[6]]))
+            ])
+            case_1 = np.argmin(protrusions_1)
+            protrusions_2 = np.array([
+                np.linalg.norm(self.bones[int(joint[1])].left - np.array([joint[4], joint[5], joint[6]])),
+                np.linalg.norm(self.bones[int(joint[1])].right - np.array([joint[4], joint[5], joint[6]]))
+            ])
+            case_2 = np.argmin(protrusions_2)
+            if protrusions_1[case_1] < self.threshold_distance_trim and protrusions_2[
+                case_2] < self.threshold_distance_trim:
+                midpoint = np.array([joint[4], joint[5], joint[6]]) + np.array(
+                    np.array([joint[7], joint[8], joint[9]]) - np.array([joint[4], joint[5], joint[6]])
+                ) / 2
+
+                if case_1 == 0:
+                    self.bones[int(joint[0])].left = midpoint
+                    self.bones[int(joint[0])].left_edit = True
+                    print('did sth')
+                    log += 1
+                else:
+                    self.bones[int(joint[0])].right = midpoint
+                    self.bones[int(joint[0])].right_edit = True
+                    print('did sth')
+                    log += 1
+                if case_2 == 0:
+                    self.bones[int(joint[1])].left = midpoint
+                    self.bones[int(joint[1])].left_edit = True
+                    print('did sth')
+                    log += 1
+                else:
+                    self.bones[int(joint[1])].right = midpoint
+                    self.bones[int(joint[1])].right_edit = True
                     print('did sth')
                     log += 1
 
-                if protrusion_right < protrusion_left and protrusion_right < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.right_edit:
-                    if i == 0:
-                        bone.right = np.array([joint[7], joint[8], joint[9]])
-                    elif i == 1:
-                        bone.right = np.array([joint[4], joint[5], joint[6]])
-                    else:
-                        raise Exception('bone index out of range')
-                    bone.right_edit = True
-                    print('did sth')
-                    log += 1
-                if log == 2:
-                    bone.left_joint = True
-                    bone.right_joint = True
+            else:
+
+
+                # trim one
+                for i in [0, 1]:
+                    bone = self.bones[i]
+                    protrusion_left = np.linalg.norm(bone.left - np.array([joint[4], joint[5], joint[6]]))
+                    protrusion_right = np.linalg.norm(bone.right - np.array([joint[4], joint[5], joint[6]]))
+
+                    if protrusion_left < protrusion_right and protrusion_left < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.left_edit:
+                        if i == 0:
+                            bone.left = np.array([joint[7], joint[8], joint[9]])
+                        elif i == 1:
+                            bone.left = np.array([joint[4], joint[5], joint[6]])
+                        else:
+                            raise Exception('bone index out of range')
+                        bone.left_edit = True
+                        print('did sth')
+                        log += 1
+
+                    if protrusion_right < protrusion_left and protrusion_right < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.right_edit:
+                        if i == 0:
+                            bone.right = np.array([joint[7], joint[8], joint[9]])
+                        elif i == 1:
+                            bone.right = np.array([joint[4], joint[5], joint[6]])
+                        else:
+                            raise Exception('bone index out of range')
+                        bone.right_edit = True
+                        print('did sth')
+                        log += 1
+                    if log == 2:
+                        bone.left_joint = True
+                        bone.right_joint = True
         if log == 0:
             self.potential[1] = 1
         return
