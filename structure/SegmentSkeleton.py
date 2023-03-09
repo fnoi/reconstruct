@@ -183,7 +183,7 @@ class Skeleton:
             self.potential[1] = 1
         return
 
-    def join_passing_new(self):
+    def join_passing_new(self):  #TODO: should start with only real passings... and finally join non-passings
         log = 0
         agenda = [1]
         count = 0
