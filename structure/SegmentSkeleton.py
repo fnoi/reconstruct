@@ -26,8 +26,8 @@ class Skeleton:
             self.pipes = True
 
         self.bones = []
-        self.threshold_distance_join = 0.5
-        self.threshold_distance_trim = 0.2
+        self.threshold_distance_join = 1
+        self.threshold_distance_trim = 0.4
         self.bone_count = 0
         self.joints_in = None
         self.joints_array = None
@@ -186,7 +186,9 @@ class Skeleton:
     def join_passing_new(self):
         log = 0
         agenda = [1]
+        count = 0
         while len(agenda) > 0:
+            count += 1
             self.find_joints()
             self.joints2joint_array()
             agenda = self.joints_array[self.joints_array[:, 2] == 2]
@@ -238,6 +240,8 @@ class Skeleton:
                         print('did sth')
                     log += 1
                     break
+            if count > 5:
+                break
             if log == 0:
                 self.potential[0] = 1
                 break

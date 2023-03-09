@@ -3,7 +3,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
+
+def cloud_to_rgb():
 
     color_ind = 0
     for file in os.listdir('C:/Users/ga25mal/OneDrive - TUM/2023_i3CE/data/instances/pipe/'):
@@ -29,3 +30,12 @@ if __name__ == '__main__':
         color_ind += 1
         if color_ind > 9:
             color_ind = 0
+
+def obj_to_rgb():
+
+    color_ind = 0
+    for file in os.listdir('data/out/'):
+
+
+if __name__ == '__main__':
+    cloud_to_rgb()

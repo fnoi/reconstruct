@@ -47,19 +47,31 @@ if __name__ == '__main__':
 
             for i, skeleton in enumerate(skeletons):
                 skeleton.potential = np.array([0, 0, 0])
-                counter = 0
-                while np.sum(skeleton.potential) < 3: #testing is 1 !
-                    print(f'Iteration {counter +1}')
-                    skeleton.join_passing_new()
-                    skeleton.trim_passing()
-                    skeleton.join_on_passing()
-                    print(skeleton.potential)
-                    counter += 1
-                    if counter > 10:
-                        break
+                # counter = 0
+                # while np.sum(skeleton.potential) < 3: #testing is 1 !
+                #     print(f'Iteration {counter +1}')
+                #     skeleton.trim_passing()
+                #     skeleton.join_passing_new()
+                #     skeleton.join_on_passing()
+                #     print(skeleton.potential)
+                #     counter += 1
+                #     if counter > 10:
+                #         break
+
+                skeleton.join_passing_new()
+                skeleton.join_on_passing()
+                skeleton.trim_passing()
+
+                # print('in 1')
+                # skeleton.trim_passing()
+                # print('in 2')
+                # skeleton.join_passing_new()
+                # print('in 3')
+                # skeleton.join_on_passing()
+
                 if test:
                     plot_test_out(skeleton, pth)
-                skeleton.to_obj(topic=f'store_{i}')
+                skeleton.to_obj(topic=f'store_pipe{i}')
 
                 a = 0
 
@@ -82,7 +94,27 @@ if __name__ == '__main__':
             cloud.pc2obj(pc_type='initial')
             skeleton.add_cloud(cloud)
 
-        skeleton.find_joints()
-        skeleton.join_passing()
+        skeleton.potential = np.array([0, 0, 0])
+        # counter = 0
+        # while np.sum(skeleton.potential) < 3:  # testing is 1 !
+        #     print(f'Iteration {counter + 1}')
+        #     skeleton.trim_passing()
+        #     skeleton.join_passing_new()
+        #     skeleton.join_on_passing()
+        #     print(skeleton.potential)
+        #     counter += 1
+        #     if counter > 10:
+        #         break
+
+        skeleton.join_passing_new()
         skeleton.join_on_passing()
-        skeleton.to_obj(topic='intermediate')
+        skeleton.trim_passing()
+
+        # print('in 1')
+        # skeleton.trim_passing()
+        # print('in 2')
+        # skeleton.join_passing_new()
+        # print('in 3')
+        # skeleton.join_on_passing()
+
+        skeleton.to_obj(topic=f'store_beam')
