@@ -44,12 +44,18 @@ class Skeleton:
         self.bones.append(bone)
         self.bone_count += 1
 
-    def to_obj(self, topic: str):
+    def to_obj(self, topic: str, radius: bool=False):
         for i, bone in enumerate(self.bones):
             with open(f'{self.path}/{topic}_bone_{i + 1}.obj', 'w') as f:
-                f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
-                        f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
-                        f'l 1 2 \n')
+                if radius:
+                    f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
+                            f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
+                            f'l 1 2 \n'
+                            f'# radius: {bone.radius} \n')
+                else:
+                    f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
+                            f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
+                            f'l 1 2 \n')
 
     def find_joints(self):
         all_joints = list(itertools.combinations(range(len(self.bones)), 2))

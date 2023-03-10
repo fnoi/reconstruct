@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     # does skeleton need to be inside the loop actually?
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes', 'beams'])  # beams
+                        types=['pipes'])  # beams
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
@@ -45,6 +45,10 @@ if __name__ == '__main__':
 
                 skeleton_actual.add_bone(seg)
 
+            mean_radius = np.mean([skeleton_actual.bones[i].radius for i in range(len(skeleton_actual.bones))])
+            for _ in skeleton_actual.bones:
+                _.radius = mean_radius
+
             for i, skeleton in enumerate(skeletons):
                 skeleton.potential = np.array([0, 0, 0])
                 # counter = 0
@@ -71,12 +75,12 @@ if __name__ == '__main__':
 
                 if test:
                     plot_test_out(skeleton, pth)
-                skeleton.to_obj(topic=f'store_pipe{i}')
+                skeleton.to_obj(topic=f'store_pipe{i}', radius=True)
 
                 a = 0
 
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes', 'beams'])  # beams
+                        types=['pipes'])  # beams
 
     if skeleton.beams:
 

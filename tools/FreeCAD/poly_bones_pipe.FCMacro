@@ -5,9 +5,9 @@ import pickle
 import numpy as np
 from sys import platform
 
-import Part
-import Mesh
-import importOBJ
+# import Part
+# import Mesh
+# import importOBJ
 
 
 def sketch_bone(objlines):
@@ -91,13 +91,35 @@ if __name__ == '__main__':
         #     path_3 = f'D:/Uni/hiwi/reconstruct/data/out/beam_{no}/rotations.pickle'
         #     path_4 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
         else:
-            path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
-            path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
-            path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
-            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            path_0 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out_pipe/'
+            path_hack = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out_pipe/sweep_pipe.txt'
 
-        # 1 get polygon corners
         # hardcode_path as FC macro works on different directories and I don't care
+        # TODO: the following is an attempt to robustly load the objs while identifying the passing, connected pipes. for now cardcoded
+        # dict = {}
+        # for objfile in os.listdir(path_0):
+        #     if objfile.endswith('obj'):
+        #         inst_l0 = objfile[10]
+        #         inst_l1 = objfile[17]
+        #         with open(path_0 + objfile, 'r') as f:
+        #             # read obj file
+        #             objlines = f.readlines()
+        #             # read x y z as floats
+        #             x0, y0, z0 = [float(i) for i in objlines[0].split(' ')[1:4]]
+        #             x1, y1, z1 = [float(i) for i in objlines[1].split(' ')[1:4]]
+        #             lr = [inst_l1, [x0, y0, z0], [x1, y1, z1]]
+        #             if inst_l0 in dict:
+        #                 dict[inst_l0].append(lr)
+        #             else:
+        #                 dict[inst_l0] = [lr]
+        with open(path_hack, 'r') as f:
+            # read obj file
+            objlines = f.readlines()
+            # read x y z as floats
+
+
+
+        a = 0
 
         hardcode_path = path_1
         print(hardcode_path)
