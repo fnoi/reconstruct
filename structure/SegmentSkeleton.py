@@ -59,15 +59,28 @@ class Skeleton:
                     continue
                 else:
                     self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
+                    bone=self.bones[int(joining)]
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
                     self.bones[int(joining)].left_edit = True
             else:
                 if self.bones[int(joining)].right_edit:
                     continue
                 else:
                     self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
+                    bone=self.bones[int(joining)]
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
                     self.bones[int(joining)].right_edit = True
             self.bones[int(passing)].intermediate_points.append(joint[2])
             
+            
+        for iter in self.bones:
+            iter.left_edit=False
+            iter.right_edit=False
+            
+        self.find_joints()
+        self.joints2joint_array()
         agenda = self.joints_array[self.joints_array[:, 2] == 1]
         agenda = agenda[agenda[:, 3].argsort()]
         for joint in agenda:
@@ -89,18 +102,11 @@ class Skeleton:
                     self.bones[int(joining)].right_edit = True
             self.bones[int(passing)].intermediate_points.append(joint[2])
             
-
         return
 
     def join_passing(self):
-        # find passing bones #TODO: implementation should pick up where we left off here
+        self.find_joints()
         self.joints2joint_array()
-        # not sure if this is needed because case 0 will be handled by join_on_passing
-        # passing = np.unique(
-        #     np.hstack(
-        #         (np.where(self.joints_array[:, 2] == 0), np.where(self.joints_array[:, 2] == 1))
-        #     )
-        # )
         agenda = self.joints_array[self.joints_array[:, 2] == 2]
         agenda = agenda[agenda[:, 0].argsort()]
         # reapeat the agenda until no more solution is found
@@ -113,10 +119,13 @@ class Skeleton:
                 toremove=[]
                 joints = [int(agenda[i][0]),int(agenda[i][1])]
                 j=1
-                if i<len(agenda)-1:
+                if i+j<len(agenda):
                     while agenda[i+j][0]==agenda[i][0]:
                         joints.append(int(agenda[i+j][1]))
                         j+=1
+                        if i+j>=len(agenda):
+                            break
+                        
                 listdirection=[]
 
                 for iter in range(len(joints)-1):
@@ -211,10 +220,16 @@ class Skeleton:
                 # *2 because of the mean of midpoint
                 midpoint=midpoint/(count*2)
                 for iter in range(len(joints)):
+                    bone=self.bones[int(joints[iter])]
                     if listdirection[iter]=="left":
-                        self.bones[int(joints[iter])].left=midpoint
+                        bone.left=midpoint
                     else:
-                        self.bones[int(joints[iter])].right=midpoint
+                        bone.right=midpoint
+                        
+                    # need to update the bones properties 
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
+                    
                 # set connection point as middel
                 # join the most prominent
                 for iter in np.unique(joints):
@@ -226,10 +241,8 @@ class Skeleton:
             for iter in self.bones:
                 iter.left_edit=False
                 iter.right_edit=False
-            # need to update the bones properties 
-            for iter in self.bones:
-                iter.pca=(iter.right-iter.left)/np.linalg.norm(iter.right-iter.left)
-                iter.center=(iter.right-iter.left)/2
+
+
                 
             # re-calc joints and dists
             self.find_joints()
