@@ -135,7 +135,7 @@ def bone_pose(bone):
 if __name__ == '__main__':
 
     ids = [i for i in range(1, 30)]
-    segments = [f'intermediate_bone_{i}.obj' for i in ids]
+    segments = [f'store_beam_bone_{i}.obj' for i in ids]
 
     for linefile, no in zip(segments, ids):
 
@@ -157,7 +157,7 @@ if __name__ == '__main__':
             path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
             path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
             path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
-            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/store_beam_bone_{linefile}.obj'
 
         # 1 get polygon corners
         # hardcode_path as FC macro works on different directories and I don't care

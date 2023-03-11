@@ -71,6 +71,10 @@ class Segment(object):
         self.pcb = pc[1][:, 1]
         self.pcc = pc[1][:, 2]
 
+    def recompute_pca(self):
+        self.pca = self.left - self.right
+
+
     def transform_clean(self):
         """
         calculate projections, rotation matrices, meta information for skeleton
@@ -124,8 +128,8 @@ class Segment(object):
         # test
         self.rot_mat_test=np.matmul(self.rot_mat_pca,self.rot_mat_pcb)
         
-        cache_meta(data={'rot_mat_pca': self.rot_mat_pca, 'rot_mat_pcb': self.rot_mat_pcb},
-                   path=self.outpath, topic='rotations')
+        # cache_meta(data={'rot_mat_pca': self.rot_mat_pca, 'rot_mat_pcb': self.rot_mat_pcb},
+        #            path=self.outpath, topic='rotations')
         lines2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
 
 

@@ -7,8 +7,8 @@ import numpy as np
 
 from structure.CloudSegment import Segment
 from structure.SegmentSkeleton import Skeleton
-from tools.geometry import warped_vectors_intersection, manipulate_skeleton
-from tools.IO import lines2obj
+from tools.geometry import warped_vectors_intersection, manipulate_skeleton, rotation_matrix_from_vectors
+from tools.IO import lines2obj, cache_meta
 from tools.utils import update_logbook_checklist
 from tools.test_plots import plot_test_in, plot_test_out
 
@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
     # does skeleton need to be inside the loop actually?
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes'])  # beams
+                        types=['beams'])  # beams
 
     # pretty lost, import pipe data here according to convention
     if skeleton.pipes:
@@ -80,7 +80,7 @@ if __name__ == '__main__':
                 a = 0
 
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['pipes'])  # beams
+                        types=['beams'])  # beams
 
     if skeleton.beams:
 
@@ -110,7 +110,8 @@ if __name__ == '__main__':
         #     if counter > 10:
         #         break
 
-        skeleton.join_passing_new()
+        # skeleton.join_passing_new()
+        skeleton.join_passing()
         skeleton.join_on_passing()
         skeleton.trim_passing()
 
@@ -122,3 +123,11 @@ if __name__ == '__main__':
         # skeleton.join_on_passing()
 
         skeleton.to_obj(topic=f'store_beam')
+        for bone in skeleton.bones:
+            # bone.recompute_pca()
+            x_vec = np.array([1, 0, 0])
+
+            # here pcb_rot and pcc_rot needed?
+            bone.rot_mat_pca = rotation_matrix_from_vectors(bone.pca, x_vec)
+            cache_meta(data={'rot_mat_pca': bone.rot_mat_pca, 'rot_mat_pcb': bone.rot_mat_pcb},
+                       path=bone.outpath, topic='rotations')
