@@ -61,7 +61,9 @@ class Skeleton:
         all_joints = list(itertools.combinations(range(len(self.bones)), 2))
         self.joints_in = []
         for joint in all_joints:
+
             # calculate distance
+            # here the error of not converging is "create"
             bridgepoint1, bridgepoint2, rating, case = warped_vectors_intersection(
                 self.bones[joint[0]],
                 self.bones[joint[1]])
@@ -73,17 +75,11 @@ class Skeleton:
         log = 0
         self.find_joints()
         self.joints2joint_array()
-        agenda = self.joints_array
+        agenda = self.joints_array[self.joints_array[:, 2] == 0]
         agenda = agenda[agenda[:, 3].argsort()]
         for joint in agenda:
-            if joint[2] == 0:
-                passing = joint[0]
-                joining = joint[1]
-            elif joint[2] == 1:
-                passing = joint[1]
-                joining = joint[0]
-            else:
-                continue
+            passing = joint[0]
+            joining = joint[1]
             dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
             dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
             if dist_left < dist_right:
@@ -91,6 +87,9 @@ class Skeleton:
                     continue
                 else:
                     self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
+                    bone=self.bones[int(joining)]
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
                     self.bones[int(joining)].left_edit = True
                     print('did sth')
                     log += 1
@@ -99,10 +98,42 @@ class Skeleton:
                     continue
                 else:
                     self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
+                    bone=self.bones[int(joining)]
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
                     self.bones[int(joining)].right_edit = True
                     print('did sth')
                     log += 1
             self.bones[int(passing)].intermediate_points.append(joint[2])
+
+
+        for iter in self.bones:
+            iter.left_edit=False
+            iter.right_edit=False
+
+        self.find_joints()
+        self.joints2joint_array()
+        agenda = self.joints_array[self.joints_array[:, 2] == 1]
+        agenda = agenda[agenda[:, 3].argsort()]
+        for joint in agenda:
+            passing = joint[1]
+            joining = joint[0]
+            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[7], joint[8], joint[9]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[7], joint[8], joint[9]]))
+            if dist_left < dist_right:
+                if self.bones[int(joining)].left_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].left = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].left_edit = True
+            else:
+                if self.bones[int(joining)].right_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].right = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].right_edit = True
+            self.bones[int(passing)].intermediate_points.append(joint[2])
+
         if log == 0:
             self.potential[0] = 1
         return
@@ -254,39 +285,31 @@ class Skeleton:
         return
 
     def join_passing(self):
+        self.find_joints()
         log = 0
         # find passing bones #TODO: implementation should pick up where we left off here
-        self.find_joints()
         self.joints2joint_array()
-        # not sure if this is needed because case 0 will be handled by join_on_passing
-        # passing = np.unique(
-        #     np.hstack(
-        #         (np.where(self.joints_array[:, 2] == 0), np.where(self.joints_array[:, 2] == 1))
-        #     )
-        # )
         agenda = self.joints_array[self.joints_array[:, 2] == 2]
         agenda = agenda[agenda[:, 0].argsort()]
         # reapeat the agenda until no more solution is found
-
-        # 
-        agenda_backup = []
-        while len(agenda) != 0:
-
-            joints = []
-            # skip iterations in agenda if more points are on the same connections
-            skipping = 0
+        
+        while len(agenda)!=0:
+            joints=[]
             # remove tuppel where one side is already moved
             toremove = []
             for i in range(len(agenda)):
 
-                toremove = []
-                joints = [int(agenda[i][0]), int(agenda[i][1])]
-                j = 1
-                if i < len(agenda) - 1:
-                    while agenda[i + j][0] == agenda[i][0]:
-                        joints.append(int(agenda[i + j][1]))
-                        j += 1
-                listdirection = []
+                toremove=[]
+                joints = [int(agenda[i][0]),int(agenda[i][1])]
+                j=1
+                if i+j<len(agenda):
+                    while agenda[i+j][0]==agenda[i][0]:
+                        joints.append(int(agenda[i+j][1]))
+                        j+=1
+                        if i+j>=len(agenda):
+                            break
+
+                listdirection=[]
 
                 for iter in range(len(joints) - 1):
                     # find right/left for both bones to calc midpoint
@@ -317,33 +340,42 @@ class Skeleton:
                     dist0_right = np.linalg.norm(self.bones[int(joints[0])].right - np.array(
                         [agenda[i + iter][4], agenda[i + iter][5], agenda[i + iter][6]]))
 
-                    dist_left = np.linalg.norm(self.bones[int(joints[iter + 1])].left - np.array(
-                        [agenda[i + iter][7], agenda[i + iter][8], agenda[i + iter][9]]))
-                    dist_right = np.linalg.norm(self.bones[int(joints[iter + 1])].right - np.array(
-                        [agenda[i + iter][7], agenda[i + iter][8], agenda[i + iter][9]]))
+                    dist_left = np.linalg.norm(self.bones[int(joints[iter+1])].left - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
+                    dist_right = np.linalg.norm(self.bones[int(joints[iter+1])].right - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
 
+                    # adding directions
                     if dist0_left < dist0_right:
-                        if listdirection[0] == "right" or self.bones[int(joints[iter + 1])].left_edit:
-                            if listdirection[0] == "right":
-                                toremove.append(joints[iter])
+                        if listdirection[0]=="right":
+                            toremove.append(joints[iter+1])
                             continue
                         else:
-                            if dist_left < dist_right:
+                            if dist_left<dist_right:
+                                if self.bones[int(joints[iter+1])].left_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("left")
                                 self.bones[int(joints[iter + 1])].left_edit = True
                             else:
+                                if self.bones[int(joints[iter+1])].right_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("right")
                                 self.bones[int(joints[iter + 1])].right_edit = True
                     else:
-                        if listdirection[0] == "left" or self.bones[int(joints[iter + 1])].right_edit:
-                            if listdirection[0] == "left":
-                                toremove.append(joints[iter + 1])
+                        if listdirection[0]=="left":
+                            toremove.append(joints[iter+1])
                             continue
                         else:
-                            if dist_left < dist_right:
+                            if dist_left<dist_right:
+                                if self.bones[int(joints[iter+1])].left_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("left")
                                 self.bones[int(joints[iter + 1])].left_edit = True
                             else:
+                                if self.bones[int(joints[iter+1])].right_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("right")
                                 self.bones[int(joints[iter + 1])].right_edit = True
 
@@ -378,10 +410,16 @@ class Skeleton:
                 # *2 because of the mean of midpoint
                 midpoint = midpoint / (count * 2)
                 for iter in range(len(joints)):
-                    if listdirection[iter] == "left":
-                        self.bones[int(joints[iter])].left = midpoint
+                    bone=self.bones[int(joints[iter])]
+                    if listdirection[iter]=="left":
+                        bone.left=midpoint
                     else:
-                        self.bones[int(joints[iter])].right = midpoint
+                        bone.right=midpoint
+
+                    # need to update the bones properties
+                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
+                    bone.center=(bone.right+bone.left)/2
+
                 # set connection point as middel
                 # join the most prominent
                 for iter in np.unique(joints):
@@ -389,22 +427,20 @@ class Skeleton:
 
             # reset edit that next iteration can modify them again
             for iter in self.bones:
-                iter.left_edit = False
-                iter.right_edit = False
+                iter.left_edit=False
+                iter.right_edit=False
+
+
+
             # re-calc joints and dists
             self.find_joints()
             self.joints2joint_array()
             agenda = self.joints_array[self.joints_array[:, 2] == 2]
             agenda = agenda[agenda[:, 0].argsort()]
             # remove all entrys where the bridge points are "identical"
-            # need to add tolerance because the values are nearly identical but it seems that some calc are in between
-            agenda = [x for x in agenda if
-                      not np.allclose(np.array([x[4], x[5], x[6]]), np.array([x[7], x[8], x[9]]), rtol=1e-2)]
-            # if the solution is not convercing -> break
-            if len(agenda) == len(agenda_backup):
-                if np.allclose(agenda, agenda_backup):
-                    return
-            agenda_backup = copy.deepcopy(agenda)
+            # need to add tolerance because the values are nearly identical
+            agenda = [x for x in agenda if not np.allclose(np.array([x[4], x[5], x[6]]),np.array([x[7], x[8], x[9]]),rtol=1e-2)]
+
         # repeat until no more joints?
         if log == 0:
             self.potential[2] = 1
