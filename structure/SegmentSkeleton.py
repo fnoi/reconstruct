@@ -45,6 +45,7 @@ class Skeleton:
                 self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case])  # KEY
 
     def join_on_passing(self):
+        self.find_joints()
         self.joints2joint_array()
         agenda = self.joints_array[self.joints_array[:, 2] == 0]
         agenda = agenda[agenda[:, 3].argsort()]
@@ -66,6 +67,28 @@ class Skeleton:
                     self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
                     self.bones[int(joining)].right_edit = True
             self.bones[int(passing)].intermediate_points.append(joint[2])
+            
+        agenda = self.joints_array[self.joints_array[:, 2] == 1]
+        agenda = agenda[agenda[:, 3].argsort()]
+        for joint in agenda:
+            passing = joint[1]
+            joining = joint[0]
+            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[7], joint[8], joint[9]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[7], joint[8], joint[9]]))
+            if dist_left < dist_right:
+                if self.bones[int(joining)].left_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].left = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].left_edit = True
+            else:
+                if self.bones[int(joining)].right_edit:
+                    continue
+                else:
+                    self.bones[int(joining)].right = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].right_edit = True
+            self.bones[int(passing)].intermediate_points.append(joint[2])
+            
 
         return
 
@@ -82,17 +105,11 @@ class Skeleton:
         agenda = agenda[agenda[:, 0].argsort()]
         # reapeat the agenda until no more solution is found
         
-        # 
-        agenda_backup=[]
         while len(agenda)!=0:
-            
             joints=[]
-            # skip iterations in agenda if more points are on the same connections
-            skipping=0
             # remove tuppel where one side is already moved
             toremove=[]
             for i in range(len(agenda)):
-                    
                 toremove=[]
                 joints = [int(agenda[i][0]),int(agenda[i][1])]
                 j=1
@@ -130,27 +147,37 @@ class Skeleton:
                     
                     # adding directions
                     if dist0_left < dist0_right:
-                        if listdirection[0]=="right" or self.bones[int(joints[iter+1])].left_edit:
-                            if listdirection[0]=="right":
-                                toremove.append(joints[iter])
+                        if listdirection[0]=="right":
+                            toremove.append(joints[iter+1])
                             continue
                         else:
                             if dist_left<dist_right:
+                                if self.bones[int(joints[iter+1])].left_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("left")
                                 self.bones[int(joints[iter+1])].left_edit = True
                             else:
+                                if self.bones[int(joints[iter+1])].right_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("right")
                                 self.bones[int(joints[iter+1])].right_edit = True
                     else:
-                        if listdirection[0]=="left" or self.bones[int(joints[iter+1])].right_edit:
-                            if listdirection[0]=="left":
-                                toremove.append(joints[iter+1])
+                        if listdirection[0]=="left":
+                            toremove.append(joints[iter+1])
                             continue
                         else:
                             if dist_left<dist_right:
+                                if self.bones[int(joints[iter+1])].left_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("left")
                                 self.bones[int(joints[iter+1])].left_edit = True
                             else:
+                                if self.bones[int(joints[iter+1])].right_edit:
+                                    toremove.append(joints[iter+1])
+                                    continue
                                 listdirection.append("right")
                                 self.bones[int(joints[iter+1])].right_edit = True
                     
