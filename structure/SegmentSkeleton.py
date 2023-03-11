@@ -34,7 +34,9 @@ class Skeleton:
         all_joints = list(itertools.combinations(range(len(self.bones)), 2))
         self.joints_in = []
         for joint in all_joints:
+            
             # calculate distance
+            # here the error of not converging is "create"
             bridgepoint1, bridgepoint2, rating, case = warped_vectors_intersection(
                 self.bones[joint[0]],
                 self.bones[joint[1]])
@@ -101,7 +103,7 @@ class Skeleton:
                 listdirection=[]
 
                 for iter in range(len(joints)-1):
-                    # find right/left for both bones to calc midpoint
+                    # find right/left for bones to calc midpoint
 
                     if iter==0:
                         dist_left = np.linalg.norm(self.bones[int(joints[iter])].left - np.array([agenda[i+iter][4], agenda[i+iter][5], agenda[i+iter][6]]))
@@ -126,6 +128,7 @@ class Skeleton:
                     dist_left = np.linalg.norm(self.bones[int(joints[iter+1])].left - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
                     dist_right = np.linalg.norm(self.bones[int(joints[iter+1])].right - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
                     
+                    # adding directions
                     if dist0_left < dist0_right:
                         if listdirection[0]=="right" or self.bones[int(joints[iter+1])].left_edit:
                             if listdirection[0]=="right":
@@ -196,19 +199,20 @@ class Skeleton:
             for iter in self.bones:
                 iter.left_edit=False
                 iter.right_edit=False
+            # need to update the bones properties 
+            for iter in self.bones:
+                iter.pca=(iter.right-iter.left)/np.linalg.norm(iter.right-iter.left)
+                iter.center=(iter.right-iter.left)/2
+                
             # re-calc joints and dists
             self.find_joints()
             self.joints2joint_array()
             agenda = self.joints_array[self.joints_array[:, 2] == 2]
             agenda = agenda[agenda[:, 0].argsort()]
             # remove all entrys where the bridge points are "identical"
-            # need to add tolerance because the values are nearly identical but it seems that some calc are in between
+            # need to add tolerance because the values are nearly identical 
             agenda = [x for x in agenda if not np.allclose(np.array([x[4], x[5], x[6]]),np.array([x[7], x[8], x[9]]),rtol=1e-2)]
-            # if the solution is not convercing -> break
-            if len(agenda)==len(agenda_backup):
-                if np.allclose(agenda,agenda_backup):
-                    return
-            agenda_backup=copy.deepcopy(agenda)
+
         # repeat until no more joints?
         return
 
