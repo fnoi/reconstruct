@@ -51,6 +51,7 @@ if __name__ == '__main__':
 
             for i, skeleton in enumerate(skeletons):
                 skeleton.potential = np.array([0, 0, 0])
+                skeleton.to_obj(topic=f'skeletonraw_{i}')
                 # counter = 0
                 # while np.sum(skeleton.potential) < 3: #testing is 1 !
                 #     print(f'Iteration {counter +1}')

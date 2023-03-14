@@ -152,7 +152,7 @@ class Segment(object):
         #plot points in xy iwth scatter
         fig, ax = plt.subplots()
         ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
-        ax.set_aspect('equal', 'box')
+        #ax.set_aspect('equal', 'box')
         plt.show()
 
         return
