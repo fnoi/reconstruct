@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import open3d as o3d
+from scipy.spatial import KDTree
 
 from matplotlib import pyplot as plt
 
@@ -30,13 +31,15 @@ if __name__ == "__main__":
     points_arr_normals = np.asarray(pc.normals)
     pointcloud_arr = np.concatenate((points_arr, points_arr_normals), axis=1)
     # for each point find k nearest neighbors patch
+
+    tree = KDTree(pointcloud_arr)
+    k = 30
     for point in pointcloud_arr:
         # find k nearest neighbors
-        k = 30
-        kdtree = o3d.geometry.KDTreeFlann(pc)
-        [k, idx, _] = kdtree.search_knn_vector_3d()
+        dd, ii = tree.query(point, k=k)
         # get patch
-        patch = pointcloud_arr[idx, :]
+        patch = pointcloud_arr[ii, :]
+        a = 0
 
 #    scatter plot points with iso view
     fig = plt.figure()
