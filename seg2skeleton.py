@@ -91,6 +91,7 @@ if __name__ == '__main__':
         for segment in segments:
             cloud = Segment(name=segment)
             cloud.load_from_txt(segment)
+            cloud.calc_main_axis()
             cloud.calc_pca_o3d()
 
             cloud.plot_flats()

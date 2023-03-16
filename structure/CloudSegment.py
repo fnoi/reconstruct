@@ -1,3 +1,5 @@
+import copy
+import itertools
 import os
 
 import numpy as np
@@ -47,6 +49,46 @@ class Segment(object):
             data = np.array(data, dtype=np.float32)
 
             self.points = data[:, :3]
+
+    def calc_main_axis(self):
+        plane = pyrsc.Plane()
+        planes = []
+        points = copy.deepcopy(self.points)
+        while True:
+            res = plane.fit(pts=points, thresh=0.01, minPoints=0.2*len(self.points), maxIteration=1000)
+            planes.append(res[0])
+            points = np.delete(points, res[1], axis=0)
+            # calculate angle between planes
+            if len(planes) > 1:
+                combinations = itertools.combinations(range(len(planes)), 2)
+                for comb in combinations:
+                    plane1 = planes[comb[0]]
+                    plane2 = planes[comb[1]]
+
+                    normal1 = plane1[:3]
+                    normal1 = np.append(normal1, 0)
+                    normal2 = plane2[:3]
+                    normal2 = np.append(normal2, 0)
+
+                    dot_product = np.dot(normal1, normal2)
+                    norm1 = np.linalg.norm(normal1)
+                    norm2 = np.linalg.norm(normal2)
+                    cos_theta = dot_product / (norm1 * norm2)
+                    theta = np.arccos(cos_theta)
+                    theta = np.rad2deg(theta)
+                    if theta < 60:
+                        continue
+                    else:  # find intersecting line
+                        A = np.column_stack((plane1[:2], plane2[:2], np.zeros((2, 1))))
+                        b = np.array([plane1[3], plane2[3]])
+                        t, u, v = np.linalg.solve(A, b)
+                        point1 = np.array([t, 0, plane1[3]])
+                        point2 = np.array([0, u, plane2[3]])
+                        direction = point2 - point1
+                        break
+
+        print(direction)
+        a = 0
 
     def find_cylinder(self):
         cyl = pyrsc.Cylinder()
