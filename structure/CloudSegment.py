@@ -6,6 +6,7 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
+import sympy as sym
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors
@@ -55,7 +56,7 @@ class Segment(object):
         planes = []
         points = copy.deepcopy(self.points)
         while True:
-            res = plane.fit(pts=points, thresh=0.01, minPoints=0.2*len(self.points), maxIteration=1000)
+            res = plane.fit(pts=points, thresh=0.005, minPoints=0.2*len(points), maxIteration=1000)
             planes.append(res[0])
             points = np.delete(points, res[1], axis=0)
             # calculate angle between planes
@@ -66,9 +67,9 @@ class Segment(object):
                     plane2 = planes[comb[1]]
 
                     normal1 = plane1[:3]
-                    normal1 = np.append(normal1, 0)
+                    # normal1 = np.append(normal1, 0)
                     normal2 = plane2[:3]
-                    normal2 = np.append(normal2, 0)
+                    # normal2 = np.append(normal2, 0)
 
                     dot_product = np.dot(normal1, normal2)
                     norm1 = np.linalg.norm(normal1)
@@ -79,6 +80,9 @@ class Segment(object):
                     if theta < 60:
                         continue
                     else:  # find intersecting line
+                        a = 0
+
+
                         A = np.column_stack((plane1[:2], plane2[:2], np.zeros((2, 1))))
                         b = np.array([plane1[3], plane2[3]])
                         t, u, v = np.linalg.solve(A, b)
