@@ -92,13 +92,16 @@ if __name__ == '__main__':
             cloud = Segment(name=segment)
             cloud.load_from_txt(segment)
             cloud.calc_main_axis()
-            cloud.calc_pca_o3d()
+            cloud.calc_secondary_axis()
+            # cloud.calc_pca_o3d()
 
-            cloud.plot_flats()
+            # cloud.plot_flats()
+            #
+            # cloud.transform_clean()
+            # cloud.pc2obj(pc_type='initial')
+            # skeleton.add_cloud(cloud)
 
-            cloud.transform_clean()
-            cloud.pc2obj(pc_type='initial')
-            skeleton.add_cloud(cloud)
+        a = 0
 
         skeleton.potential = np.array([0, 0, 0])
         # counter = 0

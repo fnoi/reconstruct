@@ -8,27 +8,41 @@ from tqdm import tqdm
 
 from matplotlib import pyplot as plt
 
-def plot_cloud(pc, head, candidate, c_grav, cross_mean, norms):
-    norms = norms / 3
-    cross_mean = cross_mean / 3
+
+def plot_cloud(pc, head, candidate=False, c_grav=False, cross_mean=False, norms=False, leftright=False):
+    if norms:
+        norms = norms / 3
+    # if cross_mean:
+    if type(cross_mean) == np.ndarray:
+        cross_mean = cross_mean / 3
 
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(pc[:, 0], pc[:, 1], pc[:, 2], s=0.2)
-    ax.scatter(candidate[0], candidate[1], candidate[2], s=10, c='g')
-    ax.scatter(c_grav[0], c_grav[1], c_grav[2], s=10, c='b')
-    ax.plot([candidate[0], c_grav[0]], [candidate[1], c_grav[1]], [candidate[2], c_grav[2]])
-    for norm in norms:
-        ax.plot(
-            [candidate[0], candidate[0] + norm[0]],
-            [candidate[1], candidate[1] + norm[1]],
-            [candidate[2], candidate[2] + norm[2]],
-            c='k', linewidth=0.05
-        )
-    ax.plot([candidate[0], candidate[0] + cross_mean[0]],
-            [candidate[1], candidate[1] + cross_mean[1]],
-            [candidate[2], candidate[2] + cross_mean[2]],
-            c='r', linewidth=2)
+    ax.scatter(pc[:, 0], pc[:, 1], pc[:, 2], s=0.01, c='grey')
+    if candidate.any():
+        ax.scatter(candidate[0], candidate[1], candidate[2], s=10, c='g')
+    if c_grav and candidate.any():
+        ax.scatter(c_grav[0], c_grav[1], c_grav[2], s=10, c='b')
+        ax.plot([candidate[0], c_grav[0]], [candidate[1], c_grav[1]], [candidate[2], c_grav[2]])
+    if norms:
+        for norm in norms:
+            ax.plot(
+                [candidate[0], candidate[0] + norm[0]],
+                [candidate[1], candidate[1] + norm[1]],
+                [candidate[2], candidate[2] + norm[2]],
+                c='k', linewidth=0.05
+            )
+    # if cross_mean and candidate.any():
+    # if cross_mean.any() and candidate.any():
+    #     ax.plot([candidate[0], candidate[0] + cross_mean[0]],
+    #             [candidate[1], candidate[1] + cross_mean[1]],
+    #             [candidate[2], candidate[2] + cross_mean[2]],
+    #             c='r', linewidth=2)
+    if type(leftright) != bool:
+        ax.plot([leftright[0][0], leftright[1][0]],
+                [leftright[0][1], leftright[1][1]],
+                [leftright[0][2], leftright[1][2]],
+                c='r', linewidth=2)
     ax.set_aspect('equal')
     plt.title(head)
     plt.show()
@@ -66,18 +80,17 @@ if __name__ == "__main__":
     pointcloud_arr = np.concatenate((points_arr, points_arr_normals), axis=1)
     pointcloud_enc = np.concatenate((points_arr, np.zeros_like(points_arr)), axis=1)
 
-
     # for each point find k nearest neighbors patch
 
     # tree = KDTree(pointcloud_arr)
     tree = KDTree(points_arr)
     # k = 30
     # for point in pointcloud_arr:
-        # find k nearest neighbors
-        # dd, ii = tree.query(point, k=k)
-        # get patch
-        # patch = pointcloud_arr[ii, :]
-        # a = 0
+    # find k nearest neighbors
+    # dd, ii = tree.query(point, k=k)
+    # get patch
+    # patch = pointcloud_arr[ii, :]
+    # a = 0
 
     radius = 0.3
     thresh_dif = 0.5
@@ -105,7 +118,7 @@ if __name__ == "__main__":
         # a = True
         super_normal = True
         if dist < thresh_dif and len(patch) > thresh_inliers:
-        # if a:
+            # if a:
             ok_core_points.append(candidate_id)
             if super_normal:
                 patch_norms = patch[:, 3:6]
@@ -143,7 +156,6 @@ if __name__ == "__main__":
             pointcloud_enc[pt_id, 3:6] = cross_mean
             pointcloud_end_rgb = copy.deepcopy(pointcloud_enc)
             pointcloud_end_rgb[:, 3:6] = np.abs(pointcloud_end_rgb[:, 3:6]) * 255
-
 
             if plot:
                 plot_cloud(pc=patch, head='ok', candidate=candidate, c_grav=c_grav, cross_mean=cross_mean,
@@ -205,12 +217,10 @@ if __name__ == "__main__":
             #     orthogonal_vectors.append(orthogonal_vector)
             # cross_mean = orthogonal_vectors[-1]
 
-
-
             # a = 0
         # else:
         #     a = 0
-            # plot_cloud(pc=patch, head='not ok', candidate=candidate, c_grav=c_grav)
+        # plot_cloud(pc=patch, head='not ok', candidate=candidate, c_grav=c_grav)
 
     # ok point cloud
     ok_cp = pointcloud_arr[ok_core_points, :]
@@ -225,10 +235,6 @@ if __name__ == "__main__":
     pc_end_rgb = pointcloud_end_rgb[~np.all(pointcloud_end_rgb[:, 3:6] == 0, axis=1)]
     with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc_rgb.txt', 'w') as f:
         np.savetxt(f, pc_end_rgb, fmt='%.6f')
-
-
-
-
 
 # #    scatter plot points with iso view
 #     fig = plt.figure()

@@ -8,12 +8,19 @@ import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
 import sympy as sym
 
+from scipy.spatial import distance
+from math import degrees, acos
+
+from pcd_main import plot_cloud
+
 from tools.IO import points2txt, lines2obj, cache_meta
-from tools.geometry import rotation_matrix_from_vectors
+from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
+    project_points_onto_plane, rotate_points_to_xy_plane
 
 
 class Segment(object):
     def __init__(self, name: str = None):
+        self.dir = None
         self.points_cleaned = None
         self.intermediate_points = []
         self.left = None
@@ -50,13 +57,14 @@ class Segment(object):
             data = np.array(data, dtype=np.float32)
 
             self.points = data[:, :3]
+            self.center = np.mean(self.points, axis=0)
 
     def calc_main_axis(self):
         plane = pyrsc.Plane()
         planes = []
         points = copy.deepcopy(self.points)
         while True:
-            res = plane.fit(pts=points, thresh=0.005, minPoints=0.2*len(points), maxIteration=1000)
+            res = plane.fit(pts=points, thresh=0.01, minPoints=0.2 * len(points), maxIteration=10000)
             planes.append(res[0])
             points = np.delete(points, res[1], axis=0)
             # calculate angle between planes
@@ -66,37 +74,57 @@ class Segment(object):
                     plane1 = planes[comb[0]]
                     plane2 = planes[comb[1]]
 
-                    normal1 = plane1[:3]
-                    # normal1 = np.append(normal1, 0)
-                    normal2 = plane2[:3]
-                    # normal2 = np.append(normal2, 0)
+                    angle = angle_between_planes(plane1, plane2)
+                    if 45 < angle % 180 < 135:
+                        point, line = line_of_intersection(plane1, plane2)
+                        # line = line / np.linalg.norm(line)
 
-                    dot_product = np.dot(normal1, normal2)
-                    norm1 = np.linalg.norm(normal1)
-                    norm2 = np.linalg.norm(normal2)
-                    cos_theta = dot_product / (norm1 * norm2)
-                    theta = np.arccos(cos_theta)
-                    theta = np.rad2deg(theta)
-                    if theta < 60:
-                        continue
-                    else:  # find intersecting line
-                        a = 0
+                        ##############################
+                        # project points onto line
+                        points_dist = np.dot(self.points - self.center, line)
+                        self.left = self.center + line * np.min(points_dist)
+                        self.right = self.center + line * np.max(points_dist)
+                        self.dir = line
+                        ##############################
 
-
-                        A = np.column_stack((plane1[:2], plane2[:2], np.zeros((2, 1))))
-                        b = np.array([plane1[3], plane2[3]])
-                        t, u, v = np.linalg.solve(A, b)
-                        point1 = np.array([t, 0, plane1[3]])
-                        point2 = np.array([0, u, plane2[3]])
-                        direction = point2 - point1
+                        plot_cloud(pc=self.points,
+                                   candidate=self.center,
+                                   head=f'ransac intersecting line for segment {self.name}',
+                                   # cross_mean=False)
+                                   # cross_mean=np.array([left, right]))
+                                   leftright=np.array([self.left, self.right]))
                         break
+                    else:
+                        continue
 
-        print(direction)
+            if type(self.right) == np.ndarray and type(self.left) == np.ndarray:
+                break
+
+    def calc_secondary_axis(self):
+        # project points onto plane
+        proj_pts = project_points_onto_plane(self.points, self.dir)
+        rotated_pts = rotate_points_to_xy_plane(proj_pts, self.dir)
+        points_proj = rotated_pts
+
+
+
+        # points_dist = np.dot(self.points - self.left, self.dir)
+        # points_proj = self.points - np.outer(points_dist, self.dir)
+        # self.rotmat_main = rotation_matrix_from_vectors(self.dir, np.array([0, 0, 1]))
+        # plot scatter points_proj
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.scatter(points_proj[:, 0], points_proj[:, 1], s=0.05)
+        # plt.scatter(points_proj[:, 0], points_proj[:, 1], s=0.05)
+        plt.title(f'projected points for segment {self.name}, count {len(points_proj)}')
+        plt.show()
+
         a = 0
 
     def find_cylinder(self):
         cyl = pyrsc.Cylinder()
-        res = cyl.fit(self.points, 0.01, 1000)
+        res = cyl.fit(self.points, 0.04, 1000)
 
         return res
 
@@ -111,15 +139,12 @@ class Segment(object):
         cov = pcd_clean.compute_mean_and_covariance()
         pc = np.linalg.eig(cov[1])
 
-        self.center = pcd_clean.get_center()
-
         self.pca = pc[1][:, 0]
         self.pcb = pc[1][:, 1]
         self.pcc = pc[1][:, 2]
 
     def recompute_pca(self):
         self.pca = self.left - self.right
-
 
     def transform_clean(self):
         """
@@ -160,24 +185,22 @@ class Segment(object):
         y_vec = np.array([0, 1, 0])
         x_vec = np.array([1, 0, 0])
 
-
-        #here pcb_rot and pcc_rot needed?
+        # here pcb_rot and pcc_rot needed?
         self.rot_mat_pca = rotation_matrix_from_vectors(plane_normal, x_vec)
-        #added transposed because the rotation matrix is on the left of the vector
-        pca_rot = np.dot(self.pca,self.rot_mat_pca.T)
+        # added transposed because the rotation matrix is on the left of the vector
+        pca_rot = np.dot(self.pca, self.rot_mat_pca.T)
         pcb_rot = np.dot(self.pcb, self.rot_mat_pca.T)
         pcc_rot = np.dot(self.pcc, self.rot_mat_pca.T)
         self.rot_mat_pcb = rotation_matrix_from_vectors(pcb_rot, y_vec)
         pcb_rot = np.dot(pcb_rot, self.rot_mat_pcb.T)
         pcc_rot = np.dot(pcc_rot, self.rot_mat_pcb.T)
-        
+
         # test
-        self.rot_mat_test=np.matmul(self.rot_mat_pca,self.rot_mat_pcb)
-        
+        self.rot_mat_test = np.matmul(self.rot_mat_pca, self.rot_mat_pcb)
+
         # cache_meta(data={'rot_mat_pca': self.rot_mat_pca, 'rot_mat_pcb': self.rot_mat_pcb},
         #            path=self.outpath, topic='rotations')
         lines2obj(lines=[pcb_rot, pcc_rot], path=self.outpath, topic='pcbc')
-
 
         # rotate normal vector using the rotation matrix
         normal_rot = np.dot(plane_normal, self.rot_mat_pca)
@@ -192,24 +215,22 @@ class Segment(object):
         cleaned, ind = pcd_rot.remove_statistical_outlier(nb_neighbors=20, std_ratio=2.0)
         # TODO create new center points in center of gravity of projected points
         # TODO adapt the centerline accordingly with relative translation
-        #points2txt(pointset=np.asarray(cleaned.points), path=self.outpath, topic='points_rot')
+        # points2txt(pointset=np.asarray(cleaned.points), path=self.outpath, topic='points_rot')
         points2txt(pointset=points_rot, path=self.outpath, topic='points_flat')
 
-        #plot points in xy iwth scatter
+        # plot points in xy iwth scatter
         fig, ax = plt.subplots()
         ax.scatter(points_rot[:, 0], points_rot[:, 1], s=0.1)
-        #ax.set_aspect('equal', 'box')
+        # ax.set_aspect('equal', 'box')
         plt.show()
 
         return
-
 
     def plot_flats(self):
         """
         plot the points in the xy plane in a scatter plot for each segment in subplot
         """
         a = 0
-
 
     def pc2obj(self, pc_type):
         if pc_type == 'initial':
