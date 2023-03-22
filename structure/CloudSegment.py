@@ -16,7 +16,7 @@ from pcd_main import plot_cloud
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
-    intersection_point_of_line_and_plane, points_to_actual_plane
+    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line
 
 
 class Segment(object):
@@ -77,82 +77,83 @@ class Segment(object):
 
                     angle = angle_between_planes(plane1, plane2)
                     if 45 < angle % 180 < 135:  # qualified pair, look no further
-                        point, line = line_of_intersection(plane1, plane2)
+                        # point, line = line_of_intersection(plane1, plane2)
+                        point, line = intersecting_line(plane1, plane2)
                         # line = line / np.linalg.norm(line)
 
-                        ##############################
-                        # project points onto line
-                        vec_to_point = self.points - point
-                        scalar_proj = np.dot(vec_to_point, line)
-                        vec_proj = scalar_proj * np.expand_dims(line, axis=1)
-                        proj_pts_2 = np.expand_dims(point, axis=1) + vec_proj
 
-                        self.left = line * np.min(scalar_proj)
-                        self.right = line * np.max(scalar_proj)
+                        points_on_line = project_points_to_line(self.points, point, line)
+
+                        ref_x = -1000
+                        ref_t = (ref_x - point[0]) / line[0]
+                        ref_pt = point + ref_t * line
+                        vecs = points_on_line - ref_pt
+                        dists = np.linalg.norm(vecs, axis=1)
+                        l_ind = np.argmin(dists)
+                        r_ind = np.argmax(dists)
+
+                        self.left = self.points[l_ind]
+                        self.right = self.points[r_ind]
                         self.dir = line
 
-
-                        # points_dist = np.dot(self.points - self.center, line)  # TODO: re-think significance of center point
-                        # points_dist = np.dot(self.points, line)
-                        # self.left = line * np.min(points_dist)
-                        # self.right = line * np.max(points_dist)
-                        # self.dir = line
-                        ##############################
-
-                        # plot_cloud(pc=self.points,
-                        #            candidate=self.center,
-                        #            head=f'ransac intersecting line for segment {self.name}',
-                        #            # cross_mean=False)
-                        #            # cross_mean=np.array([left, right]))
-                        #            leftright=np.array([self.left, self.right]))
-
-                        ##############################
-                        # secondary axis
                         proj_plane = normal_and_point_to_plane(self.dir, self.left)
-                        # proj_plane_normal = proj_plane[:3]
-                        # proj_plane_point = proj_plane[3]
+                        proj_line_pt_0, proj_line_0 = intersecting_line(proj_plane, plane1)
+                        proj_line_pt_1, proj_line_1 = intersecting_line(proj_plane, plane2)
 
-                        proj_line_pt_0, proj_line_0 = line_of_intersection(proj_plane, plane1)
-                        proj_line_pt_1, proj_line_1 = line_of_intersection(proj_plane, plane2)
-                        # project points onto plane
-                        # proj_pts = project_points_onto_plane(self.points, self.dir)
-                        ######################### proj_pts_2 = points_to_actual_plane(self.points, self.dir, self.left)
-                        # proj_pts_2 extents
-                        proj_pts_x = (np.min(proj_pts_2[:, 0]), np.max(proj_pts_2[:, 0]), np.max(proj_pts_2[:, 0]) - np.min(proj_pts_2[:, 0]))
-                        proj_pts_y = (np.min(proj_pts_2[:, 1]), np.max(proj_pts_2[:, 1]), np.max(proj_pts_2[:, 1]) - np.min(proj_pts_2[:, 1]))
-                        proj_pts_z = (np.min(proj_pts_2[:, 2]), np.max(proj_pts_2[:, 2]), np.max(proj_pts_2[:, 2]) - np.min(proj_pts_2[:, 2]))
+                        proj_pts_2 = points_to_actual_plane(self.points, self.dir, self.left)
 
+                        lengthy_boi = 0.2
                         linepts_0_0 = [
-                            self.left[0] - proj_line_0[0] * proj_pts_x[2],
-                            self.left[1] - proj_line_0[1] * proj_pts_y[2],
-                            self.left[2] - proj_line_0[2] * proj_pts_z[2]
+                            self.left[0] - proj_line_0[0] * lengthy_boi,
+                            self.left[1] - proj_line_0[1] * lengthy_boi,
+                            self.left[2] - proj_line_0[2] * lengthy_boi
                         ]
                         linepts_0_1 = [
-                            self.left[0] + proj_line_0[0] * proj_pts_x[2],
-                            self.left[1] + proj_line_0[1] * proj_pts_y[2],
-                            self.left[2] + proj_line_0[2] * proj_pts_z[2]
+                            self.left[0] + proj_line_0[0] * lengthy_boi,
+                            self.left[1] + proj_line_0[1] * lengthy_boi,
+                            self.left[2] + proj_line_0[2] * lengthy_boi
                         ]
 
                         linepts_1_0 = [
-                            self.left[0] - proj_line_1[0] * proj_pts_x[2],
-                            self.left[1] - proj_line_1[1] * proj_pts_y[2],
-                            self.left[2] - proj_line_1[2] * proj_pts_z[2]
+                            self.left[0] - proj_line_1[0] * lengthy_boi,
+                            self.left[1] - proj_line_1[1] * lengthy_boi,
+                            self.left[2] - proj_line_1[2] * lengthy_boi
                         ]
                         linepts_1_1 = [
-                            self.left[0] + proj_line_1[0] * proj_pts_x[2],
-                            self.left[1] + proj_line_1[1] * proj_pts_y[2],
-                            self.left[2] + proj_line_1[2] * proj_pts_z[2]
+                            self.left[0] + proj_line_1[0] * lengthy_boi,
+                            self.left[1] + proj_line_1[1] * lengthy_boi,
+                            self.left[2] + proj_line_1[2] * lengthy_boi
                         ]
-
-                        linepts_0 = [self.left - proj_pts_2[2] * proj_line_0, self.left + proj_pts_2[2] * proj_line_0]
-                        linepts_1 = [self.left - proj_pts_2[2] * proj_line_1, self.left + proj_pts_2[2] * proj_line_1]
 
                         fig = plt.figure()
                         ax = fig.add_subplot(111, projection='3d')
-                        ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
-                        ax.plot([linepts_0_0[0], linepts_0_1[0]], [linepts_0_0[1], linepts_0_1[1]], [linepts_0_0[2], linepts_0_1[2]], color='red')
-                        ax.plot([linepts_1_0[0], linepts_1_1[0]], [linepts_1_0[1], linepts_1_1[1]], [linepts_1_0[2], linepts_1_1[2]], color='purple')
+                        # ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
+                        ax.scatter(self.points[:, 0], self.points[:, 1], self.points[:, 2], alpha=0.1)
+                        ax.plot(
+                            [linepts_0_0[0], linepts_0_1[0]],
+                            [linepts_0_0[1], linepts_0_1[1]],
+                            [linepts_0_0[2], linepts_0_1[2]],
+                            color='red')
+                        ax.plot(
+                            [linepts_1_0[0], linepts_1_1[0]],
+                            [linepts_1_0[1], linepts_1_1[1]],
+                            [linepts_1_0[2], linepts_1_1[2]],
+                            color='purple')
 
+                        ax.plot(
+                            [self.left[0], self.right[0]],
+                            [self.left[1], self.right[1]],
+                            [self.left[2], self.right[2]],
+                            color='green')
+                        # t_0 = (-20 - point[0]) / line[0]
+                        # t_1 = (20 - point[0]) / line[0]
+                        # pt_0 = point + t_0 * line
+                        # pt_1 = point + t_1 * line
+                        #
+                        # ax.plot([pt_0[0], pt_1[0]], [pt_0[1], pt_1[1]], [pt_0[2], pt_1[2]], color='blue')
+                        # ax.set_xlim(-20, 20)
+                        # ax.set_ylim(-20, 20)
+                        # ax.set_zlim(0, 10)
                         ax.set_aspect('equal')
                         fig.show()
 
@@ -162,11 +163,46 @@ class Segment(object):
 
                         rotated_pts = rotate_points_to_xy_plane(proj_pts_2, self.dir)
                         rotated_linepts = rotate_points_to_xy_plane(np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
+
+
                         fig = plt.figure()
                         ax = fig.add_subplot(111, projection='3d')
-                        ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], rotated_pts[:, 2])
-                        ax.plot([rotated_linepts[0, 0], rotated_linepts[1, 0]], [rotated_linepts[0, 1], rotated_linepts[1, 1]], [rotated_linepts[0, 2], rotated_linepts[1, 2]], color='red')
-                        ax.set_aspect('equal')
+                        ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
+                        ax.plot(
+                            [linepts_0_0[0], linepts_0_1[0]],
+                            [linepts_0_0[1], linepts_0_1[1]],
+                            [linepts_0_0[2], linepts_0_1[2]],
+                            color='red')
+                        ax.plot(
+                            [linepts_1_0[0], linepts_1_1[0]],
+                            [linepts_1_0[1], linepts_1_1[1]],
+                            [linepts_1_0[2], linepts_1_1[2]],
+                            color='purple')
+                        ax.plot(
+                            [self.left[0], self.right[0]],
+                            [self.left[1], self.right[1]],
+                            [self.left[2], self.right[2]],
+                            color='green')
+
+
+                        x = np.linspace(-1.4, -0.6, 20)
+                        y = np.linspace(24.4, 25.6, 20)
+                        x, y = np.meshgrid(x, y)
+                        # find z for each x,y pair
+                        a, b, c, d = plane1
+                        z = (d - a * x - b * y) / c
+                        z = np.ones((20, 20)) * 5
+
+                        ax.plot_surface(x, y, z, alpha=0.2)
+
+                        ax.set_xlim(-1, 4, -0, 6)
+                        ax.set_ylim(24.4, 25.6)
+                        ax.set_zlim(4, 7.5)
+
+
+                        # ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], rotated_pts[:, 2])
+                        # ax.plot([rotated_linepts[0, 0], rotated_linepts[1, 0]], [rotated_linepts[0, 1], rotated_linepts[1, 1]], [rotated_linepts[0, 2], rotated_linepts[1, 2]], color='red')
+                        # ax.set_aspect('equal')
                         fig.show()
 
 
@@ -193,7 +229,7 @@ class Segment(object):
 
                         # get line of intersection
                         tab10_color_0 = (0.12156863, 0.46666667, 0.70588235)
-                        ax.scatter(pivot_pt[0], pivot_pt[1], color=tab10_color_0)
+                        # ax.scatter(pivot_pt[0], pivot_pt[1], color=tab10_color_0)
 
                         # ax.plot(
                         #     [plane_point - 10 * proj_line_0[0], plane_point + 10 * proj_line_0[0]],
@@ -209,8 +245,8 @@ class Segment(object):
 
 
                         # plt.scatter(points_proj[:, 0], points_proj[:, 1], s=0.05)
-                        plt.title(f'projected points for segment {self.name}, count {len(points_proj)}')
-                        plt.show()
+                        # plt.title(f'projected points for segment {self.name}, count {len(points_proj)}')
+                        # plt.show()
 
                         a = 0
 

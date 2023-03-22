@@ -31,6 +31,19 @@ def intersection_point_of_line_and_plane(line_point, direction, plane):
     return intersection_point
 
 
+def intersecting_line(plane1, plane2):
+    normal1 = np.array(plane1[:3])
+    normal2 = np.array(plane2[:3])
+    d1 = plane1[3]
+    d2 = plane2[3]
+    direction = np.cross(normal1, normal2)
+    if np.linalg.norm(direction) == 0:
+        raise Exception("Planes are parallel, no intersection found")
+    point_on_line = np.linalg.solve(
+        np.column_stack((normal1, normal2, -direction)), -np.array([d1, d2, 0])
+
+    )
+    return point_on_line, direction
 
 
 def line_of_intersection(plane1, plane2):
@@ -264,14 +277,32 @@ def project_points_onto_plane(points, normal):
 
 
 def points_to_actual_plane(points, normal, point_on_plane):
-    a = 0
-
     # Normalize the normal vector
     normal = normal / np.linalg.norm(normal)
 
     # Calculate the projections
     projections = points - np.dot(points - point_on_plane, normal)[:, np.newaxis] * normal
     return projections
+
+
+def project_points_to_plane(points, plane_normal, point_on_plane):
+    plane_normal_normalized = plane_normal / np.linalg.norm(plane_normal)
+    vec_to_points = points - point_on_plane
+    scalar_proj = np.dot(vec_to_points, plane_normal_normalized)
+    vec_proj = np.outer(scalar_proj, plane_normal_normalized)
+    orthogonal_vec = vec_to_points - vec_proj
+    projected_points = points - orthogonal_vec
+    return projected_points
+
+
+
+def project_points_to_line(points, point_on_line, direction):
+    direction_normalized = direction / np.linalg.norm(direction)
+    vec_to_points = points - point_on_line
+    scalar_proj = np.dot(vec_to_points, direction_normalized)
+    vec_proj = np.outer(scalar_proj, direction_normalized)
+    projected_points = point_on_line + vec_proj
+    return projected_points
 
 
 def rotation_matrix_from_vectors(vec1, vec2):
