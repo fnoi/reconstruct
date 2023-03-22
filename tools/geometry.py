@@ -13,6 +13,26 @@ def angle_between_planes(plane1, plane2):
     return angle
 
 
+def normal_and_point_to_plane(normal, point):
+    plane = np.zeros(4)
+    plane[:3] = normal
+    plane[3] = - np.dot(normal, point)
+    return plane
+
+
+def intersection_point_of_line_and_plane(line_point, direction, plane):
+    normal = plane[:3]
+    constant = plane[3]
+    denominator = np.dot(normal, direction)
+    if denominator == 0:
+        raise Exception("Line is parallel to plane, no intersection found")
+    t = - (np.dot(normal, line_point) + constant) / denominator
+    intersection_point = line_point + t * direction
+    return intersection_point
+
+
+
+
 def line_of_intersection(plane1, plane2):
     normal1 = plane1[:3]
     normal2 = plane2[:3]
@@ -240,6 +260,17 @@ def project_points_onto_plane(points, normal):
 
     # Calculate the projections
     projections = points - np.dot(points, normal)[:, np.newaxis] * normal
+    return projections
+
+
+def points_to_actual_plane(points, normal, point_on_plane):
+    a = 0
+
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+
+    # Calculate the projections
+    projections = points - np.dot(points - point_on_plane, normal)[:, np.newaxis] * normal
     return projections
 
 
