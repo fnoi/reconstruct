@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import numpy as np
 
@@ -7,6 +8,13 @@ def points2txt(pointset, path, topic):
     with open(f'{path}/{topic}.txt', 'w') as f:
         for i in range(pointset.shape[0]):
             f.write(f'{pointset[i][0]} {pointset[i][1]} {pointset[i][2]} \n')
+
+    return
+
+
+def cache_meta(data, path, topic):
+    with open(f'{path}/{topic}.pickle', 'wb') as f:
+        pickle.dump(data, f)
 
     return
 

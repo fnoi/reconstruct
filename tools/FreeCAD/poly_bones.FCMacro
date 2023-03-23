@@ -1,0 +1,299 @@
+import os
+import stat
+import pickle
+
+import numpy as np
+from sys import platform
+
+import Part
+import Mesh
+import importOBJ
+
+
+# import matplotlib.pyplot as plt
+# def plot_polygon(p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11):
+#     fig = plt.figure()
+#     ax = fig.add_subplot(111)
+#     ax.plot([p0[0], p1[0]], [p0[1], p1[1]])
+#     ax.plot([p1[0], p2[0]], [p1[1], p2[1]])
+#     ax.plot([p2[0], p3[0]], [p2[1], p3[1]])
+#     ax.plot([p3[0], p4[0]], [p3[1], p4[1]])
+#     ax.plot([p4[0], p5[0]], [p4[1], p5[1]])
+#     ax.plot([p5[0], p6[0]], [p5[1], p6[1]])
+#     ax.plot([p6[0], p7[0]], [p6[1], p7[1]])
+#     ax.plot([p7[0], p8[0]], [p7[1], p8[1]])
+#     ax.plot([p8[0], p9[0]], [p8[1], p9[1]])
+#     ax.plot([p9[0], p10[0]], [p9[1], p10[1]])
+#     ax.plot([p10[0], p11[0]], [p10[1], p11[1]])
+#     ax.plot([p11[0], p0[0]], [p11[1], p0[1]])
+#     ax.set_aspect('equal')
+#     plt.show()
+
+def cornerpts(poly_params):
+    _ = poly_params[0].split(' ')
+    x0 = float(_[0])
+    y0 = float(_[1])
+    tf = float(_[2])
+    tw = float(_[3])
+    lf = float(_[4])
+    lw = float(_[5])
+
+    p0 = (x0, y0)
+    p1 = (p0[0], p0[1] + tf)
+    p2 = (p1[0] + lf / 2 - tw / 2, p1[1])
+    p3 = (p2[0], p2[1] + lw)
+    p4 = (p1[0], p3[1])
+    p5 = (p4[0], p4[1] + tf)
+    p6 = (p5[0] + lf, p5[1])
+    p7 = (p6[0], p4[1])
+    p8 = (p7[0] - lf / 2 + tw / 2, p7[1])
+    p9 = (p8[0], p2[1])
+    p10 = (p7[0], p9[1])
+    p11 = (p10[0], p0[1])
+
+    array = np.array([
+        [p0[0], p0[1]],
+        [p1[0], p1[1]],
+        [p2[0], p2[1]],
+        [p3[0], p3[1]],
+        [p4[0], p4[1]],
+        [p5[0], p5[1]],
+        [p6[0], p6[1]],
+        [p7[0], p7[1]],
+        [p8[0], p8[1]],
+        [p9[0], p9[1]],
+        [p10[0], p10[1]],
+        [p11[0], p11[1]]
+    ])
+
+    center = (
+        np.min(array[:, 0]) + (np.max(array[:, 0]) - np.min(array[:, 0])) / 2,
+        np.min(array[:, 1]) + (np.max(array[:, 1]) - np.min(array[:, 1])) / 2
+    )
+
+    return (p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11), center
+
+
+def sketch_bone(objlines):
+    start = objlines[0].split(' ')[1:4]
+    end = objlines[1].split(' ')[1:4]
+
+    x_start = float(start[0])
+    y_start = float(start[1])
+    z_start = float(start[2])
+    x_end = float(end[0])
+    y_end = float(end[1])
+    z_end = float(end[2])
+
+    return {
+        'start': (x_start, y_start, z_start),
+        'end': (x_end, y_end, z_end)
+    }
+
+def bone_pose(bone):
+    x_start = bone['start'][0]
+    y_start = bone['start'][1]
+    z_start = bone['start'][2]
+    x_end = bone['end'][0]
+    y_end = bone['end'][1]
+    z_end = bone['end'][2]
+
+    array = np.array([
+        [x_start, y_start, z_start],
+        [x_end, y_end, z_end]
+    ])
+    translate_start = np.array([x_start, y_start, z_start])
+    translate_end = np.array([x_end - x_start, y_end - y_start, z_end - z_start])
+
+    len_bone = np.linalg.norm(translate_end)
+    ax_bone = np.array([len_bone, 0, 0])
+    a = ax_bone / np.linalg.norm(ax_bone)
+    b = translate_end / np.linalg.norm(translate_end)
+
+    # calculate rotation matrix from ax_bone to translate_end
+    v = np.cross(a, b)
+    s = np.linalg.norm(v)
+    c = np.dot(a, b)
+    vx = np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0]
+    ])
+    rot_mat = np.eye(3) + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+
+    # apply rotation matrix to ax_bone
+    translate_end_nu = np.dot(rot_mat, ax_bone)
+
+    bone['rotation'] = rot_mat
+    bone['translate_start'] = translate_start
+    bone['translate_end'] = translate_end
+    bone['ax_bone'] = ax_bone
+
+    return bone
+
+
+if __name__ == '__main__':
+
+    ids = [i for i in range(1, 30)]
+    segments = [f'store_beam_bone_{i}.obj' for i in ids]
+
+    for linefile, no in zip(segments, ids):
+
+        if platform == 'darwin':
+            path_1 = f'/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXO)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXU)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXG)
+        # not sure if this is stable
+        # elif platform == 'win32':
+        #     path_1 = f'D:/Uni/hiwi/reconstruct/data/first_beam.txt'
+        #     path_2 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/{linefile}'
+        #     path_3 = f'D:/Uni/hiwi/reconstruct/data/out/beam_{no}/rotations.pickle'
+        #     path_4 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+        else:
+            path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/store_beam_bone_{linefile}.obj'
+
+        # 1 get polygon corners
+        # hardcode_path as FC macro works on different directories and I don't care
+
+        hardcode_path = path_1
+        print(hardcode_path)
+
+        with open(hardcode_path, 'r') as f:
+            line = f.readlines()
+
+        polygon_corners, polygon_center = cornerpts(poly_params=line)
+
+        # 2 get bone line
+        hardcode_path = path_2
+        print(hardcode_path)
+        with open(hardcode_path, 'r') as f:
+            # read obj file
+            _ = f.readlines()
+
+        bone_dict = sketch_bone(objlines=_)
+        bone_dict = bone_pose(bone=bone_dict)
+
+        # store them on the fly? (for dodo, clean intersection at some point i guess)
+
+        # 3 set up FreeCAD "file"
+        App = FreeCAD
+        filename = 'beam_skeleton'
+        App.newDocument(filename)
+        fcdoc = App.getDocument(filename)
+        fcdoc.addObject('PartDesign::Body', 'Body')
+        fcdoc.recompute()
+
+        # loop starts here
+        #   4 sketch bone line
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
+        line_1 = fcdoc.getObject('line_path')
+        line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+        line_1.MapMode = 'FlatFace'
+        line_1.addGeometry(Part.LineSegment(
+            App.Vector(0, 0, 0),
+            App.Vector(bone_dict['ax_bone'][0], bone_dict['ax_bone'][1], bone_dict['ax_bone'][2])),
+            False
+        )
+        fcdoc.recompute()
+
+        #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
+        polygon = fcdoc.getObject('cross_section')
+        polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
+        polygon.MapMode = 'FlatFace'
+
+        polygon_edges = []
+        for i in range(12):
+            if i != 11:
+                polygon_edges.append((i, i + 1))
+            else:
+                polygon_edges.append((i, 0))
+
+        print(polygon_edges)
+
+        for edge in polygon_edges:
+            polygon.addGeometry(Part.LineSegment(
+                App.Vector(polygon_corners[edge[0]][0], polygon_corners[edge[0]][1], 0),
+                App.Vector(polygon_corners[edge[1]][0], polygon_corners[edge[1]][1], 0)),
+                False
+            )
+
+        fcdoc.recompute()
+
+
+        #   6 sweep
+        fcdoc.addObject('Part::Sweep', 'beam')
+        sweep = fcdoc.getObject('beam')
+        sweep.Sections = polygon
+        sweep.Spine = line_1
+        sweep.Solid = True
+        sweep.Frenet = False
+
+        #  7.1 rotate
+        # sweep.Placement = App.Placement(App.Matrix(
+        #     bone_dict['rotation'][0][0], bone_dict['rotation'][0][1], bone_dict['rotation'][0][2], 0,
+        #     bone_dict['rotation'][1][0], bone_dict['rotation'][1][1], bone_dict['rotation'][1][2], 0,
+        #     bone_dict['rotation'][2][0], bone_dict['rotation'][2][1], bone_dict['rotation'][2][2], 0,
+        #     0, 0, 0, 1
+        # ))
+        # fcdoc.recompute()
+
+
+        with open(path_3, 'rb') as f:
+            rotations = pickle.load(f)
+            #not sure if inv and transpose is the same in this case
+            rotation_pca = np.linalg.inv(rotations['rot_mat_pca'])
+            rotation_pcb = np.linalg.inv(rotations['rot_mat_pcb'])
+
+		
+        rotation_all=np.matmul(rotation_pca,rotation_pcb)
+
+        # testing
+       
+        sweep.Placement = App.Placement(App.Matrix(
+            rotation_all[0][0], rotation_all[0][1], rotation_all[0][2], 0,
+            rotation_all[1][0], rotation_all[1][1], rotation_all[1][2], 0,
+            rotation_all[2][0], rotation_all[2][1], rotation_all[2][2], 0,
+            0, 0, 0, 1
+        ))
+        fcdoc.recompute()
+
+
+
+
+        # 7.2 translate
+        sweep.Placement.move(App.Vector(
+            bone_dict['translate_start'][0],
+            bone_dict['translate_start'][1],
+            bone_dict['translate_start'][2]
+        ))
+        fcdoc.recompute()
+
+
+        # 8 export to obj
+        __objs__ = []
+        __objs__.append(fcdoc.getObject('beam'))
+        Mesh.export(__objs__, path_4)
+        del __objs__
+
+        # 9 clean up
+        App.closeDocument(filename)
+
+
+
+    # clean up sketch things
+    # fcdoc.removeObject('line_path')
+    # fcdoc.removeObject('cross_section')
+    # fcdoc.recompute()
+
+    # clean ups as postprocessing possible?
+    # export to obj
+
+    print('PyCharm says hi and congrats for running the whole macro without errors!')

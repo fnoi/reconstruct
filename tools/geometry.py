@@ -1,5 +1,84 @@
 import numpy as np
-#from structure.CloudSegment import CloudSegment
+# from structure.CloudSegment import CloudSegment
+
+from scipy.spatial import distance
+from math import degrees, acos
+
+
+def angle_between_planes(plane1, plane2):
+    normal1 = plane1[:3]
+    normal2 = plane2[:3]
+    cos_angle = np.dot(normal1, normal2) / (np.linalg.norm(normal1) * np.linalg.norm(normal2))
+    angle = degrees(acos(cos_angle))
+    return angle
+
+
+def normal_and_point_to_plane(normal, point):
+    plane = np.zeros(4)
+    plane[:3] = normal
+    plane[3] = - np.dot(normal, point)
+    return plane
+
+
+def intersection_point_of_line_and_plane(line_point, direction, plane):
+    normal = plane[:3]
+    constant = plane[3]
+    denominator = np.dot(normal, direction)
+    if denominator == 0:
+        raise Exception("Line is parallel to plane, no intersection found")
+    t = - (np.dot(normal, line_point) + constant) / denominator
+    intersection_point = line_point + t * direction
+    return intersection_point
+
+
+# def intersecting_line(plane1, plane2):
+#     normal1 = np.array(plane1[:3])
+#     normal2 = np.array(plane2[:3])
+#     d1 = plane1[3]
+#     d2 = plane2[3]
+#     direction = np.cross(normal1, normal2)
+#     if np.linalg.norm(direction) == 0:
+#         raise Exception("Planes are parallel, no intersection found")
+#     point_on_line = np.linalg.solve(
+#         np.column_stack((normal1, normal2, direction)), -np.array([d1, d2, 0])
+#
+#     )
+#     return point_on_line, direction
+
+def intersecting_line(plane1, plane2):
+    normal1, d1 = np.array(plane1[:3], dtype=np.float64), plane1[3]
+    normal2, d2 = np.array(plane2[:3], dtype=np.float64), plane2[3]
+    direction = np.cross(normal1, normal2)
+    point_on_line = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction)**2
+    return point_on_line, direction
+
+
+def line_of_intersection(plane1, plane2):
+    normal1 = plane1[:3]
+    normal2 = plane2[:3]
+    direction = np.cross(normal1, normal2)
+    point_on_line = None
+
+    # Find a point on the line by checking if any of the coordinates of the cross product are non-zero
+    for i in range(3):
+        if direction[i] != 0:
+            constant = - plane1[3] / plane1[i]
+            point_on_line = np.zeros(3)
+            point_on_line[i] = constant
+            break
+
+    if point_on_line is None:
+        raise Exception("Planes are parallel, no intersection found")
+
+    return point_on_line, direction
+
+
+def intersecting_line_between_planes(plane1, plane2):
+    angle = angle_between_planes(plane1, plane2)
+    if 45 < angle < 235:
+        return line_of_intersection(plane1, plane2)
+    else:
+        raise Exception(f"Angle between planes is {angle}, which is not between 45 and 235 degrees")
 
 
 def rotation_matrix_from_vectors(vec1, vec2):
@@ -25,18 +104,20 @@ def rotation_matrix_from_vectors(vec1, vec2):
     s = np.linalg.norm(v)
     c = np.dot(vec1, vec2)
     vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-    R = np.eye(3) + vx + np.dot(vx, vx) * (1 - c) / s ** 2
+    R = np.eye(3) + vx + np.dot(vx, vx) * ((1 - c) / s ** 2)
     return R
 
 
 def warped_vectors_intersection(seg1, seg2):
-    dir1 = seg1.pca
-    dir2 = seg2.pca
+    dir1 = seg1.right - seg1.left
+    dir2 = seg2.right - seg2.left
+    # dir1 = seg1.pca
+    # dir2 = seg2.pca
     connect = np.cross(dir1, dir2)
 
     if np.nonzero(connect) is False:
         raise 'Vectors are parallel'
-    dist = np.abs(np.dot(seg1.center - seg2.center, connect)) / np.linalg.norm(connect)
+    # kicked recently! # dist = np.abs(np.dot(seg1.center - seg2.center, connect)) / np.linalg.norm(connect)
     # source: https://math.stackexchange.com/questions/2213165/find-shortest-distance-between-lines-in-3d
     t1 = np.dot(np.cross(dir2, connect), (seg2.center - seg1.center)) / np.dot(connect, connect)
     t2 = np.dot(np.cross(dir1, connect), (seg2.center - seg1.center)) / np.dot(connect, connect)
@@ -98,14 +179,33 @@ def warped_vectors_intersection(seg1, seg2):
         rating = np.max(np.asarray([rating1, rating2]))
         case = 2
 
+    # case 3: both segments continuous: intersecting
+    if check1 and check2:
+        rating = np.linalg.norm(bridgepoint1 - bridgepoint2)
+        case = 3
+
     if rating == 0 or rating > 0 is False:
-    # if rating > 0 is False:
+        # if rating > 0 is False:
         rating = 1e8
+
+    print(case)
 
     return bridgepoint1, bridgepoint2, rating, case
 
 
 # def passing_check:
+
+
+def rotate_points(points, angle, axis):
+    axis_normalized = axis / np.linalg.norm(axis)
+    a = np.cos(angle / 2)
+    b, c, d = -axis_normalized * np.sin(angle / 2)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    rotation_matrix = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                                [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                                [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    return np.dot(points, rotation_matrix)
 
 
 
@@ -121,7 +221,7 @@ def manipulate_skeleton(segment1, segment2,
                 if matched:
                     break
                 else:
-                    if np.linalg.norm(point - bridgepoint1) < 0.1: # TODO: make this a parameter
+                    if np.linalg.norm(point - bridgepoint1) < 0.1:  # TODO: make this a parameter
                         print('joining on existent intermediate point')
                         bridgepoint1 = point
                         matched = True
@@ -147,7 +247,7 @@ def manipulate_skeleton(segment1, segment2,
                 if matched:
                     break
                 else:
-                    if np.linalg.norm(point - bridgepoint2) < 0.1: # TODO: make this a parameter
+                    if np.linalg.norm(point - bridgepoint2) < 0.1:  # TODO: make this a parameter
                         print('joining on existent intermediate point')
                         bridgepoint2 = point
                         matched = True
@@ -186,3 +286,69 @@ def manipulate_skeleton(segment1, segment2,
         raise 'Case not defined'
 
     return segment1, segment2
+
+
+def project_points_onto_plane(points, normal):
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+
+    # Calculate the projections
+    projections = points - np.dot(points, normal)[:, np.newaxis] * normal
+    return projections
+
+
+def points_to_actual_plane(points, normal, point_on_plane):
+    # Normalize the normal vector
+    normal = normal / np.linalg.norm(normal)
+
+    # Calculate the projections
+    projections = points - np.dot(points - point_on_plane, normal)[:, np.newaxis] * normal
+    return projections
+
+
+def project_points_to_plane(points, plane_normal, point_on_plane):
+    plane_normal_normalized = plane_normal / np.linalg.norm(plane_normal)
+    vec_to_points = points - point_on_plane
+    scalar_proj = np.dot(vec_to_points, plane_normal_normalized)
+    vec_proj = np.outer(scalar_proj, plane_normal_normalized)
+    orthogonal_vec = vec_to_points - vec_proj
+    projected_points = points - orthogonal_vec
+    return projected_points
+
+
+
+def project_points_to_line(points, point_on_line, direction):
+    direction_normalized = direction / np.linalg.norm(direction)
+    vec_to_points = points - point_on_line
+    scalar_proj = np.dot(vec_to_points, direction_normalized)
+    vec_proj = np.outer(scalar_proj, direction_normalized)
+    projected_points = point_on_line + vec_proj
+    return projected_points
+
+
+def rotation_matrix_from_vectors(vec1, vec2):
+    vec1 = vec1 / np.linalg.norm(vec1)
+    vec2 = vec2 / np.linalg.norm(vec2)
+
+    axis = np.cross(vec1, vec2)
+    axis_norm = np.linalg.norm(axis)
+    if axis_norm < 1e-7:
+        return np.identity(3)  # No rotation needed
+    axis = axis / axis_norm
+
+    angle = np.arccos(np.dot(vec1, vec2))
+
+    kmat = np.array([[0, -axis[2], axis[1]],
+                     [axis[2], 0, -axis[0]],
+                     [-axis[1], axis[0], 0]])
+
+    return np.identity(3) + np.sin(angle) * kmat + (1 - np.cos(angle)) * np.dot(kmat, kmat)
+
+
+def rotate_points_to_xy_plane(points, normal):
+    # Find the rotation matrix
+    rot_matrix = rotation_matrix_from_vectors(normal, np.array([0, 0, 1]))
+
+    # Rotate the points
+    rotated_points = np.dot(points, rot_matrix.T)
+    return rotated_points

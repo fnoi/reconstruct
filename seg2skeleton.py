@@ -1,141 +1,137 @@
 import itertools
 import os
+from math import ceil, sqrt
+import matplotlib.pyplot as plt
 
 import numpy as np
 
 from structure.CloudSegment import Segment
 from structure.SegmentSkeleton import Skeleton
-from tools.geometry import warped_vectors_intersection, manipulate_skeleton
-from tools.IO import lines2obj
+from tools.geometry import warped_vectors_intersection, manipulate_skeleton, rotation_matrix_from_vectors
+from tools.IO import lines2obj, cache_meta
 from tools.utils import update_logbook_checklist
+from tools.test_plots import plot_test_in, plot_test_out
 
 if __name__ == '__main__':
 
-    skeleton = Skeleton(f'{str(os.getcwd())}/data/out/0_skeleton')
-    if not os.path.exists(skeleton.path):
-        os.makedirs(skeleton.path)
+    # does skeleton need to be inside the loop actually?
+    skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
+                        types=['beams'])  # beams
 
-    segments: list = [
-        'beam_01',
-        'beam_02',
-        'beam_03',
-        'beam_04',
-        'beam_05',
-        'beam_06',
-        'beam_07',
-        'beam_08',
-        'beam_09',
-        'beam_10',
-        'beam_11',
-        'beam_12',
-        'beam_13',
-        'beam_14',
-        'beam_15',
-        'beam_16',
-        'beam_17',
-        'beam_18',
-        'beam_19',
-        'beam_20',
-        'beam_21',
-        'beam_22',
-        'beam_23',
-        'beam_24',
-        'beam_25',
-        'beam_26',
-        'beam_27',
-        'beam_28',
-        'beam_29',
-        'beam_30'
-    ]
+    # pretty lost, import pipe data here according to convention
+    if skeleton.pipes:
+        pth = f'{str(os.getcwd())}/data/in_pipe/axis.txt'
+        # pth = f'{str(os.getcwd())}/data/test/test_x.txt'
+        with open(pth, 'r') as f:
+            test = False
+            data = f.readlines()
+            data = [line.strip().split(' ') for line in data]
+            if test:
+                plot_test_in(data, pth)
+            pipe_ind = -1
+            skeletons = []
+            for line in data:
+                if int(line[0]) != pipe_ind:
+                    skeleton_actual = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton', types=['pipes'])
+                    skeletons.append(skeleton_actual)
 
-    for segment in segments:
-        cloud = Segment(name=segment)
-        cloud.load_from_txt(segment)
-        cloud.calc_pca_o3d()
-        cloud.transform_clean()
-        cloud.pc2obj(pc_type='initial')
-        skeleton.add(cloud)
+                pipe_ind = int(line[0])
+                seg = Segment(name=str(pipe_ind))
 
-    skeleton.find_joints()
-    skeleton.join_passing()
-    skeleton.join_on_passing()
-    skeleton.to_obj(topic='intermediate')
+                seg.left = np.array([float(line[1]), float(line[2]), float(line[3])])
+                seg.right = np.array([float(line[4]), float(line[5]), float(line[6])])
+                seg.center = (seg.left + seg.right) / 2
+                seg.radius = float(line[7])
 
+                skeleton_actual.add_bone(seg)
 
-    # build obj for initial skeleton
-    for bone in skeleton.bones:
-        lines2obj([(bone.left, bone.right)], path=skeleton.parent_path, topic=f'source_{bone.name}')
+            mean_radius = np.mean([skeleton_actual.bones[i].radius for i in range(len(skeleton_actual.bones))])
+            for _ in skeleton_actual.bones:
+                _.radius = mean_radius
 
-    # logbook: list of tuples (bone, bone, distance, case) to describe state of skeleton joints
-    logbook = {}
-    # done_or_flagged: list of indices of bones that are done or flagged (legacy?)
-    done_or_flagged = []
-    # checklist: dictionary indicating which bones are passing through (prio 1)
-    checklist = dict.fromkeys(range(len(skeleton)), 0)
-    # neighbors: list of tuples (bone, bone) to describe all potential bone joints
-    neighbors = list(itertools.combinations(range(len(skeleton)), 2))
+            for i, skeleton in enumerate(skeletons):
+                skeleton.potential = np.array([0, 0, 0])
+                skeleton.to_obj(topic=f'skeletonraw_{i}')
+                # counter = 0
+                # while np.sum(skeleton.potential) < 3: #testing is 1 !
+                #     print(f'Iteration {counter +1}')
+                #     skeleton.trim_passing()
+                #     skeleton.join_passing_new()
+                #     skeleton.join_on_passing()
+                #     print(skeleton.potential)
+                #     counter += 1
+                #     if counter > 10:
+                #         break
 
-    while True:
-        min_ind = None
-        min_track = 1e10
-        logbook, checklist = update_logbook_checklist(skeleton=skeleton,
-                                                      neighbors=neighbors,
-                                                      checklist=checklist)
+                skeleton.join_passing_new()
+                skeleton.join_on_passing()
+                skeleton.trim_passing()
 
-        ind = max(checklist, key=checklist.get)
-        print(ind)
-        while checklist[ind] > 0:
+                # print('in 1')
+                # skeleton.trim_passing()
+                # print('in 2')
+                # skeleton.join_passing_new()
+                # print('in 3')
+                # skeleton.join_on_passing()
 
-            ind = max(checklist, key=checklist.get)
-            temp_log = []
-            for neighbor in neighbors:
-                if ind in neighbor:
-                    temp_log.append(logbook[neighbor][2])
-                else:
-                    temp_log.append(1e10)
-            to_do = np.argmin(np.asarray(temp_log))
-            skeleton[neighbors[to_do][0]], skeleton[neighbors[to_do][1]] = manipulate_skeleton(
-                segment1=skeleton[neighbors[to_do][0]],
-                segment2=skeleton[neighbors[to_do][1]],
-                bridgepoint1=logbook[neighbors[to_do]][0],
-                bridgepoint2=logbook[neighbors[to_do]][1],
-                case=logbook[neighbors[to_do]][3])
-            # initialize next iteration
-            done_or_flagged.append(neighbors[to_do])
-            checklist[ind] -= 1
-            ind = max(checklist, key=checklist.get)
+                if test:
+                    plot_test_out(skeleton, pth)
+                skeleton.to_obj(topic=f'store_pipe{i}', radius=True)
 
+                a = 0
 
-        if checklist[neighbors[to_do][0]] == 2:
-            if rating < min_track and neighbor not in done_or_flagged:
-                min_track = rating
-                min_ind = neighbor
-                min_bp1 = bridgepoint1
-                min_bp2 = bridgepoint2
-                min_case = case
-            logbook[neighbor] = rating
-            # print(dist)
-            # lines2obj([(pt1, pt2)], path=skeletonpath, topic=f'cross_me_{str(neighbor)}')
+    skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
+                        types=['beams'])  # beams
 
-        boss = max(checklist, key=checklist.get)
+    if skeleton.beams:
 
-        if min_ind is None or min_track > 0.3:
-            break
-        else:
-            print(f'crossing {min_ind} with rating {min_track}, case {min_case}')
-            # adjust the skeleton!
-            skeleton[min_ind[0]], skeleton[min_ind[1]] = manipulate_skeleton(
-                segment1=skeleton[min_ind[0]],
-                segment2=skeleton[min_ind[1]],
-                bridgepoint1=min_bp1,
-                bridgepoint2=min_bp2,
-                case=min_case)
-            done_or_flagged.append(min_ind)
+        segments: list = [f'beam_{i}' for i in range(1, 31)]
+        # segment_files: list = [_ for _ in os.listdir(f'{str(os.getcwd())}/data/in_beam/')]
+        # segments: list = [_[:-4] for _ in segment_files]
+        for segment in segments:
+            cloud = Segment(name=segment)
+            cloud.load_from_txt(segment)
+            cloud.calc_axes()
+            # cloud.calc_pca_o3d()
+
+            # cloud.plot_flats()
+            #
+            # cloud.transform_clean()
+            # cloud.pc2obj(pc_type='initial')
+            # skeleton.add_cloud(cloud)
 
         a = 0
 
-    # build the updated skeleton
-    for bone in skeleton:
-        lines2obj([(bone.left, bone.right)], path=skeletonpath, topic=f'prc_{bone.name}')
+        skeleton.potential = np.array([0, 0, 0])
+        # counter = 0
+        # while np.sum(skeleton.potential) < 3:  # testing is 1 !
+        #     print(f'Iteration {counter + 1}')
+        #     skeleton.trim_passing()
+        #     skeleton.join_passing_new()
+        #     skeleton.join_on_passing()
+        #     print(skeleton.potential)
+        #     counter += 1
+        #     if counter > 10:
+        #         break
 
-    a = 0
+        # skeleton.join_passing_new()
+        skeleton.join_passing()
+        skeleton.join_on_passing()
+        skeleton.trim_passing()
+
+        # print('in 1')
+        # skeleton.trim_passing()
+        # print('in 2')
+        # skeleton.join_passing_new()
+        # print('in 3')
+        # skeleton.join_on_passing()
+
+        skeleton.to_obj(topic=f'store_beam')
+        for bone in skeleton.bones:
+            # bone.recompute_pca()
+            x_vec = np.array([1, 0, 0])
+
+            # here pcb_rot and pcc_rot needed?
+            bone.rot_mat_pca = rotation_matrix_from_vectors(bone.pca, x_vec)
+            cache_meta(data={'rot_mat_pca': bone.rot_mat_pca, 'rot_mat_pcb': bone.rot_mat_pcb},
+                       path=bone.outpath, topic='rotations')
