@@ -31,18 +31,25 @@ def intersection_point_of_line_and_plane(line_point, direction, plane):
     return intersection_point
 
 
-def intersecting_line(plane1, plane2):
-    normal1 = np.array(plane1[:3])
-    normal2 = np.array(plane2[:3])
-    d1 = plane1[3]
-    d2 = plane2[3]
-    direction = np.cross(normal1, normal2)
-    if np.linalg.norm(direction) == 0:
-        raise Exception("Planes are parallel, no intersection found")
-    point_on_line = np.linalg.solve(
-        np.column_stack((normal1, normal2, -direction)), -np.array([d1, d2, 0])
+# def intersecting_line(plane1, plane2):
+#     normal1 = np.array(plane1[:3])
+#     normal2 = np.array(plane2[:3])
+#     d1 = plane1[3]
+#     d2 = plane2[3]
+#     direction = np.cross(normal1, normal2)
+#     if np.linalg.norm(direction) == 0:
+#         raise Exception("Planes are parallel, no intersection found")
+#     point_on_line = np.linalg.solve(
+#         np.column_stack((normal1, normal2, direction)), -np.array([d1, d2, 0])
+#
+#     )
+#     return point_on_line, direction
 
-    )
+def intersecting_line(plane1, plane2):
+    normal1, d1 = np.array(plane1[:3], dtype=np.float64), plane1[3]
+    normal2, d2 = np.array(plane2[:3], dtype=np.float64), plane2[3]
+    direction = np.cross(normal1, normal2)
+    point_on_line = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction)**2
     return point_on_line, direction
 
 
@@ -187,6 +194,20 @@ def warped_vectors_intersection(seg1, seg2):
 
 
 # def passing_check:
+
+
+def rotate_points(points, angle, axis):
+    axis_normalized = axis / np.linalg.norm(axis)
+    a = np.cos(angle / 2)
+    b, c, d = -axis_normalized * np.sin(angle / 2)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    rotation_matrix = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                                [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                                [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    return np.dot(points, rotation_matrix)
+
+
 
 
 def manipulate_skeleton(segment1, segment2,

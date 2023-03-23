@@ -16,7 +16,8 @@ from pcd_main import plot_cloud
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
-    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line
+    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
+    rotate_points
 
 
 class Segment(object):
@@ -65,7 +66,7 @@ class Segment(object):
         planes = []
         points = copy.deepcopy(self.points)
         while True:
-            res = plane.fit(pts=points, thresh=0.005, minPoints=0.2 * len(points), maxIteration=10000)
+            res = plane.fit(pts=points, thresh=0.005, minPoints=0.2 * len(points), maxIteration=100000)
             planes.append(res[0])
             points = np.delete(points, res[1], axis=0)
             # calculate angle between planes
@@ -92,8 +93,8 @@ class Segment(object):
                         l_ind = np.argmin(dists)
                         r_ind = np.argmax(dists)
 
-                        self.left = self.points[l_ind]
-                        self.right = self.points[r_ind]
+                        self.left = points_on_line[l_ind]
+                        self.right = points_on_line[r_ind]
                         self.dir = line
 
                         proj_plane = normal_and_point_to_plane(self.dir, self.left)
@@ -127,47 +128,44 @@ class Segment(object):
 
                         fig = plt.figure()
                         ax = fig.add_subplot(111, projection='3d')
-                        # ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
-                        ax.scatter(self.points[:, 0], self.points[:, 1], self.points[:, 2], alpha=0.1)
-                        ax.plot(
-                            [linepts_0_0[0], linepts_0_1[0]],
-                            [linepts_0_0[1], linepts_0_1[1]],
-                            [linepts_0_0[2], linepts_0_1[2]],
-                            color='red')
-                        ax.plot(
-                            [linepts_1_0[0], linepts_1_1[0]],
-                            [linepts_1_0[1], linepts_1_1[1]],
-                            [linepts_1_0[2], linepts_1_1[2]],
-                            color='purple')
+                        ax.scatter(self.points[:, 0], self.points[:, 1], self.points[:, 2], marker='.', s=0.01)
+                        thresh = 1
+                        xlim = (np.min(self.points[:, 0]) - thresh, np.max(self.points[:, 0]) + thresh)
+                        ylim = (np.min(self.points[:, 1]) - thresh, np.max(self.points[:, 1]) + thresh)
+                        zlim = (np.min(self.points[:, 2]) - thresh, np.max(self.points[:, 2]) + thresh)
 
-                        ax.plot(
-                            [self.left[0], self.right[0]],
-                            [self.left[1], self.right[1]],
-                            [self.left[2], self.right[2]],
-                            color='green')
-                        # t_0 = (-20 - point[0]) / line[0]
-                        # t_1 = (20 - point[0]) / line[0]
-                        # pt_0 = point + t_0 * line
-                        # pt_1 = point + t_1 * line
-                        #
-                        # ax.plot([pt_0[0], pt_1[0]], [pt_0[1], pt_1[1]], [pt_0[2], pt_1[2]], color='blue')
-                        # ax.set_xlim(-20, 20)
-                        # ax.set_ylim(-20, 20)
-                        # ax.set_zlim(0, 10)
-                        ax.set_aspect('equal')
+                        x = np.linspace(xlim[0], xlim[1], 3)
+                        y = np.linspace(ylim[0], ylim[1], 3)
+                        z = np.linspace(zlim[0], zlim[1], 3)
+
+                        x1, y1 = np.meshgrid(x, y)
+                        a1, b1, c1, d1 = plane1
+                        z1 = (- a1 * x1 - b1 * y1 - d1) / c1
+                        ax.plot_surface(x1, y1, z1, alpha=0.3)
+
+                        x2, z2 = np.meshgrid(x, z)
+                        a2, b2, c2, d2 = plane2
+                        y2 = (- a2 * x2 - c2 * z2 - d2) / b2
+                        ax.plot_surface(x2, y2, z2, alpha=0.3)
+
+                        y2, z2 = np.meshgrid(y, z)
+                        a2, b2, c2, d2 = proj_plane
+                        x2 = (- b2 * y2 - c2 * z2 - d2) / a2
+                        ax.plot_surface(x2, y2, z2, alpha=0.3)
+
+                        ax.scatter(self.left[0], self.left[1], self.left[2], marker='o', s=10)
+                        ax.scatter(point[0], point[1], point[2], marker='o', s=10)
+
+                        ax.set_xlim = xlim
+                        ax.set_ylim = ylim
+                        ax.set_zlim = zlim
+                        # ax.set_aspect('equal')
                         fig.show()
-
-
-                        # pivot_pt = intersection_point_of_line_and_plane(point, proj_plane_normal, proj_plane_point)
-                        # pivot_pt = rotate_points_to_xy_plane(pivot_pt, self.dir)
-
-                        rotated_pts = rotate_points_to_xy_plane(proj_pts_2, self.dir)
-                        rotated_linepts = rotate_points_to_xy_plane(np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
-
 
                         fig = plt.figure()
                         ax = fig.add_subplot(111, projection='3d')
                         ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
+                        # ax.scatter(points_on_line[:, 0], points_on_line[:, 1], points_on_line[:, 2], color='red')
                         ax.plot(
                             [linepts_0_0[0], linepts_0_1[0]],
                             [linepts_0_0[1], linepts_0_1[1]],
@@ -178,32 +176,54 @@ class Segment(object):
                             [linepts_1_0[1], linepts_1_1[1]],
                             [linepts_1_0[2], linepts_1_1[2]],
                             color='purple')
-                        ax.plot(
-                            [self.left[0], self.right[0]],
-                            [self.left[1], self.right[1]],
-                            [self.left[2], self.right[2]],
-                            color='green')
-
-
-                        x = np.linspace(-1.4, -0.6, 20)
-                        y = np.linspace(24.4, 25.6, 20)
-                        x, y = np.meshgrid(x, y)
-                        # find z for each x,y pair
-                        a, b, c, d = plane1
-                        z = (d - a * x - b * y) / c
-                        z = np.ones((20, 20)) * 5
-
-                        ax.plot_surface(x, y, z, alpha=0.2)
-
-                        ax.set_xlim(-1, 4, -0, 6)
-                        ax.set_ylim(24.4, 25.6)
-                        ax.set_zlim(4, 7.5)
-
-
-                        # ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], rotated_pts[:, 2])
-                        # ax.plot([rotated_linepts[0, 0], rotated_linepts[1, 0]], [rotated_linepts[0, 1], rotated_linepts[1, 1]], [rotated_linepts[0, 2], rotated_linepts[1, 2]], color='red')
-                        # ax.set_aspect('equal')
+                        ax.set_aspect('equal')
                         fig.show()
+
+                        rotated_pts = rotate_points_to_xy_plane(proj_pts_2, self.dir)
+                        rotated_linepts = rotate_points_to_xy_plane(np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
+
+                        fig = plt.figure()
+                        ax = fig.add_subplot(111)
+                        ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], s=0.05)
+                        ax.plot(
+                            [rotated_linepts[0, 0], rotated_linepts[1, 0]],
+                            [rotated_linepts[0, 1], rotated_linepts[1, 1]],
+                            color='red')
+                        ax.plot(
+                            [rotated_linepts[2, 0], rotated_linepts[3, 0]],
+                            [rotated_linepts[2, 1], rotated_linepts[3, 1]],
+                            color='purple')
+                        ax.set_aspect('equal')
+                        fig.show()
+
+                        # calculate angle between line plane 1 and x-axis
+                        angle = np.arctan2(rotated_linepts[1, 1] - rotated_linepts[0, 1], rotated_linepts[1, 0] - rotated_linepts[0, 0])
+                        # rotate points to align line with x-axis
+                        rotated_pivot = rotate_points(np.array([self.left]), angle, np.array([0, 0, 1]))[0]
+                        rotated_pts = rotate_points(rotated_pts, angle, np.array([0, 0, 1]))
+                        rotated_linepts = rotate_points(rotated_linepts, angle, np.array([0, 0, 1]))
+
+                        if np.mean(rotated_pts[:, 1]) < rotated_pivot[1]:
+                            rotated_pts = rotate_points(rotated_pts, np.deg2rad(180), np.array([0, 0, 1]))
+                            rotated_linepts = rotate_points(rotated_linepts, np.deg2rad(180), np.array([0, 0, 1]))
+
+
+                        fig = plt.figure()
+                        ax = fig.add_subplot(111)
+                        ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], s=0.05)
+                        ax.plot(
+                            [rotated_linepts[0, 0], rotated_linepts[1, 0]],
+                            [rotated_linepts[0, 1], rotated_linepts[1, 1]],
+                            color='red')
+                        ax.plot(
+                            [rotated_linepts[2, 0], rotated_linepts[3, 0]],
+                            [rotated_linepts[2, 1], rotated_linepts[3, 1]],
+                            color='purple')
+                        ax.set_aspect('equal')
+                        fig.show()
+
+
+
 
 
                         points_proj = rotated_pts
@@ -227,26 +247,6 @@ class Segment(object):
                         plane_point = intersection_point_of_line_and_plane(point, self.dir, proj_plane)
 
 
-                        # get line of intersection
-                        tab10_color_0 = (0.12156863, 0.46666667, 0.70588235)
-                        # ax.scatter(pivot_pt[0], pivot_pt[1], color=tab10_color_0)
-
-                        # ax.plot(
-                        #     [plane_point - 10 * proj_line_0[0], plane_point + 10 * proj_line_0[0]],
-                        #     [plane_point - 10 * proj_line_0[1], plane_point + 10 * proj_line_0[1]],
-                        #     color=tab10_color_0)
-
-                        tab10_color_1 = (1.0, 0.4980392156862745, 0.054901960784313725)
-                        # ax.scatter(plane_point[0], plane_point[1], color=tab10_color_1)
-                        # ax.plot(
-                        #     [plane_point - 10 * proj_line_1[0], plane_point + 10 * proj_line_1[0]],
-                        #     [plane_point - 10 * proj_line_1[1], plane_point + 10 * proj_line_1[1]],
-                        #     color=tab10_color_1)
-
-
-                        # plt.scatter(points_proj[:, 0], points_proj[:, 1], s=0.05)
-                        # plt.title(f'projected points for segment {self.name}, count {len(points_proj)}')
-                        # plt.show()
 
                         a = 0
 
