@@ -1,0 +1,48 @@
+import math
+import Arch
+import numpy as np
+
+
+#create new file with beams
+olddoc=FreeCAD.ActiveDocument
+App = FreeCAD
+filename = 'ifc_beams'
+App.newDocument(filename)
+fcdoc = App.getDocument(filename)
+
+for obj in olddoc.Objects:
+	if obj.TypeId=='Part::Sweep':
+		placement=obj.Placement
+		crosssection=fcdoc.copyObject(obj.Sections[0], True)
+		length=obj.Spine[0].Geometry[0].length()
+		beam = Arch.makeStructure(crosssection)
+		beam.Height=length
+		#move beam because extrusion is into negative axes
+		yawpitchroll=placement.Rotation.toEuler()
+		yaw=np.deg2rad(yawpitchroll[2])
+		pitch=np.deg2rad(yawpitchroll[1])
+		roll=np.deg2rad(yawpitchroll[0])
+
+		Rx = np.array([[1, 0, 0],
+		               [0, np.cos(pitch), -np.sin(pitch)],
+		               [0, np.sin(pitch), np.cos(pitch)]])
+		
+		Ry = np.array([[np.cos(yaw), 0, np.sin(yaw)],
+		               [0, 1, 0],
+		               [-np.sin(yaw), 0, np.cos(yaw)]])
+		
+		Rz = np.array([[np.cos(roll), -np.sin(roll), 0],
+		               [np.sin(roll), np.cos(roll), 0],
+		               [0, 0, 1]])
+		
+		R = Rz.dot(Ry.dot(Rx))
+		
+		# Calculate the direction vector
+		d = R.dot(np.array([1, 0, 0]))
+		beam.Placement=placement
+		#shift beam to match start point of sweep extrution
+		beam.Placement.Base.x=placement.Base.x+(length*d[0])
+		beam.Placement.Base.y=placement.Base.y+length*d[1]
+		beam.Placement.Base.z=placement.Base.z+length*d[2]
+		beam.IfcType='Beam'
+		fcdoc.recompute()
