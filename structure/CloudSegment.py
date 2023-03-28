@@ -11,7 +11,7 @@ import sympy as sym
 from scipy.spatial import distance
 from math import degrees, acos
 
-from pcd_main import plot_cloud
+from feature_test import plot_cloud
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \

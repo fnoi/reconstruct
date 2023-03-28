@@ -1,4 +1,5 @@
 from math import floor
+import matplotlib.pyplot as plt
 
 import numpy as np
 from sklearn.cluster import DBSCAN
@@ -7,19 +8,25 @@ from sklearn.metrics import silhouette_score
 
 if __name__ == "__main__":
 
-    with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc_rgb.txt', 'r') as f:
-        thisthat = np.loadtxt(f)
+    with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc.txt', 'r') as f:
+        data = np.loadtxt(f)
+    # with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc_rgb.txt', 'r') as f:
+    #     thisthat = np.loadtxt(f)
 
     # downsample every 20th point
-    thisthat = thisthat[::100, :]
+    sampling_rate = 10
+    thisthat = data[::sampling_rate, :]
     coordinates = thisthat[:, :3]
     features = thisthat[:, 3:]
     scaler = StandardScaler()
     scaled_feat = scaler.fit_transform(features)
     data = np.hstack((coordinates, scaled_feat))
 
-    eps_values = np.linspace(0.1, 10, 100)
-    min_samples_values = [_ for _ in range(2, 100)]
+    search_res = 20
+    eps_values = np.linspace(0.1, 2, search_res)
+
+    sv_min, sv_max = 2, 500
+    min_samples_values = [_ for _ in range(sv_min, sv_max, int(floor((sv_max - sv_min) / search_res)))]
 
     best_eps = None
     best_min_samples = None
@@ -49,15 +56,25 @@ if __name__ == "__main__":
         print(f'Best min_samples: {best_min_samples}')
         print(f'Best silhouette: {best_silhouette}')
 
-        import matplotlib.pyplot as plt
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.imshow(result_frame, cmap='rainbow')
+        plt.show()
 
-        plt.imshow(result_frame, cmap='hot', interpolation='nearest')
+        # plt.imshow(result_frame, cmap='hot', interpolation='nearest')
+
+
 
     else:
-        dbscan = DBSCAN(eps=2.5, min_samples=99)
+        dbscan = DBSCAN(eps=0.8, min_samples=26)
         cluster_labels = dbscan.fit_predict(data)
 
         a = 0
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=cluster_labels, cmap='rainbow')
+        plt.show()
 
     # encode cluster_labels in RGB
 
