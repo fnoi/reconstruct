@@ -13,8 +13,8 @@ if __name__ == "__main__":
     # with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc_rgb.txt', 'r') as f:
     #     thisthat = np.loadtxt(f)
 
-    # downsample every 20th point
-    sampling_rate = 10
+    # downsample every *th point
+    sampling_rate = 1
     thisthat = data[::sampling_rate, :]
     coordinates = thisthat[:, :3]
     features = thisthat[:, 3:]
@@ -61,27 +61,24 @@ if __name__ == "__main__":
         ax.imshow(result_frame, cmap='rainbow')
         plt.show()
 
-        # plt.imshow(result_frame, cmap='hot', interpolation='nearest')
-
-
-
     else:
-        dbscan = DBSCAN(eps=0.8, min_samples=26)
+        scaler = StandardScaler()
+        normalized_data = scaler.fit_transform(data)
+        data = normalized_data
+
+        dbscan = DBSCAN(eps=0.25, min_samples=100)
+
         cluster_labels = dbscan.fit_predict(data)
 
         a = 0
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=cluster_labels, cmap='rainbow')
+        ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=cluster_labels, cmap='rainbow', s=0.1)
         plt.show()
 
     # encode cluster_labels in RGB
 
     # plot heatmap of results
-
-
-
-
 
     a = 0

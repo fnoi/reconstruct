@@ -80,7 +80,7 @@ def plot_cloud(pc, head, candidate=False, c_grav=False, cross_mean=False, norms=
 
 def calc_super_normal_numpy(patch):
     patch_normals = patch[:, 3:6]
-    if patch.shape[0] %2 != 0:
+    if patch.shape[0] % 2 != 0:
         patch_normals = patch_normals[:-1, :]
     n = patch_normals.shape[0]
     crosses = np.cross(patch_normals[:n//2, :], patch_normals[n//2:, :])
@@ -95,7 +95,6 @@ def super_normal_multiproc(patch, n_processes=4):
         patches = np.array_split(patch, n_processes)
         results = pool.map(calc_super_normal_numpy, patches)
         return np.mean(results, axis=0)
-
 
 
 if __name__ == "__main__":
