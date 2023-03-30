@@ -98,7 +98,7 @@ def super_normal_multiproc(patch, n_processes=4):
 
 
 if __name__ == "__main__":
-    path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/feature_test_limited.txt'
+    path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/combined_1cm.txt'
     plot = False
 
     with open(path, 'r') as f:
