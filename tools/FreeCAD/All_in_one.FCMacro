@@ -1,0 +1,445 @@
+import os
+import stat
+import pickle
+
+import numpy as np
+from sys import platform
+
+import Part
+import Mesh
+import Draft
+
+import importOBJ
+
+
+
+
+
+#this is obsolete if json data is there
+def cornerpts(poly_params):
+    _ = poly_params[0].split(' ')
+    x0 = float(_[0])
+    y0 = float(_[1])
+    tf = float(_[2])
+    tw = float(_[3])
+    lf = float(_[4])
+    lw = float(_[5])
+
+    p0 = (x0, y0)
+    p1 = (p0[0], p0[1] + tf)
+    p2 = (p1[0] + lf / 2 - tw / 2, p1[1])
+    p3 = (p2[0], p2[1] + lw)
+    p4 = (p1[0], p3[1])
+    p5 = (p4[0], p4[1] + tf)
+    p6 = (p5[0] + lf, p5[1])
+    p7 = (p6[0], p4[1])
+    p8 = (p7[0] - lf / 2 + tw / 2, p7[1])
+    p9 = (p8[0], p2[1])
+    p10 = (p7[0], p9[1])
+    p11 = (p10[0], p0[1])
+
+    array = np.array([
+        [p0[0], p0[1]],
+        [p1[0], p1[1]],
+        [p2[0], p2[1]],
+        [p3[0], p3[1]],
+        [p4[0], p4[1]],
+        [p5[0], p5[1]],
+        [p6[0], p6[1]],
+        [p7[0], p7[1]],
+        [p8[0], p8[1]],
+        [p9[0], p9[1]],
+        [p10[0], p10[1]],
+        [p11[0], p11[1]]
+    ])
+
+    center = (
+        np.min(array[:, 0]) + (np.max(array[:, 0]) - np.min(array[:, 0])) / 2,
+        np.min(array[:, 1]) + (np.max(array[:, 1]) - np.min(array[:, 1])) / 2
+    )
+
+    return (p0, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11), center
+
+#this is obsolete if json data is there
+def sketch_bone(objlines):
+    start = objlines[0].split(' ')[1:4]
+    end = objlines[1].split(' ')[1:4]
+
+    x_start = float(start[0])
+    y_start = float(start[1])
+    z_start = float(start[2])
+    x_end = float(end[0])
+    y_end = float(end[1])
+    z_end = float(end[2])
+
+    return {
+        'start': (x_start, y_start, z_start),
+        'end': (x_end, y_end, z_end)
+    }
+
+# processed data for extrusion 
+def bone_pose(bone):
+    x_start = bone['start'][0]
+    y_start = bone['start'][1]
+    z_start = bone['start'][2]
+    x_end = bone['end'][0]
+    y_end = bone['end'][1]
+    z_end = bone['end'][2]
+
+    array = np.array([
+        [x_start, y_start, z_start],
+        [x_end, y_end, z_end]
+    ])
+    translate_start = np.array([x_start, y_start, z_start])
+    translate_end = np.array([x_end - x_start, y_end - y_start, z_end - z_start])
+
+    len_bone = np.linalg.norm(translate_end)
+    ax_bone = np.array([len_bone, 0, 0])
+    a = ax_bone / np.linalg.norm(ax_bone)
+    b = translate_end / np.linalg.norm(translate_end)
+
+    # calculate rotation matrix from ax_bone to translate_end
+    v = np.cross(a, b)
+    s = np.linalg.norm(v)
+    c = np.dot(a, b)
+    vx = np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0]
+    ])
+    rot_mat = np.eye(3) + vx + np.dot(vx, vx) * ((1 - c) / (s ** 2))
+
+    # apply rotation matrix to ax_bone
+    translate_end_nu = np.dot(rot_mat, ax_bone)
+
+    bone['rotation'] = rot_mat
+    bone['translate_start'] = translate_start
+	#translate_end not needed i guess
+    bone['translate_end'] = translate_end
+    bone['ax_bone'] = ax_bone
+
+    return bone
+
+
+def quaternion_rotation(v, ax=np.array([1.0, 0.0, 0.0])):
+    v = v / norm(v)  # Normalize the vector
+
+    if v[0] == 1.0:  # Vector is already aligned with x-axis
+        q = np.array([1.0, 0.0, 0.0, 0.0])
+    else:
+        axis = np.cross(v, ax)  # Calculate rotation axis
+        angle = np.arccos(np.dot(v, ax))  # Calculate rotation angle
+        q = np.array([np.cos(angle/2), axis[0]*np.sin(angle/2), axis[1]*np.sin(angle/2), axis[2]*np.sin(angle/2)])  # Convert axis-angle representation to quaternion
+
+    return q
+
+
+
+if __name__ == '__main__':
+
+	App = FreeCAD
+	# read json -> get range of bones
+    ids = [i for i in range(1, 30)]
+    segments = [f'store_beam_bone_{i}.obj' for i in ids]
+
+    for linefile, no in zip(segments, ids):
+		# enter here path of 
+        if platform == 'darwin':
+            path_1 = f'/Users/fnoic/PycharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXO)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXU)
+            # os.chmod(f'/Users/fnoic/PycharmProjects/reconstruct/data/out/0_skeleton/', stat.S_IRWXG)
+        elif platform == 'win32':
+        # not sure if this is stable
+            path_1 = f'D:/Uni/hiwi/reconstruct/data/first_beam.txt'
+            path_2 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'D:/Uni/hiwi/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'D:/Uni/hiwi/reconstruct/data/out/0_skeleton/beam_bone_{linefile}.obj'
+        else:
+            path_1 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/first_beam.txt'
+            path_2 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/{linefile}'
+            path_3 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/beam_{no}/rotations.pickle'
+            path_4 = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out/0_skeleton/store_beam_bone_{linefile}.obj'
+
+        # 1 get polygon corners
+        # hardcode_path as FC macro works on different directories and I don't care
+
+        #ToDo: Change path to path of input 
+        hardcode_path = path_1
+        print(hardcode_path)
+
+        with open(hardcode_path, 'r') as f:
+            line = f.readlines()
+
+        polygon_corners, polygon_center = cornerpts(poly_params=line)
+
+        # 2 get bone line
+        hardcode_path = path_2
+        print(hardcode_path)
+        with open(hardcode_path, 'r') as f:
+            # read obj file
+            _ = f.readlines()
+
+		#ToDo: bone sketch delete and process data for sweep
+        bone_dict = sketch_bone(objlines=_)
+        bone_dict = bone_pose(bone=bone_dict)
+
+        # store them on the fly? (for dodo, clean intersection at some point i guess)
+
+        # 3 set up FreeCAD "file"
+		# maybe all in one document?
+        filename_beam = 'beam_skeleton'
+        App.newDocument(filename_beam)
+        fcdoc = App.getDocument(filename_beam)
+        fcdoc.addObject('PartDesign::Body', 'Body')
+        fcdoc.recompute()
+
+        # loop starts here
+        #   4 sketch bone line
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
+        line_1 = fcdoc.getObject('line_path')
+        line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+        line_1.MapMode = 'FlatFace'
+        line_1.addGeometry(Part.LineSegment(
+            App.Vector(0, 0, 0),
+            App.Vector(bone_dict['ax_bone'][0], bone_dict['ax_bone'][1], bone_dict['ax_bone'][2])),
+            False
+        )
+        fcdoc.recompute()
+
+        #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
+        fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
+        polygon = fcdoc.getObject('cross_section')
+        polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
+        polygon.MapMode = 'FlatFace'
+
+        polygon_edges = []
+        for i in range(12):
+            if i != 11:
+                polygon_edges.append((i, i + 1))
+            else:
+                polygon_edges.append((i, 0))
+
+        print(polygon_edges)
+
+        for edge in polygon_edges:
+            polygon.addGeometry(Part.LineSegment(
+                App.Vector(polygon_corners[edge[0]][0], polygon_corners[edge[0]][1], 0),
+                App.Vector(polygon_corners[edge[1]][0], polygon_corners[edge[1]][1], 0)),
+                False
+            )
+
+        fcdoc.recompute()
+
+
+        #   6 sweep
+        fcdoc.addObject('Part::Sweep', 'beam')
+        sweep = fcdoc.getObject('beam')
+        sweep.Sections = polygon
+        sweep.Spine = line_1
+        sweep.Solid = True
+        sweep.Frenet = False
+
+		#	7.1 Rotation
+
+        with open(path_3, 'rb') as f:
+            rotations = pickle.load(f)
+            #not sure if inv and transpose is the same in this case
+            rotation_pca = np.linalg.inv(rotations['rot_mat_pca'])
+            rotation_pcb = np.linalg.inv(rotations['rot_mat_pcb'])
+
+		
+        rotation_all=np.matmul(rotation_pca,rotation_pcb)
+
+
+       
+        sweep.Placement = App.Placement(App.Matrix(
+            rotation_all[0][0], rotation_all[0][1], rotation_all[0][2], 0,
+            rotation_all[1][0], rotation_all[1][1], rotation_all[1][2], 0,
+            rotation_all[2][0], rotation_all[2][1], rotation_all[2][2], 0,
+            0, 0, 0, 1
+        ))
+        fcdoc.recompute()
+
+
+
+
+        # 7.2 translate
+        sweep.Placement.move(App.Vector(
+            bone_dict['translate_start'][0],
+            bone_dict['translate_start'][1],
+            bone_dict['translate_start'][2]
+        ))
+        fcdoc.recompute()
+		
+		#	8 save beam into IFC Export list
+
+		#  TBA
+		#
+		#
+		#
+
+        # 9 export to obj
+        __objs__ = []
+        __objs__.append(fcdoc.getObject('beam'))
+        Mesh.export(__objs__, path_4)
+        del __objs__
+
+
+	# Pipe stuff
+
+	# get range from json file lenght pipes
+    ids = [i for i in range(1, 30)]
+    segments = [f'intermediate_bone_{i}.obj' for i in ids]
+	# ToDo: change path to path in json with pipe folder
+	
+	
+    path_hack = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out_pipe/sweep_pipe.txt'
+
+    piperuns = []
+    with open(path_hack, 'r') as f:
+        # read in json for pipes
+        objlines = f.readlines()
+        # read x y z as floats
+        piperun_0 = [[float(i) for i in objlines[0].split(' ')[1:7]],
+                     [float(i) for i in objlines[1].split(' ')[1:7]],
+                     [float(i) for i in objlines[2].split(' ')[1:7]]]
+        piperuns.append(piperun_0)
+        piperun_1 = [[float(i) for i in objlines[3].split(' ')[1:7]]]
+        piperuns.append(piperun_1)
+        piperun_2 = [[float(i) for i in objlines[4].split(' ')[1:7]]]
+        piperuns.append(piperun_2)
+
+    radius = 17.7 /100  # sorry.
+    # 3 set up FreeCAD "file"
+    filename_pipe = 'pipe_skeleton'
+    App.newDocument(filename_pipe)
+    fcdoc = App.getDocument(filename_pipe)
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.recompute()
+	
+	#foreach pipe go throught segements
+    for i, piperun in enumerate(piperuns):
+        print(i)
+        # 4 draw wire in Draft
+        pl = FreeCAD.Placement()
+        # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
+        pl.Base = FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2])
+        if len(piperun) == 1:
+            points = [
+                FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2]),
+                FreeCAD.Vector(piperun[0][3], piperun[0][4], piperun[0][5])]
+            print(points)
+        if len(piperun) == 3:  # again, I am very sorry for this hack
+            points = [
+                FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2]),
+                FreeCAD.Vector(piperun[0][3], piperun[0][4], piperun[0][5]),
+                FreeCAD.Vector(piperun[1][0], piperun[1][1], piperun[1][2]),
+                FreeCAD.Vector(piperun[1][3], piperun[1][4], piperun[1][5]),
+                FreeCAD.Vector(piperun[2][0], piperun[2][1], piperun[2][2]),
+                FreeCAD.Vector(piperun[2][3], piperun[2][4], piperun[2][5])]
+        line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+        Draft.autogroup(line)
+        FreeCAD.ActiveDocument.recompute()
+
+        pl = FreeCAD.Placement()
+
+        # calculate rotation matrix to rotate z axis with vector
+        vector = np.array(
+            points[1] - points[0]
+
+        a = np.array([0, 0, 1])
+        b = vector / np.linalg.norm(vector)
+        v = np.cross(a, b)
+        c = np.dot(a, b)
+        s = np.linalg.norm(v)
+        kmat = np.array([[0, -v[2], v[1]],
+                         [v[2], 0, -v[0]],
+                         [-v[1], v[0], 0]])
+        rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+        # rotmat from numpy to FreeCAD
+        rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
+                            rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
+                            rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
+                            0, 0, 0, 1)
+
+        pl.Rotation.Matrix = rotmat
+
+        pl.Base = FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2])
+        circle = Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
+        Draft.autogroup(circle)
+        FreeCAD.ActiveDocument.recompute()
+        #
+        # 5 make pipe
+        App.getDocument(filename).addObject('Part::Sweep', f'Pipe_{i}')
+        App.getDocument(filename).ActiveObject.Sections = [circle, ]
+        App.getDocument(filename).ActiveObject.Spine = line
+        App.getDocument(filename).ActiveObject.Solid = True
+        App.getDocument(filename).ActiveObject.Frenet = False
+        App.getDocument(filename).ActiveObject.Transition = u"Round corner"
+
+
+	# export IFC
+	beam_skeleton=App.getDocument(filename_beam)
+	pipe_skeleton=App.getDocument(filename_pipe)
+	filename_export = 'ifc_beams'
+	App.newDocument(filename_export)
+	fcdoc = App.getDocument(filename_export)
+	#get all beams
+	for obj in beam_skeleton.Objects:
+		if obj.TypeId=='Part::Sweep':
+			placement=obj.Placement
+			crosssection=fcdoc.copyObject(obj.Sections[0], True)
+			length=obj.Spine[0].Geometry[0].length()
+			beam = Arch.makeStructure(crosssection,height=length)
+			#move beam because extrusion is into negative axes
+			yawpitchroll=placement.Rotation.toEuler()
+			yaw=np.deg2rad(yawpitchroll[2])
+			pitch=np.deg2rad(yawpitchroll[1])
+			roll=np.deg2rad(yawpitchroll[0])
+	
+			Rx = np.array([[1, 0, 0],
+			               [0, np.cos(pitch), -np.sin(pitch)],
+			               [0, np.sin(pitch), np.cos(pitch)]])
+			
+			Ry = np.array([[np.cos(yaw), 0, np.sin(yaw)],
+			               [0, 1, 0],
+			               [-np.sin(yaw), 0, np.cos(yaw)]])
+			
+			Rz = np.array([[np.cos(roll), -np.sin(roll), 0],
+			               [np.sin(roll), np.cos(roll), 0],
+			               [0, 0, 1]])
+			
+			R = Rz.dot(Ry.dot(Rx))
+			
+			# Calculate the direction vector
+			d = R.dot(np.array([1, 0, 0]))
+			beam.Placement=placement
+			beam.Profile="Crosssection"
+			#shift beam to match start point of sweep extrution
+			beam.Placement.Base.x=placement.Base.x+(length*d[0])
+			beam.Placement.Base.y=placement.Base.y+length*d[1]
+			beam.Placement.Base.z=placement.Base.z+length*d[2]
+			beam.IfcType='Beam'
+			Draft.autogroup(beam)
+			fcdoc.recompute()
+
+
+    for obj in pipe_skeleton.Objects:
+        if obj.TypeId=='Part::Sweep':
+            placement=obj.Placement
+            crosssection=fcdoc.copyObject(obj.Sections[0], True)
+            line=fcdoc.copyObject(obj.Spine[0],True)
+            pipe = Arch.makePipe(crosssection)
+            Draft.autogroup(pipe)
+            pipe = Arch.makePipe(line)
+            Draft.autogroup(pipe)
+            pipe.Diameter=radius*2
+
+
+    print('PyCharm says hi and congrats for running the whole macro without errors!')
+
+

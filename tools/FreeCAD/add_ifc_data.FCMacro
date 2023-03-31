@@ -1,5 +1,6 @@
 import math
 import Arch
+import Draft
 import numpy as np
 
 
@@ -15,8 +16,7 @@ for obj in olddoc.Objects:
 		placement=obj.Placement
 		crosssection=fcdoc.copyObject(obj.Sections[0], True)
 		length=obj.Spine[0].Geometry[0].length()
-		beam = Arch.makeStructure(crosssection)
-		beam.Height=length
+		beam = Arch.makeStructure(crosssection,height=length)
 		#move beam because extrusion is into negative axes
 		yawpitchroll=placement.Rotation.toEuler()
 		yaw=np.deg2rad(yawpitchroll[2])
@@ -40,9 +40,11 @@ for obj in olddoc.Objects:
 		# Calculate the direction vector
 		d = R.dot(np.array([1, 0, 0]))
 		beam.Placement=placement
+		beam.Profile="Crosssection"
 		#shift beam to match start point of sweep extrution
 		beam.Placement.Base.x=placement.Base.x+(length*d[0])
 		beam.Placement.Base.y=placement.Base.y+length*d[1]
 		beam.Placement.Base.z=placement.Base.z+length*d[2]
 		beam.IfcType='Beam'
+		Draft.autogroup(beam)
 		fcdoc.recompute()
