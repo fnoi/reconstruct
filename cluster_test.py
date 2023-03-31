@@ -13,7 +13,7 @@ def euclidean_distance(p1, p2):
     return np.sqrt(np.sum((p1 - p2) ** 2))
 
 
-def euclidian_distance_x(p1x, p2x):
+def euclidian_distancex(p1x, p2x):
     p1x = np.asarray(p1x)
     p2x = np.asarray(p2x)
 
@@ -40,7 +40,7 @@ def angular_distance(v1, v2):
     return angle
 
 
-def angular_distance(v1x, v2x):
+def angular_distancex(v1x, v2x):
     v1x = np.asarray(v1x)
     v2x = np.asarray(v2x)
 
@@ -79,14 +79,20 @@ def region_growing(points, spatial_threshold, feature_threshold):
     return clusters
 
 
-def grow_cluster(seed_id, points, visited_points, spatial_threshold, feature_threshold, kdtree):
-    cluster = [seed_id]
-    visited_points[seed_id] = True
+def grow_cluster(seed_idx, points, visited_points, spatial_threshold, feature_threshold, kdtree):
+    if type(seed_idx) == np.int32:  # initialize region
+    # if len(seed_idx) == 1:  # initialize region
+        cluster = [seed_idx]
+        visited_points[seed_idx] = True
+        neighbors = kdtree.query_radius([points[seed_idx][:3]], r=spatial_threshold)[0]
+        neighbor_fts = points[neighbors][:,3:]
+        neighbor_fts_dist = angular_distancex(np.tile(points[seed_idx][3:], (neighbor_fts.shape[0], 1)), neighbor_fts)
+        a = 0
 
-    neighbors = kdtree.query_radius([points[seed_id][:3]], r=spatial_threshold)[0]
+    neighbors = kdtree.query_radius([points[seed_idx][:3]], r=spatial_threshold)[0]
     neighbor_fts = points[neighbors][:,3:]
     neighbor_fts_dist = [angular_distance(points[seed])]
-    valid_idx = np.where(angular_distance(points[seed_id][3:], neighbor_fts) <= feature_threshold)[0]
+    valid_idx = np.where(angular_distance(points[seed_idx][3:], neighbor_fts) <= feature_threshold)[0]
 
 
 
