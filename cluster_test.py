@@ -13,6 +13,19 @@ def euclidean_distance(p1, p2):
     return np.sqrt(np.sum((p1 - p2) ** 2))
 
 
+def euclidian_distance_x(p1x, p2x):
+    p1x = np.asarray(p1x)
+    p2x = np.asarray(p2x)
+
+    if p1x.shape != p2x.shape:
+        raise ValueError('p1x and p2x must have the same shape')
+
+    distance = np.sqrt(np.sum((p1x - p2x) ** 2, axis=1))
+
+    return distance
+
+
+
 def angular_distance(v1, v2):
     v1_magnitude = np.linalg.norm(v1)
     v2_magnitude = np.linalg.norm(v2)
@@ -27,7 +40,27 @@ def angular_distance(v1, v2):
     return angle
 
 
-    # return np.arccos(np.dot(p1, p2) / (np.linalg.norm(p1) * np.linalg.norm(p2)))
+def angular_distance(v1x, v2x):
+    v1x = np.asarray(v1x)
+    v2x = np.asarray(v2x)
+
+    if v1x.shape[1:] != (3,) or v2x.shape[1:] != (3,):
+        raise ValueError('v1x and v2x must have the shape (n, 3)')
+
+    v1_magnitude = np.linalg.norm(v1x, axis=1)
+    v2_magnitude = np.linalg.norm(v2x, axis=1)
+
+    zero_mask = (v1_magnitude == 0) | (v2_magnitude == 0)
+    if zero_mask.any():
+        raise ValueError('Cannot compute angle between zero vectors')
+
+    dot_product = np.sum(v1x * v2x, axis=1)
+    cos_anglex = dot_product / (v1_magnitude * v2_magnitude)
+    cos_anglex = np.clip(cos_anglex, -1, 1)
+    anglex = np.arccos(cos_anglex)
+    anglex = np.degrees(anglex)
+
+    return anglex
 
 
 def region_growing(points, spatial_threshold, feature_threshold):
@@ -35,18 +68,29 @@ def region_growing(points, spatial_threshold, feature_threshold):
     clusters = []
 
     kdtree = KDTree(points[:, :3], leaf_size=2)
+    pt_idx = np.random.permutation(np.arange(len(points)))
 
-    for idx, point in tqdm(enumerate(points), total=len(points), desc='region growing'):
-        if not visited_points[idx]:
-            cluster = grow_cluster(idx, points, visited_points, spatial_threshold, feature_threshold, kdtree)
+    for pt_id, point in zip(pt_idx, points):
+        if not visited_points[pt_id]:
+            cluster = grow_cluster(pt_id, points, visited_points, spatial_threshold, feature_threshold, kdtree)
             clusters.append(cluster)
+            print(f'{pt_id} - {len(cluster)} - {len(points) - np.count_nonzero(visited_points)}')
 
     return clusters
 
 
-def grow_cluster(seed_idx, points, visited_points, spatial_threshold, feature_threshold, kdtree):
-    cluster = [seed_idx]
-    visited_points[seed_idx] = True
+def grow_cluster(seed_id, points, visited_points, spatial_threshold, feature_threshold, kdtree):
+    cluster = [seed_id]
+    visited_points[seed_id] = True
+
+    neighbors = kdtree.query_radius([points[seed_id][:3]], r=spatial_threshold)[0]
+    neighbor_fts = points[neighbors][:,3:]
+    neighbor_fts_dist = [angular_distance(points[seed])]
+    valid_idx = np.where(angular_distance(points[seed_id][3:], neighbor_fts) <= feature_threshold)[0]
+
+
+
+
     i = 0
 
     while i < len(cluster):
@@ -126,8 +170,8 @@ if __name__ == "__main__":
         # dbscan = DBSCAN(eps=0.25, min_samples=100)
         #
         # cluster_labels = dbscan.fit_predict(data)
-        spatial_threshold = 0.05
-        feature_threshold = 7.5
+        spatial_threshold = 0.1
+        feature_threshold = 15
 
         clusters = region_growing(data, spatial_threshold, feature_threshold)
 
