@@ -1,3 +1,4 @@
+import copy
 from math import floor
 import matplotlib.pyplot as plt
 
@@ -63,63 +64,181 @@ def angular_distancex(v1x, v2x):
     return anglex
 
 
-def region_growing(points, spatial_threshold, feature_threshold):
-    visited_points = np.zeros(len(points), dtype=bool)
+def region_growing(points, spatial_threshold, feature_threshold, plot_individual_clusters=False):
+    regional_points = np.zeros(len(points), dtype=bool)
     clusters = []
 
     kdtree = KDTree(points[:, :3], leaf_size=2)
     pt_idx = np.random.permutation(np.arange(len(points)))
 
     for pt_id, point in zip(pt_idx, points):
-        if not visited_points[pt_id]:
-            cluster = grow_cluster(pt_id, points, visited_points, spatial_threshold, feature_threshold, kdtree)
-            clusters.append(cluster)
-            print(f'{pt_id} - {len(cluster)} - {len(points) - np.count_nonzero(visited_points)}')
+        if not regional_points[pt_id]:
+            cluster, regional_points = grow_cluster(pt_id, points, regional_points, spatial_threshold, feature_threshold, kdtree)
+            print(f'cluster {len(clusters) + 1}: {len(cluster)} pts | remaining: {len(points) - np.count_nonzero(regional_points)}')
+            if len(cluster) > 200:
+                cluster_labels = np.zeros(len(points))
+                cluster_labels[cluster] = 10
+
+                # plot_individual_clusters = True
+
+                if plot_individual_clusters:
+                    fig = plt.figure()
+                    ax = fig.add_subplot(111, projection='3d')
+                    ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=cluster_labels, cmap='rainbow', s=0.1)
+
+                    plt.show()
+
+                clusters.append(cluster)
+
+
+            # print(f'{pt_id} - {len(cluster)} - {len(points) - np.count_nonzero(regional_points)}')
 
     return clusters
 
 
-def grow_cluster(seed_idx, points, visited_points, spatial_threshold, feature_threshold, kdtree):
-    if type(seed_idx) == np.int32:  # initialize region
-    # if len(seed_idx) == 1:  # initialize region
-        cluster = [seed_idx]
-        visited_points[seed_idx] = True
-        neighbors = kdtree.query_radius([points[seed_idx][:3]], r=spatial_threshold)[0]
-        neighbor_fts = points[neighbors][:,3:]
-        neighbor_fts_dist = angular_distancex(np.tile(points[seed_idx][3:], (neighbor_fts.shape[0], 1)), neighbor_fts)
-        a = 0
+def grow_cluster(seed_id, points, visited_points, spatial_threshold, feature_threshold, kdtree):
 
-    neighbors = kdtree.query_radius([points[seed_idx][:3]], r=spatial_threshold)[0]
-    neighbor_fts = points[neighbors][:,3:]
-    neighbor_fts_dist = [angular_distance(points[seed])]
-    valid_idx = np.where(angular_distance(points[seed_idx][3:], neighbor_fts) <= feature_threshold)[0]
+    cluster = [seed_id]
+
+    visited_points[seed_id] = True
+    tested_points = np.zeros(len(points), dtype=bool)
+
+    neighbors = kdtree.query_radius([points[seed_id][:3]], r=spatial_threshold)[0]
+    neighbor_fts = points[neighbors][:, 3:]
+    neighbor_fts_dist = angular_distancex(np.tile(points[seed_id][3:], (neighbor_fts.shape[0], 1)), neighbor_fts)
+
+    fit_idx = np.nonzero(
+        np.logical_or(
+            np.logical_and(
+                -feature_threshold < neighbor_fts_dist,
+                neighbor_fts_dist < feature_threshold
+            ),
+            np.logical_and(
+                180 - feature_threshold < neighbor_fts_dist,
+                neighbor_fts_dist < 180 + feature_threshold
+            )
+        )
+    )[0]
+    cluster = np.concatenate((cluster, neighbors[fit_idx]))
+    # remove seed_id from tbc
+    tbc = cluster
+    tbc = np.delete(tbc, np.where(tbc == seed_id))
+    visited_points[cluster] = True
+
+    # now cluster needs to grow
+    while True:
+        feature_test_individual = False
+        if feature_test_individual:
+            # for each point in cluster, find neighbors that are not yet visited and not yet in the cluster
+            for pt_id in tbc:
+                neighbors = kdtree.query_radius([points[pt_id][:3]], r=spatial_threshold)[0]
+                # remove points that are already in the cluster
+                neighbors = np.setdiff1d(neighbors, cluster)
+                # remove points that are already visited
+                neighbors = np.setdiff1d(neighbors, np.nonzero(visited_points)[0])
+                # remove points that are not within the feature threshold
+                neighbor_fts = points[neighbors][:, 3:]
+                neighbor_fts_dist = angular_distancex(np.tile(points[pt_id][3:], (neighbor_fts.shape[0], 1)), neighbor_fts)
+                fit_idx = np.nonzero(
+                    np.logical_or(
+                        np.logical_and(
+                            -feature_threshold < neighbor_fts_dist,
+                            neighbor_fts_dist < feature_threshold
+                        ),
+                        np.logical_and(
+                            180 - feature_threshold < neighbor_fts_dist,
+                            neighbor_fts_dist < 180 + feature_threshold
+                        )
+                    )
+                )[0]
+                cluster = np.concatenate((cluster, neighbors[fit_idx]))
+                visited_points[pt_id] = True
+                # print(f'{pt_id}, len now: {len(cluster)}')
+                a = 0
+
+            # print('visited all, revisit non-visited points')
+            tbc = cluster
+            tbc = np.setdiff1d(tbc, np.nonzero(visited_points)[0])
+            # print(f'len tbc: {len(tbc)}, len cluster: {len(cluster)}')
+            if len(tbc) == 0:
+                a = 0
+                break
+
+        else:
+            neighbors = kdtree.query_radius(points[cluster][:, :3], r=spatial_threshold)[0]
+            neighbors = np.setdiff1d(neighbors, cluster)
+            neighbors = np.setdiff1d(neighbors, np.nonzero(visited_points)[0])
+            if len(neighbors) == 0:
+                break
+            neighbor_fts = points[neighbors][:, 3:]
+            reference_ft = np.mean(points[cluster][:, 3:], axis=0)
+            neighbor_fts_dist = angular_distancex(np.tile(reference_ft, (neighbor_fts.shape[0], 1)), neighbor_fts)
+
+            fit_idx = np.nonzero(
+                np.logical_or(
+                    np.logical_and(
+                        -feature_threshold < neighbor_fts_dist,
+                        neighbor_fts_dist < feature_threshold
+                    ),
+                    np.logical_and(
+                        180 - feature_threshold < neighbor_fts_dist,
+                        neighbor_fts_dist < 180 + feature_threshold
+                    )
+                )
+            )[0]
+            print(len(fit_idx))
+
+            cluster = np.concatenate((cluster, neighbors[fit_idx]))
+            visited_points[cluster] = True
+
+            tbc = cluster
+            tbc = np.setdiff1d(tbc, np.nonzero(visited_points)[0])
+            tbc = np.setdiff1d(tbc, np.nonzero(tested_points)[0])
+
+            if len(tbc) == 0:
+                a = 0
+                break
+            a = 0
+
+    return cluster, visited_points
 
 
 
 
-    i = 0
-
-    while i < len(cluster):
-        current_point = points[cluster[i]]
-        spatial_neighbors = kdtree.query_radius([current_point[:3]], r=spatial_threshold)[0]
-
-        for neighbor_idx in spatial_neighbors:
-            if not visited_points[neighbor_idx]:
-                candidate_point = points[neighbor_idx]
-                feature_distance = angular_distance(current_point[3:], candidate_point[3:])
-
-                if feature_distance <= feature_threshold:
-                    cluster.append(neighbor_idx)
-                    visited_points[neighbor_idx] = True
-        i += 1
-
-    return cluster
+    #
+    #
+    # neighbors = kdtree.query_radius([points[cluster_idx][:3]], r=spatial_threshold)[0]
+    # neighbor_fts = points[neighbors][:,3:]
+    # neighbor_fts_dist = [angular_distance(points[seed])]
+    # valid_idx = np.where(angular_distance(points[cluster_idx][3:], neighbor_fts) <= feature_threshold)[0]
+    #
+    #
+    #
+    #
+    # i = 0
+    #
+    # while i < len(cluster):
+    #     current_point = points[cluster[i]]
+    #     spatial_neighbors = kdtree.query_radius([current_point[:3]], r=spatial_threshold)[0]
+    #
+    #     for neighbor_idx in spatial_neighbors:
+    #         if not visited_points[neighbor_idx]:
+    #             candidate_point = points[neighbor_idx]
+    #             feature_distance = angular_distance(current_point[3:], candidate_point[3:])
+    #
+    #             if feature_distance <= feature_threshold:
+    #                 cluster.append(neighbor_idx)
+    #                 visited_points[neighbor_idx] = True
+    #     i += 1
+    #
+    # return cluster
 
 
 if __name__ == "__main__":
-
     with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc.txt', 'r') as f:
         data = np.loadtxt(f)
+    # with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc.txt', 'r') as f:
+    #     data = np.loadtxt(f)
     # with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_ok_enc_rgb.txt', 'r') as f:
     #     thisthat = np.loadtxt(f)
 
@@ -176,13 +295,13 @@ if __name__ == "__main__":
         # dbscan = DBSCAN(eps=0.25, min_samples=100)
         #
         # cluster_labels = dbscan.fit_predict(data)
-        spatial_threshold = 0.1
-        feature_threshold = 15
+        spatial_threshold = 0.2
+        feature_threshold = 30
 
         clusters = region_growing(data, spatial_threshold, feature_threshold)
 
         cluster_labels = np.zeros(len(data))
-        i = 0
+        i = 3
         for cluster in tqdm(clusters, desc='assigning labels'):
             cluster_labels[cluster] = i
             i += 1
@@ -198,6 +317,7 @@ if __name__ == "__main__":
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         ax.scatter(data[:, 0], data[:, 1], data[:, 2], c=cluster_labels, cmap='rainbow', s=0.1)
+
         plt.show()
 
         # append cluster labels to data
@@ -205,7 +325,7 @@ if __name__ == "__main__":
 
     # save to txt
     with open('C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_clusters.txt', 'w') as f:
-        np.savetxt(f, data, fmt='%i')
+        np.savetxt(f, data)
 
     # encode cluster_labels in RGB
 
