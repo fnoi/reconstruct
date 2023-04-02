@@ -97,8 +97,31 @@ def super_normal_multiproc(patch, n_processes=4):
         return np.mean(results, axis=0)
 
 
+def smooth_features_knn(pointcloud, k=20):
+    tree = KDTree(pointcloud[:, :3])
+    pointcloud_smooth = np.zeros_like(pointcloud)
+    for i in tqdm(range(pointcloud.shape[0]), desc='smoothing features', total=pointcloud.shape[0]):
+        point = pointcloud[i, :]
+        point_normal = point[3:]
+        neighbors = tree.query(point[:3], k=k)[1]
+        neighbor_normals = pointcloud[neighbors, 3:]
+
+        neighbor_normals_flipped = np.zeros_like(neighbor_normals)
+        for j, neighbor_normal in enumerate(neighbor_normals):
+            # if angle between point normal and neighbor normal is > 90°, flip neighbor normal
+            if np.dot(point_normal, neighbor_normal) < 0:
+                neighbor_normal *= -1
+                # print('did it')
+            neighbor_normals_flipped[j] = neighbor_normal
+
+        pointcloud_smooth[i, :3] = point[:3]
+        pointcloud_smooth[i, 3:] = np.mean(neighbor_normals_flipped, axis=0)
+    return pointcloud_smooth
+
+
 if __name__ == "__main__":
     path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/combined_1cm.txt'
+    # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/feature_test_limited.txt'
     plot = False
 
     with open(path, 'r') as f:
@@ -154,12 +177,16 @@ if __name__ == "__main__":
             cross_mean = solution
 
             pointcloud_enc[pt_id, 3:6] = cross_mean
-            pointcloud_end_rgb = copy.deepcopy(pointcloud_enc)
-            pointcloud_end_rgb[:, 3:6] = np.abs(pointcloud_end_rgb[:, 3:6]) * 255
+
+
 
             if plot:
                 plot_cloud(pc=patch, head='ok', candidate=candidate, c_grav=c_grav, cross_mean=cross_mean,
                            norms=patch_norms)
+
+    pointcloud_enc = smooth_features_knn(pointcloud_enc, k=6)
+    pointcloud_end_rgb = copy.deepcopy(pointcloud_enc)
+    pointcloud_end_rgb[:, 3:6] = np.abs(pointcloud_end_rgb[:, 3:6]) * 255
 
     # ok point cloud
     ok_cp = pointcloud_arr[ok_core_points, :]
