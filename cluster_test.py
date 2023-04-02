@@ -171,7 +171,8 @@ def grow_cluster(seed_id, points, visited_points, spatial_threshold, feature_thr
             if len(neighbors) == 0:
                 break
             neighbor_fts = points[neighbors][:, 3:]
-            reference_ft = np.mean(points[cluster][:, 3:], axis=0)
+            cluster_fts = points[cluster][:, 3:]
+            reference_ft = np.mean(cluster_fts, axis=0)
             neighbor_fts_dist = angular_distancex(np.tile(reference_ft, (neighbor_fts.shape[0], 1)), neighbor_fts)
 
             fit_idx = np.nonzero(
@@ -186,7 +187,6 @@ def grow_cluster(seed_id, points, visited_points, spatial_threshold, feature_thr
                     )
                 )
             )[0]
-            print(len(fit_idx))
 
             cluster = np.concatenate((cluster, neighbors[fit_idx]))
             visited_points[cluster] = True
