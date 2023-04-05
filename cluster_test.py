@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 from numba import jit
-from sklearn.cluster import DBSCAN
+from sklearn.cluster import DBSCAN, MeanShift, estimate_bandwidth
 from sklearn.neighbors import KDTree
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
@@ -63,6 +63,14 @@ def angular_distancex(v1x, v2x):
     anglex = np.degrees(anglex)
 
     return anglex
+
+
+def two_step_growth(points, spatial_threshold, feature_threshold):
+    # perform mean shift clustering
+    cluster_centers, labels = MeanShift(bandwidth=2).fit(points[:, :3])
+    a= 0
+
+
 
 
 def region_growing(points, spatial_threshold, feature_threshold, min_cluster_size=500, plot_individual_clusters=False):
@@ -283,6 +291,9 @@ if __name__ == "__main__":
         # cluster_labels = dbscan.fit_predict(data)
         spatial_threshold = 0.1
         feature_threshold = 40
+
+
+        clusters = two_step_growth(data, spatial_threshold, feature_threshold)
 
         clusters = region_growing(data, spatial_threshold, feature_threshold)
 
