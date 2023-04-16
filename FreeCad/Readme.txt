@@ -1,0 +1,1 @@
+Config.json adjust to the file and copy into %appdata%/FreeCad
