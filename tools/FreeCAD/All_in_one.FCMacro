@@ -55,7 +55,6 @@ if __name__ == '__main__':
         for iter in raw_beam_data:
            if j>0:
                break
-
            #1 getting cornerpoints
            polygon_corners=iter['ListofConers']
 
@@ -65,31 +64,50 @@ if __name__ == '__main__':
            App.newDocument(filename_beam)
            fcdoc = App.getDocument(filename_beam)
            body=fcdoc.addObject('PartDesign::Body', 'Body')
+           pl = FreeCAD.Placement()
+           # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
+           pl.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
 
            fcdoc.recompute()
 
            #   4 sketch bone line
            fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
            line_1 = fcdoc.getObject('line_path')
-           line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
-           line_1.MapMode = 'FlatFace'
+           #line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
+           #line_1.MapMode = 'FlatFace'
            vector=np.asarray([iter["End"][i]-iter["Start"][i] for i in range(3)])
            length=np.linalg.norm(vector)
            
            line_1.addGeometry(Part.LineSegment(
-              App.Vector(0, 0, 0),
-              App.Vector(length,0,0)),
+              App.Vector(iter["Start"][0], iter["Start"][1], iter["Start"][2]),
+              App.Vector(iter["End"][0], iter["End"][1],iter["End"][2])),
               False
            )
            fcdoc.recompute()
 
            #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
+           a = np.array([0, 0, 1])
+           b = vector / np.linalg.norm(vector)
+           v = np.cross(a, b)
+           c = np.dot(a, b)
+           s = np.linalg.norm(v)
+           kmat = np.array([[0, -v[2], v[1]],
+                         [v[2], 0, -v[0]],
+                         [-v[1], v[0], 0]])
+           rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+           # rotmat from numpy to FreeCAD
+           rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
+                            rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
+                            rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
+                            0, 0, 0, 1)
+
+           pl.Rotation.Matrix = rotmat
            
+           #maybe create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
            fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
            polygon = fcdoc.getObject('cross_section')
            polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
            polygon.MapMode = 'FlatFace'
-
            polygon_edges = []
            for i in range(len(iter['ListofConers'])):
                if i != len(iter['ListofConers'])-1:
@@ -98,14 +116,15 @@ if __name__ == '__main__':
                    polygon_edges.append((i, 0))
 
            print(polygon_edges)
-
+           # probably here apply the rotation matrix
            for edge in polygon_edges:
                polygon.addGeometry(Part.LineSegment(
                App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1], 0),
-               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1], 0)),
+               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],0)),
                False
            )
-
+           polygon.Placement=pl
+           Draft.autogroup(polygon)
            fcdoc.recompute()
 
 
@@ -116,67 +135,23 @@ if __name__ == '__main__':
            sweep.Spine = line_1
            sweep.Solid = True
            sweep.Frenet = False
-		   
-           # 7 Rotation
-
-           rotation_all=np.matmul(iter["PCA_rot"],iter["PCB_rot"])
-
-           # testing
-       
-           sweep.Placement = App.Placement(App.Matrix(
-               rotation_all[0][0], rotation_all[0][1], rotation_all[0][2], 0,
-               rotation_all[1][0], rotation_all[1][1], rotation_all[1][2], 0,
-               rotation_all[2][0], rotation_all[2][1], rotation_all[2][2], 0,
-               0, 0, 0, 1
-           ))
+           sweep.Placement.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
            fcdoc.recompute()
-
-           # 7.2 translate
-           sweep.Placement.move(App.Vector(
-               iter["Start"][0],
-               iter["Start"][1],
-               iter["Start"][2]
-           ))
-           fcdoc.recompute()
-
+           
+          
            
             #	8 save beam into IFC Export list
            App.setActiveDocument(filename_export)
-           placement=sweep.Placement
-           crosssection=fcdocexport.copyObject(polygon, True)
+           crosssection=fcdocexport.copyObject(sweep.Sections[0], True)
            beam = Arch.makeStructure(crosssection,height=length)
-           #move beam because extrusion is into negative axes
-           yawpitchroll=placement.Rotation.toEuler()
-           yaw=np.deg2rad(yawpitchroll[2])
-           pitch=np.deg2rad(yawpitchroll[1])
-           roll=np.deg2rad(yawpitchroll[0])
-
-           Rx = np.array([[1, 0, 0],
-                           [0, np.cos(pitch), -np.sin(pitch)],
-                           [0, np.sin(pitch), np.cos(pitch)]])
-
-           Ry = np.array([[np.cos(yaw), 0, np.sin(yaw)],
-                           [0, 1, 0],
-                           [-np.sin(yaw), 0, np.cos(yaw)]])
-
-           Rz = np.array([[np.cos(roll), -np.sin(roll), 0],
-                           [np.sin(roll), np.cos(roll), 0],
-                           [0, 0, 1]])
-
-           R = Rz.dot(Ry.dot(Rx))
-           # Calculate the direction vector
-           d = R.dot(np.array([1, 0, 0]))
-           beam.Placement=placement
            beam.Profile="Crosssection"
            #shift beam to match start point of sweep extrution
-           beam.Placement.Base.x=placement.Base.x+(length*d[0])
-           beam.Placement.Base.y=placement.Base.y+length*d[1]
-           beam.Placement.Base.z=placement.Base.z+length*d[2]
+           beam.Placement=pl
            beam.IfcType='Beam'
            Draft.autogroup(beam)
            fcdocexport.recompute()
            App.setActiveDocument(filename_beam)
-
+           fcdoc.recompute()
 
 
             # 9 export to obj
