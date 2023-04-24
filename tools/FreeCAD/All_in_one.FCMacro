@@ -248,18 +248,21 @@ if __name__ == '__main__':
             fcdoc.recompute()
             
             # Export for IFC
-            #App.setActiveDocument(filename_export)
-            #placement=sweep.Placement
-            #crosssection=fcdoc.copyObject(circle, True)
-            #line=fcdoc.copyObject(line,True)
-            #pipe = Arch.makePipe(crosssection)
-            #Draft.autogroup(pipe)
-            #pipe = Arch.makePipe(line)
-            #Draft.autogroup(pipe)
-            #pipe.Diameter=radius*2
-            #fcdocexport.recompute()
-            #App.setActiveDocument(filename_pipe)
-            #fcdoc.recompute()
+            App.setActiveDocument(filename_export)
+            placement=sweep.Placement
+            crosssection= Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
+            line_copy = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+            Draft.autogroup(line_copy)
+            fcdoc.recompute()
+            pipe = Arch.makePipe(line_copy)
+            Draft.autogroup(pipe)
+            pipe.Diameter=radius*2
+            pipe = Arch.makePipe(crosssection)
+            Draft.autogroup(pipe)
+
+            fcdocexport.recompute()
+            App.setActiveDocument(filename_pipe)
+            fcdoc.recompute()
 
              # 9 export to obj
             __objs__ = []
