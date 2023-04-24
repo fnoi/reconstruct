@@ -53,8 +53,7 @@ if __name__ == '__main__':
     with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
         raw_beam_data = json.load(f)['Beams']
         for iter in raw_beam_data:
-           if j>0:
-               break
+
            #1 getting cornerpoints
            polygon_corners=iter['ListofConers']
 
@@ -71,18 +70,12 @@ if __name__ == '__main__':
            fcdoc.recompute()
 
            #   4 sketch bone line
-           fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'line_path')
-           line_1 = fcdoc.getObject('line_path')
-           #line_1.Support = (fcdoc.getObject('XY_Plane'), [''])
-           #line_1.MapMode = 'FlatFace'
            vector=np.asarray([iter["End"][i]-iter["Start"][i] for i in range(3)])
            length=np.linalg.norm(vector)
-           
-           line_1.addGeometry(Part.LineSegment(
-              App.Vector(iter["Start"][0], iter["Start"][1], iter["Start"][2]),
-              App.Vector(iter["End"][0], iter["End"][1],iter["End"][2])),
-              False
-           )
+           points = [FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2]),
+                     FreeCAD.Vector(iter["End"][0],iter["End"][1],iter["End"][2])]
+           line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+           Draft.autogroup(line)
            fcdoc.recompute()
 
            #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
@@ -102,11 +95,29 @@ if __name__ == '__main__':
                             0, 0, 0, 1)
 
            pl.Rotation.Matrix = rotmat
+
            
            #maybe create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
+           #create rotatet plane 
+           #create points
+           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", "Point1")
+           point.X=iter['Start'][0]
+           point.Y=iter['Start'][1]
+           point.Z=iter['Start'][2]
+
+           
+           datumplane=fcdoc.getObject('Body').newObject('PartDesign::Plane','DatumPlane')
+           datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+           datumplane.MapReversed = False
+           datumplane.Support = [(point,'Vertex1')]
+           datumplane.MapPathParameter = 0.000000
+           datumplane.MapMode = 'Translate'
+           datumplane.Placement.Rotation.Matrix=rotmat
+           datumplane.recompute()
+           
            fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
            polygon = fcdoc.getObject('cross_section')
-           polygon.Support = (fcdoc.getObject('YZ_Plane'), [''])
+           polygon.Support = (fcdoc.getObject('DatumPlane'), [''])
            polygon.MapMode = 'FlatFace'
            polygon_edges = []
            for i in range(len(iter['ListofConers'])):
@@ -119,8 +130,8 @@ if __name__ == '__main__':
            # probably here apply the rotation matrix
            for edge in polygon_edges:
                polygon.addGeometry(Part.LineSegment(
-               App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1], 0),
-               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],0)),
+               App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1],  iter['ListofConers'][edge[0]][2]),
+               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],iter['ListofConers'][edge[1]][2])),
                False
            )
            polygon.Placement=pl
@@ -132,10 +143,10 @@ if __name__ == '__main__':
            fcdoc.addObject('Part::Sweep', 'beam')
            sweep = fcdoc.getObject('beam')
            sweep.Sections = polygon
-           sweep.Spine = line_1
+           sweep.Spine = line
            sweep.Solid = True
            sweep.Frenet = False
-           sweep.Placement.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
+           #sweep.Placement.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
            fcdoc.recompute()
            
           
@@ -146,7 +157,9 @@ if __name__ == '__main__':
            beam = Arch.makeStructure(crosssection,height=length)
            beam.Profile="Crosssection"
            #shift beam to match start point of sweep extrution
-           beam.Placement=pl
+           beam.Placement.Base.x=iter["End"][0]
+           beam.Placement.Base.y=iter["End"][1]
+           beam.Placement.Base.z=iter["End"][2]
            beam.IfcType='Beam'
            Draft.autogroup(beam)
            fcdocexport.recompute()
@@ -162,7 +175,7 @@ if __name__ == '__main__':
            del __objs__
            
            # 9 clean up
-           #App.closeDocument(filename_beam)
+           App.closeDocument(filename_beam)
 
 
 
