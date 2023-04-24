@@ -43,11 +43,6 @@ if __name__ == '__main__':
 
     path=path['File Path']
     # read json -> get range of bones
-    ids = [i for i in range(1, 2)]
-    segments = [f'intermediate_bone_{i}.obj' for i in ids]
-    # 1 get polygon corners
-    # hardcode_path as FC macro works on different directories and I don't care
-
     #ToDo: Change path to path of input 
     j=0
     with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
@@ -78,7 +73,7 @@ if __name__ == '__main__':
            Draft.autogroup(line)
            fcdoc.recompute()
 
-           #   5 sketch polygon, move to where it should be # TODO: fine tune placement wrt axis? (fine tune axis or this?)
+           #   calc rotation matrix for inclined plane
            a = np.array([0, 0, 1])
            b = vector / np.linalg.norm(vector)
            v = np.cross(a, b)
@@ -97,15 +92,15 @@ if __name__ == '__main__':
            pl.Rotation.Matrix = rotmat
 
            
-           #maybe create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
-           #create rotatet plane 
-           #create points
+           #create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
+ 
+           #create points for offset
            point = FreeCAD.ActiveDocument.addObject("Part::Vertex", "Point1")
            point.X=iter['Start'][0]
            point.Y=iter['Start'][1]
            point.Z=iter['Start'][2]
 
-           
+           #create rotatet plane
            datumplane=fcdoc.getObject('Body').newObject('PartDesign::Plane','DatumPlane')
            datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
            datumplane.MapReversed = False
@@ -115,6 +110,7 @@ if __name__ == '__main__':
            datumplane.Placement.Rotation.Matrix=rotmat
            datumplane.recompute()
            
+           # sketch crosssection
            fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
            polygon = fcdoc.getObject('cross_section')
            polygon.Support = (fcdoc.getObject('DatumPlane'), [''])
@@ -153,13 +149,14 @@ if __name__ == '__main__':
            
             #	8 save beam into IFC Export list
            App.setActiveDocument(filename_export)
-           crosssection=fcdocexport.copyObject(sweep.Sections[0], True)
+           crosssection=fcdocexport.copyObject(polygon, True)
            beam = Arch.makeStructure(crosssection,height=length)
            beam.Profile="Crosssection"
            #shift beam to match start point of sweep extrution
-           beam.Placement.Base.x=iter["End"][0]
-           beam.Placement.Base.y=iter["End"][1]
-           beam.Placement.Base.z=iter["End"][2]
+           beam.Placement.Base.x+=vector[0]
+           beam.Placement.Base.y+=vector[1]
+           beam.Placement.Base.z+=vector[2]
+
            beam.IfcType='Beam'
            Draft.autogroup(beam)
            fcdocexport.recompute()
@@ -179,149 +176,100 @@ if __name__ == '__main__':
 
 
 
-	# Pipe stuff
+    # Pipe stuff
 
-	# get range from json file lenght pipes
-    ids = [i for i in range(1, 30)]
-    segments = [f'intermediate_bone_{i}.obj' for i in ids]
-	# ToDo: change path to path in json with pipe folder
-	
-	
-    path_hack = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out_pipe/sweep_pipe.txt'
-
-    piperuns = []
-    with open(path_hack, 'r') as f:
-        # read in json for pipes
-        objlines = f.readlines()
-        # read x y z as floats
-        piperun_0 = [[float(i) for i in objlines[0].split(' ')[1:7]],
-                     [float(i) for i in objlines[1].split(' ')[1:7]],
-                     [float(i) for i in objlines[2].split(' ')[1:7]]]
-        piperuns.append(piperun_0)
-        piperun_1 = [[float(i) for i in objlines[3].split(' ')[1:7]]]
-        piperuns.append(piperun_1)
-        piperun_2 = [[float(i) for i in objlines[4].split(' ')[1:7]]]
-        piperuns.append(piperun_2)
-
-    radius = 17.7 /100  # sorry.
-    # 3 set up FreeCAD "file"
-    filename_pipe = 'pipe_skeleton'
-    App.newDocument(filename_pipe)
-    fcdoc = App.getDocument(filename_pipe)
-    fcdoc.addObject('PartDesign::Body', 'Body')
-    fcdoc.recompute()
-	
-	#foreach pipe go throught segements
-    for i, piperun in enumerate(piperuns):
-        print(i)
-        # 4 draw wire in Draft
-        pl = FreeCAD.Placement()
-        # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
-        pl.Base = FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2])
-        if len(piperun) == 1:
-            points = [
-                FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2]),
-                FreeCAD.Vector(piperun[0][3], piperun[0][4], piperun[0][5])]
-            print(points)
-        if len(piperun) == 3:  # again, I am very sorry for this hack
-            points = [
-                FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2]),
-                FreeCAD.Vector(piperun[0][3], piperun[0][4], piperun[0][5]),
-                FreeCAD.Vector(piperun[1][0], piperun[1][1], piperun[1][2]),
-                FreeCAD.Vector(piperun[1][3], piperun[1][4], piperun[1][5]),
-                FreeCAD.Vector(piperun[2][0], piperun[2][1], piperun[2][2]),
-                FreeCAD.Vector(piperun[2][3], piperun[2][4], piperun[2][5])]
-        line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
-        Draft.autogroup(line)
-        FreeCAD.ActiveDocument.recompute()
-
-        pl = FreeCAD.Placement()
-
-        # calculate rotation matrix to rotate z axis with vector
-        vector = np.array(points[1] - points[0])
-
-        a = np.array([0, 0, 1])
-        b = vector / np.linalg.norm(vector)
-        v = np.cross(a, b)
-        c = np.dot(a, b)
-        s = np.linalg.norm(v)
-        kmat = np.array([[0, -v[2], v[1]],
-                         [v[2], 0, -v[0]],
-                         [-v[1], v[0], 0]])
-        rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
-        # rotmat from numpy to FreeCAD
-        rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
-                            rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
-                            rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
-                            0, 0, 0, 1)
-
-        pl.Rotation.Matrix = rotmat
-
-        pl.Base = FreeCAD.Vector(piperun[0][0], piperun[0][1], piperun[0][2])
-        circle = Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
-        Draft.autogroup(circle)
-        FreeCAD.ActiveDocument.recompute()
-        #
-        # 5 make pipe
-        App.getDocument(filename).addObject('Part::Sweep', f'Pipe_{i}')
-        App.getDocument(filename).ActiveObject.Sections = [circle, ]
-        App.getDocument(filename).ActiveObject.Spine = line
-        App.getDocument(filename).ActiveObject.Solid = True
-        App.getDocument(filename).ActiveObject.Frenet = False
-        App.getDocument(filename).ActiveObject.Transition = u"Round corner"
-
-
-	# export IFC
-    beam_skeleton=App.getDocument(filename_beam)
-    pipe_skeleton=App.getDocument(filename_pipe)
-    filename_export = 'ifc_beams'
+    # get range from json file lenght pipes
+    filename_export = 'ifc_pipe'
     App.newDocument(filename_export)
-    fcdoc = App.getDocument(filename_export)
-    #get all beams
-    for obj in beam_skeleton.Objects:
-        if obj.TypeId=='Part::Sweep':
-            placement=obj.Placement
-            crosssection=fcdoc.copyObject(obj.Sections[0], True)
-            length=obj.Spine[0].Geometry[0].length()
-            beam = Arch.makeStructure(crosssection,height=length)
-            #move beam because extrusion is into negative axes
-            yawpitchroll=placement.Rotation.toEuler()
-            yaw=np.deg2rad(yawpitchroll[2])
-            pitch=np.deg2rad(yawpitchroll[1])
-            roll=np.deg2rad(yawpitchroll[0])
+    fcdocexport = App.getDocument(filename_export)
+    config=os.getenv('APPDATA')+f'/FreeCad/config.json'
+    with open(config, 'r') as f:
+        path = json.load(f)
 
-            Rx = np.array([[1, 0, 0],
-                           [0, np.cos(pitch), -np.sin(pitch)],
-                           [0, np.sin(pitch), np.cos(pitch)]])
+    path=path['File Path']
+    # read json -> get range of bones
+    #ToDo: Change path to path of input 
+    j=0
+    with open(path+f'/data/Sample_Json/pipe_sample.json', 'r') as f:
+        raw_pipe_data = json.load(f)['Pipe']
+        for iter in raw_pipe_data:
+            radius = iter["Radius"]
+            # 3 set up FreeCAD "file"
+            filename_pipe = 'pipe_skeleton'
+            App.newDocument(filename_pipe)
+            fcdoc = App.getDocument(filename_pipe)
+            fcdoc.addObject('PartDesign::Body', 'Body')
+            fcdoc.recompute()
+            #foreach pipe go throught segements
+            # 4 draw wire in Draft
+            pl = FreeCAD.Placement()
+            # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
+            points=[]
+            for piperun in iter["Segments"]:
+                points.append(FreeCAD.Vector(piperun["Start"][0], piperun["Start"][1], piperun["Start"][2]))
+                points.append(FreeCAD.Vector(piperun["End"][0], piperun["End"][1], piperun["End"][2]))
+            pl.Base = FreeCAD.Vector(points[0][0], points[0][1], points[0][2])
+            line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+            Draft.autogroup(line)
+            fcdoc.recompute()
 
-            Ry = np.array([[np.cos(yaw), 0, np.sin(yaw)],
-                           [0, 1, 0],
-                           [-np.sin(yaw), 0, np.cos(yaw)]])
+            # calculate rotation matrix to rotate z axis with vector
+            vector = np.array(points[1] - points[0])
 
-            Rz = np.array([[np.cos(roll), -np.sin(roll), 0],
-                           [np.sin(roll), np.cos(roll), 0],
-                           [0, 0, 1]])
+            a = np.array([0, 0, 1])
+            b = vector / np.linalg.norm(vector)
+            v = np.cross(a, b)
+            c = np.dot(a, b)
+            s = np.linalg.norm(v)
+            kmat = np.array([[0, -v[2], v[1]],
+                             [v[2], 0, -v[0]],
+                             [-v[1], v[0], 0]])
+            rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+            # rotmat from numpy to FreeCAD
+            rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
+                                rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
+                                rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
+                                0, 0, 0, 1)
 
-            R = Rz.dot(Ry.dot(Rx))
+            pl.Rotation.Matrix = rotmat
 
-            # Calculate the direction vector
-            dot(np.array([1, 0, 0]))
-            placement=placement
-            profile="Crosssection"
-            ifcType='Beam'
-            autogroup(beam)
-            recompute()
-             
-    for obj in pipe_skeleton.Objects:
-        if obj.TypeId=='Part::Sweep':
-            placement=obj.Placement
-            crosssection=fcdoc.copyObject(obj.Sections[0], True)
-            line=fcdoc.copyObject(obj.Spine[0],True)
-            pipe = Arch.makePipe(crosssection)
-            Draft.autogroup(pipe)
-            pipe = Arch.makePipe(line)
-            Draft.autogroup(pipe)
-            pipe.Diameter=radius*2
+
+            circle = Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
+            Draft.autogroup(circle)
+            fcdoc.recompute()
+            #
+            # 5 make pipe
+            sweep=App.getDocument(filename_pipe).addObject('Part::Sweep', f'Pipe_{j}')
+            sweep.Sections = [circle, ]
+            sweep.Spine = line
+            sweep.Solid = True
+            sweep.Frenet = False
+            sweep.Transition = u"Round corner"
+            fcdoc.recompute()
+            
+            # Export for IFC
+            #App.setActiveDocument(filename_export)
+            #placement=sweep.Placement
+            #crosssection=fcdoc.copyObject(circle, True)
+            #line=fcdoc.copyObject(line,True)
+            #pipe = Arch.makePipe(crosssection)
+            #Draft.autogroup(pipe)
+            #pipe = Arch.makePipe(line)
+            #Draft.autogroup(pipe)
+            #pipe.Diameter=radius*2
+            #fcdocexport.recompute()
+            #App.setActiveDocument(filename_pipe)
+            #fcdoc.recompute()
+
+             # 9 export to obj
+            __objs__ = []
+            __objs__.append(sweep)
+            Mesh.export(__objs__, path+f'/data/out/0_skeleton/pipe_bone_{j}.obj')
+            j=j+1
+            del __objs__
+            
+            # 9 clean up
+            App.closeDocument(filename_pipe)
 
 
     print('PyCharm says hi and congrats for running the whole macro without errors!')
