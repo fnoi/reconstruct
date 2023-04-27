@@ -37,6 +37,7 @@ if __name__ == '__main__':
     filename_export = 'ifc_beams'
     App.newDocument(filename_export)
     fcdocexport = App.getDocument(filename_export)
+    fcdocexport.addObject('PartDesign::Body', 'Body')
     #read filepath for reconstrution
     config=os.getenv('APPDATA')+f'/FreeCad/config.json'
     with open(config, 'r') as f:
@@ -150,8 +151,47 @@ if __name__ == '__main__':
             #	7 save beam into IFC Export list
            # doesnt work
            App.setActiveDocument(filename_export)
-           crosssection=fcdocexport.copyObject(polygon, True)
-           beam = Arch.makeStructure(crosssection,height=length)
+           # create crosssection again 
+           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{iter['ID']}")
+           point.X=iter['Start'][0]
+           point.Y=iter['Start'][1]
+           point.Z=iter['Start'][2]
+
+           #create rotatet plane
+           datumplane=FreeCAD.ActiveDocument.getObject('Body').newObject('PartDesign::Plane',f'DatumPlane{iter["ID"]}')
+           datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+           datumplane.MapReversed = False
+           datumplane.Support = [(point,f"Point{iter['ID']}")]
+           datumplane.MapPathParameter = 0.000000
+           datumplane.MapMode = 'Translate'
+           datumplane.Placement.Rotation.Matrix=rotmat
+           datumplane.recompute()
+           
+           # sketch crosssection
+           FreeCAD.ActiveDocument.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{iter["ID"]}')
+           polygon = FreeCAD.ActiveDocument.getObject(f'cross_section{iter["ID"]}')
+           polygon.Support = (FreeCAD.ActiveDocument.getObject(f'DatumPlane{iter["ID"]}'), [''])
+           polygon.MapMode = 'FlatFace'
+           polygon_edges = []
+           for i in range(len(iter['ListofConers'])):
+               if i != len(iter['ListofConers'])-1:
+                   polygon_edges.append((i, i + 1))
+               else:
+                   polygon_edges.append((i, 0))
+
+           print(polygon_edges)
+           # probably here apply the rotation matrix
+           for edge in polygon_edges:
+               polygon.addGeometry(Part.LineSegment(
+               App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1],  iter['ListofConers'][edge[0]][2]),
+               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],iter['ListofConers'][edge[1]][2])),
+               False
+           )
+           polygon.Placement=pl
+           Draft.autogroup(polygon)
+           fcdoc.recompute()
+
+           beam = Arch.makeStructure(polygon,height=length)
            beam.Profile="Crosssection"
            # ifc strutre elements are extruded into the negative axis
            # the beam is placed via the crosssection -> need to shift in the local placement -> the vector of the spine
@@ -164,7 +204,9 @@ if __name__ == '__main__':
            fcdocexport.recompute()
            App.setActiveDocument(filename_beam)
            fcdoc.recompute()
+           # i dont know why but this solves the problem that beams dont show up
            fcdoc.removeObject(f'DatumPlane{iter["ID"]}')
+           fcdocexport.removeObject(f'DatumPlane{iter["ID"]}')
            fcdoc.recompute()
 
 
