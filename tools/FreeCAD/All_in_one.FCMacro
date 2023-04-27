@@ -46,7 +46,6 @@ if __name__ == '__main__':
     path=path['File Path']
     # read json -> get range of bones
     #ToDo: Change path to path of input 
-    j=0
     # 0 set up FreeCAD "file"
     filename_beam = 'beam_skeleton'
     App.newDocument(filename_beam)
@@ -56,8 +55,7 @@ if __name__ == '__main__':
     with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
         raw_beam_data = json.load(f)['Beams']
         for iter in raw_beam_data:
-           if j>0:
-               break
+
            #1 getting cornerpoints
            polygon_corners=iter['ListofConers']
            
@@ -209,17 +207,45 @@ if __name__ == '__main__':
            fcdocexport.removeObject(f'DatumPlane{iter["ID"]}')
            fcdoc.recompute()
 
+    # 8 Intersections 
+    # get the connections
+    with open(path+f'/data/Sample_Json/ConnectionsBeam_sample.json', 'r') as f:
+        raw_connection_data = json.load(f)['ConnectionBeam']
+        for iter in raw_connection_data:
+            for i in range(1,len(iter["Connections"])):
+                #go through each connection and modify the current one to all beams that are befor on the list
+                for m in range(i):
+                    if m==0:
+                        #do the cutout and search the objects by Label because the inital name is fix and so i would yield the wrong object
+                        copy=fcdoc.copyObject(fcdoc.getObjectsByLabel(f"beam{iter['Connections'][m]}"))[0]
+                        cutout = BOPTools.JoinFeatures.makeCutout(name=f'cutout{iter["Connections"][i]}')
+                        oldbeam=fcdoc.getObjectsByLabel(f"beam{iter['Connections'][i]}")[0]
+                        cutout.Base = oldbeam
+                        cutout.Tool = copy
+                        cutout.Proxy.execute(cutout)
+                        cutout.purgeTouched()
+                        for obj in cutout.ViewObject.Proxy.claimChildren():
+                            obj.ViewObject.hide()
+                        # renaming the old beam and the cutout that the cutout is the new beam
+                        # FreeCad sets the name on creation and is not changeable -> need to tracke the change via Label 
+                        oldbeam.Label=oldbeam.Label+f"_v{m}"
+                        fcdoc.recompute()
+                        cutout.Label=f"beam{iter['Connections'][i]}"
+                        fcdoc.recompute()
 
-         # 9 export to obj
+
+     # 9 export to obj
+    __objs__ = []
+    with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
+        raw_beam_data = json.load(f)['Beams']
         for iter in raw_beam_data:
             __objs__ = []
-            __objs__.append(fcdoc.getObject(f'beam{iter["ID"]}'))
+            __objs__.append(fcdoc.getObjectsByLabel(f"beam{iter['ID']}")[0])
             Mesh.export(__objs__, path+f'/data/out/0_skeleton/beam_bone_{iter["ID"]}.obj')
-
             del __objs__
-        
-        # 9 clean up
-        #App.closeDocument(filename_beam)
+    
+    # 9 clean up
+    #App.closeDocument(filename_beam)
 
 
 
