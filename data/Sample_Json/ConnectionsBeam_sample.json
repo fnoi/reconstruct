@@ -1,7 +1,6 @@
 {
   "ConnectionBeam":[
 		{
-			"Primary": 6,
 			"Connections": [6,17]
         }
   ]

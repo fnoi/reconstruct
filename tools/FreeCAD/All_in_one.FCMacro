@@ -37,6 +37,7 @@ if __name__ == '__main__':
     filename_export = 'ifc_beams'
     App.newDocument(filename_export)
     fcdocexport = App.getDocument(filename_export)
+    #read filepath for reconstrution
     config=os.getenv('APPDATA')+f'/FreeCad/config.json'
     with open(config, 'r') as f:
         path = json.load(f)
@@ -45,26 +46,27 @@ if __name__ == '__main__':
     # read json -> get range of bones
     #ToDo: Change path to path of input 
     j=0
+    # 0 set up FreeCAD "file"
+    filename_beam = 'beam_skeleton'
+    App.newDocument(filename_beam)
+    fcdoc = App.getDocument(filename_beam)
+    body=fcdoc.addObject('PartDesign::Body', 'Body')
+
     with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
         raw_beam_data = json.load(f)['Beams']
         for iter in raw_beam_data:
-
+           if j>0:
+               break
            #1 getting cornerpoints
            polygon_corners=iter['ListofConers']
-
-           # 3 set up FreeCAD "file"
-		   # maybe all in one document?
-           filename_beam = 'beam_skeleton'
-           App.newDocument(filename_beam)
-           fcdoc = App.getDocument(filename_beam)
-           body=fcdoc.addObject('PartDesign::Body', 'Body')
+           
+           # 2 create placement
            pl = FreeCAD.Placement()
            # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
            pl.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
-
            fcdoc.recompute()
 
-           #   4 sketch bone line
+           #   3 sketch bone line
            vector=np.asarray([iter["End"][i]-iter["Start"][i] for i in range(3)])
            length=np.linalg.norm(vector)
            points = [FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2]),
@@ -73,7 +75,7 @@ if __name__ == '__main__':
            Draft.autogroup(line)
            fcdoc.recompute()
 
-           #   calc rotation matrix for inclined plane
+           #  4 calc rotation matrix for inclined plane
            a = np.array([0, 0, 1])
            b = vector / np.linalg.norm(vector)
            v = np.cross(a, b)
@@ -92,28 +94,28 @@ if __name__ == '__main__':
            pl.Rotation.Matrix = rotmat
 
            
-           #create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
+           # 5 create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
  
            #create points for offset
-           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", "Point1")
+           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{iter['ID']}")
            point.X=iter['Start'][0]
            point.Y=iter['Start'][1]
            point.Z=iter['Start'][2]
 
            #create rotatet plane
-           datumplane=fcdoc.getObject('Body').newObject('PartDesign::Plane','DatumPlane')
+           datumplane=fcdoc.getObject('Body').newObject('PartDesign::Plane',f'DatumPlane{iter["ID"]}')
            datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
            datumplane.MapReversed = False
-           datumplane.Support = [(point,'Vertex1')]
+           datumplane.Support = [(point,f"Point{iter['ID']}")]
            datumplane.MapPathParameter = 0.000000
            datumplane.MapMode = 'Translate'
            datumplane.Placement.Rotation.Matrix=rotmat
            datumplane.recompute()
            
            # sketch crosssection
-           fcdoc.getObject('Body').newObject('Sketcher::SketchObject', 'cross_section')
-           polygon = fcdoc.getObject('cross_section')
-           polygon.Support = (fcdoc.getObject('DatumPlane'), [''])
+           fcdoc.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{iter["ID"]}')
+           polygon = fcdoc.getObject(f'cross_section{iter["ID"]}')
+           polygon.Support = (fcdoc.getObject(f'DatumPlane{iter["ID"]}'), [''])
            polygon.MapMode = 'FlatFace'
            polygon_edges = []
            for i in range(len(iter['ListofConers'])):
@@ -134,10 +136,9 @@ if __name__ == '__main__':
            Draft.autogroup(polygon)
            fcdoc.recompute()
 
-
            #   6 sweep
-           fcdoc.addObject('Part::Sweep', 'beam')
-           sweep = fcdoc.getObject('beam')
+           fcdoc.addObject('Part::Sweep', f'beam{iter["ID"]}')
+           sweep = fcdoc.getObject(f'beam{iter["ID"]}')
            sweep.Sections = polygon
            sweep.Spine = line
            sweep.Solid = True
@@ -145,14 +146,15 @@ if __name__ == '__main__':
            #sweep.Placement.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
            fcdoc.recompute()
            
-          
            
-            #	8 save beam into IFC Export list
+            #	7 save beam into IFC Export list
+           # doesnt work
            App.setActiveDocument(filename_export)
            crosssection=fcdocexport.copyObject(polygon, True)
            beam = Arch.makeStructure(crosssection,height=length)
            beam.Profile="Crosssection"
-           #shift beam to match start point of sweep extrution
+           # ifc strutre elements are extruded into the negative axis
+           # the beam is placed via the crosssection -> need to shift in the local placement -> the vector of the spine
            beam.Placement.Base.x+=vector[0]
            beam.Placement.Base.y+=vector[1]
            beam.Placement.Base.z+=vector[2]
@@ -162,17 +164,20 @@ if __name__ == '__main__':
            fcdocexport.recompute()
            App.setActiveDocument(filename_beam)
            fcdoc.recompute()
+           fcdoc.removeObject(f'DatumPlane{iter["ID"]}')
+           fcdoc.recompute()
 
 
-            # 9 export to obj
-           __objs__ = []
-           __objs__.append(fcdoc.getObject('beam'))
-           Mesh.export(__objs__, path+f'/data/out/0_skeleton/beam_bone_{j}.obj')
-           j=j+1
-           del __objs__
-           
-           # 9 clean up
-           App.closeDocument(filename_beam)
+         # 9 export to obj
+        for iter in raw_beam_data:
+            __objs__ = []
+            __objs__.append(fcdoc.getObject(f'beam{iter["ID"]}'))
+            Mesh.export(__objs__, path+f'/data/out/0_skeleton/beam_bone_{iter["ID"]}.obj')
+
+            del __objs__
+        
+        # 9 clean up
+        #App.closeDocument(filename_beam)
 
 
 
@@ -182,13 +187,6 @@ if __name__ == '__main__':
     filename_export = 'ifc_pipe'
     App.newDocument(filename_export)
     fcdocexport = App.getDocument(filename_export)
-    config=os.getenv('APPDATA')+f'/FreeCad/config.json'
-    with open(config, 'r') as f:
-        path = json.load(f)
-
-    path=path['File Path']
-    # read json -> get range of bones
-    #ToDo: Change path to path of input 
     j=0
     with open(path+f'/data/Sample_Json/pipe_sample.json', 'r') as f:
         raw_pipe_data = json.load(f)['Pipe']
