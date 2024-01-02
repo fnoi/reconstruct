@@ -54,7 +54,12 @@ if __name__ == "__main__":
     # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/in/'
     # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams_1cm.txt'
     # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/test_beams.txt'
-    path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/combined_1cm.txt'
+    # check if OS is windows or macOS
+    if os.name == 'nt':
+        path = 'C:/Users/ga25mal/'
+    else:
+        path = '/Users/fnoic/'
+    path = f'{path}PycharmProjects/reconstruct/data/test/combined_1cm.txt'
     plot = False
     # points = []
     # for cloud in os.listdir(path):

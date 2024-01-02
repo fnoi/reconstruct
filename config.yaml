@@ -1,0 +1,3 @@
+segmentation:
+  # path to raw cloud
+  cloud_path: /data/in_test/test_junction.txt
