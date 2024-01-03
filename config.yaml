@@ -1,3 +1,17 @@
+general:
+  basepath_windows: C:/Users/ga25mal/
+  basepath_macos: /Users/fnoic/
+  project_path: PycharmProjects/reconstruct/
+
 segmentation:
   # path to raw cloud
   cloud_path: /data/in_test/test_junction.txt
+
+local:
+  normals_radius: 0.05
+  max_nn: 30
+  max_dist_cross: 0.4
+  max_dist_to_plane: 0.05
+
+initial:
+  rnd_pick_ratio: 0.05

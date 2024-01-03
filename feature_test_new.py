@@ -6,7 +6,7 @@ import open3d as o3d
 import multiprocessing as mp
 from scipy.spatial import KDTree
 from tqdm import tqdm
-from numba import njit, prange
+# from numba import njit, prange
 
 from matplotlib import pyplot as plt
 
@@ -121,8 +121,9 @@ def smooth_features_knn(pointcloud, k=20):
 
 if __name__ == "__main__":
     # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/combined_1cm.txt'
-    path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/test/feature_test_limited.txt'
-    plot = False
+    # path = 'C:/Users/ga25mal/PycharmProjects/reconstruct/data/in_test/test_junction.txt'
+    path = '/Users/fnoic/PycharmProjects/reconstruct/data/in_test/test_junction.txt'
+    plot = True
 
     with open(path, 'r') as f:
         points_arr = np.loadtxt(f)[:, :3]
