@@ -6,12 +6,18 @@ general:
 segmentation:
   # path to raw cloud
   cloud_path: /data/in_test/test_junction.txt
-
+#  cloud_path: /data/in_instances/beams.txt
 local:
   normals_radius: 0.05
   max_nn: 30
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
+  supernormal_radius: 0.15
 
 initial:
   rnd_pick_ratio: 0.05
+
+clustering:
+  max_dist_euc: 0.1  # re-think with cross and to-plane limits
+  angle_thresh_supernormal: 20
+  angle_thresh_normal: 10
