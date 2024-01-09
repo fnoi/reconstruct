@@ -28,7 +28,13 @@ def get_neighbors_flex(point_ids, full_cloud, dist):
     coords_points_all = cloud_c_n_sn_co[:, :3]
     distances = cdist(coords_points_check, coords_points_all)
     ids_neighbors = np.where(distances < dist)[1]
+    # delete seed points
+    ids_neighbors = np.delete(ids_neighbors, point_ids)
     return ids_neighbors.tolist()
+
+
+def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
+
 
 
 def region_growth(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
@@ -39,23 +45,38 @@ def region_growth(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
 
     for point_check in points_active:
         print(f'point_check {point_check}')
-        check_idx = get_neighbors(point_id=point_check, full_cloud=cloud_c_n_sn_co, dist=config.clustering.max_dist_euc)
-        for check_id in check_idx:
+        check_idx = get_neighbors(point_id=point_check,
+                                  full_cloud=cloud_c_n_sn_co,
+                                  dist=config.clustering.max_dist_euc)
+        idx_append = np.zeros(len(check_idx))
+        for i, check_id in enumerate(check_idx):
+            a = 0
             # print(f'check_id {check_id}')
             supernormal_deviation = angular_deviation(cloud_c_n_sn_co[check_id, 6:9], cloud_c_n_sn_co[point_check, 6:9])
             if supernormal_deviation < config.clustering.angle_thresh_supernormal:
-                points_region.append(check_id)
-            else:
+                # points_region.append(check_id)
+                idx_append[i] = 1
+        # ids of idx_append that are 1
+        idx_append = np.where(idx_append == 1)[0]
+        append_actual = [check_idx[_] for _ in idx_append]
+        points_region.append(append_actual)
+        # remove appended from check_idx
+        check_idx = np.delete(check_idx, idx_append)
+        if len(check_idx) > 0 and len(points_region) > 0:
+            for check_id in check_idx:
                 # check distance to all points in the region
                 dists = []
-                if len(points_region) > 0:
-                    for point_region in points_region:
-                        dist = np.linalg.norm(cloud_c_n_sn_co[check_id, :3] - cloud_c_n_sn_co[point_region, :3])
-                        dists.append(dist)
-                    # sort distances and ids
-                    dists = np.array(dists)
-                    ids = np.argsort(dists)
-                    a = 0
+                for point_region in points_region:
+                    dist = np.linalg.norm(cloud_c_n_sn_co[check_id, :3] - cloud_c_n_sn_co[point_region, :3])
+                    dists.append(dist)
+                # sort distances and ids
+                dists = np.array(dists)
+                ids = np.argsort(dists)
+            for id in ids:
+                # check if closest point is within threshold
+                if dists[id] < config.clustering.angle_thresh_normal:
+                    points_region.append(id)
+                a = 0
     b = 0
 
 
@@ -92,6 +113,8 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
         plot_flag = False
         if id_seed == plot_id:
             plot_flag = True
+        # override
+        plot_flag = False
         if plot_flag:
             fig = go.Figure()
 

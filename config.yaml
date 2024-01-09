@@ -5,7 +5,7 @@ general:
 
 segmentation:
   # path to raw cloud
-  cloud_path: /data/in_test/test_junction.txt
+  cloud_path: /data/in_test/test_junction_snip.txt
 #  cloud_path: /data/in_instances/beams.txt
 local:
   normals_radius: 0.05
