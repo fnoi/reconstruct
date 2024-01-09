@@ -4,9 +4,10 @@ general:
   project_path: PycharmProjects/reconstruct/
 
 segmentation:
-  # path to raw cloud
   cloud_path: /data/in_test/test_junction_snip.txt
-#  cloud_path: /data/in_instances/beams.txt
+  # path to raw cloud
+  #  cloud_path: /data/in_instances/beams.txt
+
 local:
   normals_radius: 0.05
   max_nn: 30
@@ -19,5 +20,5 @@ initial:
 
 clustering:
   max_dist_euc: 0.1  # re-think with cross and to-plane limits
-  angle_thresh_supernormal: 20
+  angle_thresh_supernormal: 15
   angle_thresh_normal: 10

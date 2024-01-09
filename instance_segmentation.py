@@ -1,3 +1,4 @@
+import copy
 import pathlib
 import os
 import random
@@ -34,7 +35,102 @@ def get_neighbors_flex(point_ids, full_cloud, dist):
 
 
 def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
+    regional_labels = np.zeros(len(feature_cloud_c_n_sn_co))
+    regional_label = 0
+    # append labels to cloud
+    cloud_c_n_sn_co_l = np.concatenate((feature_cloud_c_n_sn_co, regional_labels[:, None]), axis=1)
 
+    while True:
+        regional_label += 1
+        # find all points with no label
+        no_label_row_ids = cloud_c_n_sn_co_l[:, -1] == 0
+        # find no-label point with lowest co value
+        region_seed = np.argmin(cloud_c_n_sn_co_l[no_label_row_ids, -2])
+        region_neighbors = []
+        region_points = [region_seed]
+        individual_neighbors = get_neighbors(point_id=region_seed,
+                                             full_cloud=cloud_c_n_sn_co_l,
+                                             dist=config.clustering.max_dist_euc)
+        region_neighbors.extend(individual_neighbors)
+        region_neighbors = list(np.unique(region_neighbors))
+
+        # check supernormal dev between seed and neighbors
+        for neighbor in individual_neighbors:
+            supernormal_deviation = angular_deviation(
+                vector = cloud_c_n_sn_co_l[neighbor, 6:9],
+                reference = cloud_c_n_sn_co_l[region_seed, 6:9]
+            )
+            if supernormal_deviation < config.clustering.angle_thresh_supernormal:
+                cloud_c_n_sn_co_l[neighbor, -1] = regional_label
+                region_points.append(neighbor)
+
+        # visiting_region_point_ind = 0
+        legacy_neighbors = copy.deepcopy(region_neighbors)
+        iter = 0
+        checked = [region_seed]
+        while True:
+            # list of pts to check: not in checked, but in region_points
+            check_points = [x for x in region_points if x not in checked]
+            if len(check_points) == 0:
+                break
+            checking_point = check_points[0]
+            checked.append(checking_point)
+            iter += 1
+            if iter > len(region_points):
+                break
+            print(f'running loop {iter}: point {checking_point}')
+            # visiting_region_point_ind += 1
+            individual_neighbors = get_neighbors(
+                point_id=checking_point,
+                full_cloud=cloud_c_n_sn_co_l,
+                dist=config.clustering.max_dist_euc
+            )
+            region_neighbors.extend(individual_neighbors)
+            region_neighbors = list(np.unique(region_neighbors))
+            # if region_neighbors == legacy_neighbors:
+            #     break
+
+            # check supernormal dev between seed and neighbors
+            for neighbor in individual_neighbors:
+                supernormal_deviation = angular_deviation(
+                    vector = cloud_c_n_sn_co_l[neighbor, 6:9],
+                    reference = cloud_c_n_sn_co_l[region_seed, 6:9]
+                )
+                if supernormal_deviation < config.clustering.angle_thresh_supernormal:
+                    cloud_c_n_sn_co_l[neighbor, -1] = regional_label
+                    region_points.append(neighbor)
+
+            legacy_neighbors = copy.deepcopy(region_neighbors)
+
+        # save cloud
+        with open(f'{basepath}{config.general.project_path}data/parking/region_{regional_label}.txt', 'w') as f:
+            np.savetxt(f, cloud_c_n_sn_co_l, fmt='%.6f', delimiter=';', newline='\n')
+        # make o3d point cloud
+        cloud = o3d.geometry.PointCloud()
+        cloud.points = o3d.utility.Vector3dVector(cloud_c_n_sn_co_l[:, :3])
+        # add l as scalar
+        colormap = plt.get_cmap("tab20")
+        colors = colormap(cloud_c_n_sn_co_l[:, -1])
+        cloud.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        # store point cloud to pcd file
+        # write normals from 6:9
+        cloud.normals = o3d.utility.Vector3dVector(cloud_c_n_sn_co_l[:, 6:9])
+        o3d.io.write_point_cloud(f'{basepath}{config.general.project_path}data/parking/region_{regional_label}.pcd', cloud)
+        a = 0
+        # check 2
+
+        # write labels
+
+        # be done (with first region)
+
+
+
+
+
+    cloud_c_n_sn_co_l[lowest_co, -1] = regional_label
+
+
+    a = 0
 
 
 def region_growth(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
@@ -204,10 +300,16 @@ if __name__ == "__main__":
     cloud_c_n_sn_co = np.concatenate((point_coords_arr, point_normals_arr, supernormals), axis=1)
     cloud_c_n_sn_co = np.concatenate((cloud_c_n_sn_co, np.array(confidences)[:, None]), axis=1)
 
+    viz_sn = cloud_c_sn[:, 3:]
+    # pick max value and mlt for all
+    viz_sn /= np.max(viz_sn)
+    # concat with coords
+    viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
+
     # store in txt
     with open(f'{basepath}{config.general.project_path}data/parking/supernormals.txt', 'w') as f:
         np.savetxt(f, cloud_c_sn, fmt='%.6f')
 
-    cloud_clustered = region_growth(cloud_c_n_sn_co, config, point_cloud_tree)
+    cloud_clustered = region_growth_rev(cloud_c_n_sn_co, config, point_cloud_tree)
 
     a = 0
