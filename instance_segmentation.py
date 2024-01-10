@@ -34,6 +34,124 @@ def get_neighbors_flex(point_ids, full_cloud, dist):
     return ids_neighbors.tolist()
 
 
+def angle_between_normals(normal1, normal2):
+    """Calculate the angle between two normals."""
+    dot_product = np.dot(normal1, normal2)
+    return np.arccos(dot_product / (np.linalg.norm(normal1) * np.linalg.norm(normal2)))
+
+
+def region_growing_with_kdtree(points, feature_cloud_tree, config):
+    points = np.array(points[:, :6])
+
+    distance_threshold = config.clustering.dist_thresh_normal
+    angle_threshold = config.clustering.angle_thresh_normal
+    angle_threshold = np.deg2rad(angle_threshold)
+
+    num_points = points.shape[0]
+    clusters = [-1] * num_points  # Initialize cluster labels to -1
+    cluster_id = 0
+    iter = 0
+    for i in range(num_points):
+        if clusters[i] == -1:  # Unprocessed point
+            clusters[i] = cluster_id
+            seeds = [i]
+
+            while seeds:
+                current_index = seeds.pop()
+                iter += 1
+                print(f'current_index {current_index}, iteration {iter}')
+                current_point = points[current_index]
+
+                # Query points within the distance threshold
+                indices = feature_cloud_tree.query_ball_point(current_point[:3], distance_threshold)
+
+                for j in indices:
+                    if clusters[j] == -1:  # Unprocessed point
+                        # calculate mean normal of cluster
+                        regional_normal = np.mean(points[np.where(np.array(clusters) == cluster_id)][:,3:], axis=0)
+                        regional_normal /= np.linalg.norm(regional_normal)
+
+                        if angle_between_normals(regional_normal, points[j, 3:]) < angle_threshold:
+                            clusters[j] = cluster_id
+                            seeds.append(j)
+            print(f'\n\ncluster {cluster_id} done, cluster size {clusters.count(cluster_id)}\n\n')
+            cluster_id += 1
+
+    return clusters
+
+
+def euclidean_distance(point1, point2):
+    """Calculate the Euclidean distance between two points."""
+    return np.linalg.norm(point1 - point2)
+
+def angle_between_supernormals(supernormal1, supernormal2):
+    """Calculate the angle between two supernormals."""
+    dot_product = np.dot(supernormal1, supernormal2)
+    return np.arccos(dot_product / (np.linalg.norm(supernormal1) * np.linalg.norm(supernormal2)))
+
+def region_growing_supernormals(points, kdtree, config):
+    distance_threshold = config.clustering.max_dist_euc
+    angle_threshold = config.clustering.angle_thresh_supernormal
+    angle_threshold = np.deg2rad(angle_threshold)
+
+    num_points = points.shape[0]
+    super_clusters = [-1] * num_points  # Initialize super cluster labels to -1
+    super_cluster_id = 0
+
+    # get list of normal cluster ids sorted by cluster size
+    cluster_ids, cluster_sizes = np.unique(points[:, -2], return_counts=True)
+    cluster_ids_sorted = cluster_ids[np.argsort(cluster_sizes)]
+
+    # get list of id args sorted by confidence, minimum first
+    confidence_sorted_ids = np.argsort(points[:, -1])
+    confidence_sorted_ids = confidence_sorted_ids.tolist()
+
+    # sort confidence sorted ids by normal cluster size
+    confidence_sorted_ids = [x for x in confidence_sorted_ids if points[x, -2] in cluster_ids_sorted]
+
+
+    for i in confidence_sorted_ids:
+        if super_clusters[i] == -1:  # Unprocessed point
+            initial_cluster = points[i, -1]  # Last column represents the initial cluster label
+            super_clusters[i] = super_cluster_id
+
+            # all points of same cluster get super cluster id
+            seed_ids = np.where(points[:, -1] == initial_cluster)[0].tolist()
+            # write super cluster id to all points of same cluster
+            super_clusters_array = np.array(super_clusters)
+            super_clusters_array[seed_ids] = super_cluster_id
+            super_clusters = super_clusters_array.tolist()
+            # overwrite supernormals in cluster with supernormal of seed point
+            points[seed_ids, 6:9] = points[i, 6:9]
+
+            seeds = [i]
+
+            while seeds:
+                current_index = seeds.pop()
+                current_point = points[current_index]
+
+                # Query points within the distance threshold
+                indices = kdtree.query_ball_point(current_point[:3], distance_threshold)
+
+                for j in indices:
+                    if super_clusters[j] == -1:  # Unprocessed point
+                        if angle_between_supernormals(current_point[6:9], points[j, 6:9]) < angle_threshold:
+                            # add this point to the cluster
+                            super_clusters[j] = super_cluster_id
+                            seeds.append(j)
+                            # add all points of same normal cluster to super cluster
+                            seed_ids = np.where(points[:, -1] == points[j, -1])[0].tolist()
+                            super_clusters_array = np.array(super_clusters)
+                            super_clusters_array[seed_ids] = super_cluster_id
+                            super_clusters = super_clusters_array.tolist()
+                            # overwrite supernormals in cluster with supernormal of seed point
+                            points[seed_ids, 6:9] = points[i, 6:9]
+
+            super_cluster_id += 1
+
+    return super_clusters
+
+
 def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
     regional_labels = np.zeros(len(feature_cloud_c_n_sn_co))
     regional_label = 0
@@ -57,8 +175,8 @@ def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
         # check supernormal dev between seed and neighbors
         for neighbor in individual_neighbors:
             supernormal_deviation = angular_deviation(
-                vector = cloud_c_n_sn_co_l[neighbor, 6:9],
-                reference = cloud_c_n_sn_co_l[region_seed, 6:9]
+                vector=cloud_c_n_sn_co_l[neighbor, 6:9],
+                reference=cloud_c_n_sn_co_l[region_seed, 6:9]
             )
             if supernormal_deviation < config.clustering.angle_thresh_supernormal:
                 cloud_c_n_sn_co_l[neighbor, -1] = regional_label
@@ -93,8 +211,8 @@ def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
             # check supernormal dev between seed and neighbors
             for neighbor in individual_neighbors:
                 supernormal_deviation = angular_deviation(
-                    vector = cloud_c_n_sn_co_l[neighbor, 6:9],
-                    reference = cloud_c_n_sn_co_l[region_seed, 6:9]
+                    vector=cloud_c_n_sn_co_l[neighbor, 6:9],
+                    reference=cloud_c_n_sn_co_l[region_seed, 6:9]
                 )
                 if supernormal_deviation < config.clustering.angle_thresh_supernormal:
                     cloud_c_n_sn_co_l[neighbor, -1] = regional_label
@@ -115,7 +233,8 @@ def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
         # store point cloud to pcd file
         # write normals from 6:9
         cloud.normals = o3d.utility.Vector3dVector(cloud_c_n_sn_co_l[:, 6:9])
-        o3d.io.write_point_cloud(f'{basepath}{config.general.project_path}data/parking/region_{regional_label}.pcd', cloud)
+        o3d.io.write_point_cloud(f'{basepath}{config.general.project_path}data/parking/region_{regional_label}.pcd',
+                                 cloud)
         a = 0
         # check 2
 
@@ -123,12 +242,7 @@ def region_growth_rev(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
 
         # be done (with first region)
 
-
-
-
-
     cloud_c_n_sn_co_l[lowest_co, -1] = regional_label
-
 
     a = 0
 
@@ -174,8 +288,6 @@ def region_growth(feature_cloud_c_n_sn_co, config, feature_cloud_tree):
                     points_region.append(id)
                 a = 0
     b = 0
-
-
 
     return None
 
@@ -310,6 +422,39 @@ if __name__ == "__main__":
     with open(f'{basepath}{config.general.project_path}data/parking/supernormals.txt', 'w') as f:
         np.savetxt(f, cloud_c_sn, fmt='%.6f')
 
-    cloud_clustered = region_growth_rev(cloud_c_n_sn_co, config, point_cloud_tree)
+    cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
+    print(f'found {np.max(cloud_cluster_ids)} clusters')
+
+    # align xyz with labels
+    cloud_clustered = np.concatenate((cloud_c_n_sn_co, np.array(cloud_cluster_ids)[:, None]), axis=1)
+    # write to txt readable by cloudcompare
+    with open(f'{basepath}{config.general.project_path}data/parking/clustered.txt', 'w') as f:
+        np.savetxt(f, cloud_clustered, fmt='%.6f', delimiter=';', newline='\n')
+
+    super_clusters = region_growing_supernormals(cloud_clustered, point_cloud_tree, config)
+    print(f'found {np.max(super_clusters)} super clusters')
+
+    cloud_super_clustered = np.concatenate((cloud_clustered, np.array(super_clusters)[:, None]), axis=1)
+
+
+    # DROPPING POINTS
+    thresh = 20
+    # drop all points that belong to super cluster size lower than 20
+    super_cluster_sizes = np.unique(super_clusters, return_counts=True)[1]
+    super_cluster_ids = np.unique(super_clusters, return_counts=True)[0]
+    super_cluster_ids = super_cluster_ids[super_cluster_sizes > thresh]
+    # get ids of points that belong to super clusters with size > thresh
+    super_cluster_point_ids = []
+    for super_cluster_id in super_cluster_ids:
+        super_cluster_point_ids.extend(np.where(super_clusters == super_cluster_id)[0].tolist())
+    # drop all points that are not in super_cluster_point_ids
+    cloud_super_clustered = cloud_super_clustered[super_cluster_point_ids, :]
+
+
+    # write to txt readable by cloudcompare
+    with open(f'{basepath}{config.general.project_path}data/parking/super_clustered.txt', 'w') as f:
+        np.savetxt(f, cloud_super_clustered, fmt='%.6f', delimiter=';', newline='\n')
+
+    # cloud_clustered = region_growth_rev(cloud_c_n_sn_co, config, point_cloud_tree)
 
     a = 0
