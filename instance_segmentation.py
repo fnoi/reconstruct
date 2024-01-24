@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
+from sklearn.cluster import DBSCAN
 
 from tools.local import supernormal_svd, supernormal_confidence, angular_deviation
 from tools.utils import find_random_id
@@ -38,6 +39,83 @@ def angle_between_normals(normal1, normal2):
     """Calculate the angle between two normals."""
     dot_product = np.dot(normal1, normal2)
     return np.arccos(dot_product / (np.linalg.norm(normal1) * np.linalg.norm(normal2)))
+
+
+def region_growing_ransac(points_array, config):
+    clusters = []
+    cluster_ids = np.zeros(len(points_array))
+    label = 1
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(points_array[:, :3])
+    point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+        radius=config.local.normals_radius, max_nn=config.local.max_nn))
+
+    min_count = config.clustering.count_thresh_ransac
+    while True:
+
+        # print(f'running ransac with min_count {min_count}')
+        iter = 0
+        min_count -= 1
+        while True:
+            iter += 1
+            # print(f'iteration {iter}')
+            if len(point_cloud.points) < config.clustering.count_thresh_ransac_rest:
+                break
+            plane_model, inliers = point_cloud.segment_plane(distance_threshold=config.clustering.dist_thresh_ransac,
+                                                             ransac_n=5,
+                                                             num_iterations=config.clustering.iter_thresh_ransac)
+            if len(inliers) > min_count:
+            # if len(inliers) > config.clustering.count_thresh_ransac:
+                print(f'cluster {label} with {len(inliers)} points, iteration {iter}, remaining {len(point_cloud.points)}')
+
+                # DBSCAN clustering of inlier points
+                inlier_points = points_array[inliers, :3]
+                clustering = DBSCAN(eps=config.clustering.dist_thresh_dbscan,
+                                    min_samples=config.clustering.count_thresh_dbscan).fit(inlier_points)
+                clustering_labels = clustering.labels_
+                unique_labels = np.unique(clustering_labels)
+
+                # drop -1 label from labels and inliers
+                unique_labels = unique_labels[unique_labels != -1]
+                if len(unique_labels) != 0:
+                    _ = np.where(clustering_labels != -1)[0]
+                    inliers = np.asarray(inliers)[_]
+                    inliers = inliers.tolist()
+
+                    # add inliers to clusters
+                    clusters.append(inliers)
+
+                    for cluster in unique_labels:
+                        # find inlier indices of cluster
+                        cluster_inliers = inliers[clustering_labels[inliers] == cluster]
+                        for inlier in cluster_inliers:
+                            # find index of inlier in original numpy cloud
+                            inlier_id = np.where(np.all(points_array[:, :3] == point_cloud.points[inlier], axis=1))[0][0]
+                            # write label to ids
+                            cluster_ids[inlier_id] = label
+                            # remove inliers from point cloud
+
+                        label += 1
+                    point_cloud = point_cloud.select_by_index(inliers, invert=True)
+                #
+                # for inlier in inliers:
+                #     # find index of inlier in original numpy cloud
+                #     inlier_id = np.where(np.all(points_array[:, :3] == point_cloud.points[inlier], axis=1))[0][0]
+                #     # write label to ids
+                #     cluster_ids[inlier_id] = label
+                #     # min_count = config.clustering.count_thresh_ransac
+                #     # remove inliers from point cloud
+                # point_cloud = point_cloud.select_by_index(inliers, invert=True)
+                # label += 1
+            else:
+                break
+
+        if min_count < config.clustering.count_thresh_ransac_rest:
+            break
+
+    # find idxed points in original numpy cloud
+
+    return clusters, cluster_ids
 
 
 def region_growing_with_kdtree(points, feature_cloud_tree, config):
@@ -68,7 +146,7 @@ def region_growing_with_kdtree(points, feature_cloud_tree, config):
                 for j in indices:
                     if clusters[j] == -1:  # Unprocessed point
                         # calculate mean normal of cluster
-                        regional_normal = np.mean(points[np.where(np.array(clusters) == cluster_id)][:,3:], axis=0)
+                        regional_normal = np.mean(points[np.where(np.array(clusters) == cluster_id)][:, 3:], axis=0)
                         regional_normal /= np.linalg.norm(regional_normal)
 
                         if angle_between_normals(regional_normal, points[j, 3:]) < angle_threshold:
@@ -84,10 +162,12 @@ def euclidean_distance(point1, point2):
     """Calculate the Euclidean distance between two points."""
     return np.linalg.norm(point1 - point2)
 
+
 def angle_between_supernormals(supernormal1, supernormal2):
     """Calculate the angle between two supernormals."""
     dot_product = np.dot(supernormal1, supernormal2)
     return np.arccos(dot_product / (np.linalg.norm(supernormal1) * np.linalg.norm(supernormal2)))
+
 
 def region_growing_supernormals(points, kdtree, config):
     distance_threshold = config.clustering.max_dist_euc
@@ -108,7 +188,6 @@ def region_growing_supernormals(points, kdtree, config):
 
     # sort confidence sorted ids by normal cluster size
     confidence_sorted_ids = [x for x in confidence_sorted_ids if points[x, -2] in cluster_ids_sorted]
-
 
     for i in confidence_sorted_ids:
         if super_clusters[i] == -1:  # Unprocessed point
@@ -405,22 +484,43 @@ if __name__ == "__main__":
     point_ids_done = []
     point_cloud_tree = KDTree(point_coords_arr)
 
-    supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
+    supernormal_flag = False
+    if supernormal_flag:
+        supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
 
-    # concat with original point cloud
-    cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
+        # concat with original point cloud
+        cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
+
+        # store in txt
+        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'w') as f:
+            np.savetxt(f, cloud_c_sn, fmt='%.6f')
+
+        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'w') as f:
+            np.savetxt(f, np.array(confidences), fmt='%.6f')
+
+    else:
+        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'r') as f:
+            cloud_c_sn = np.loadtxt(f)
+        supernormals = cloud_c_sn[:, 3:]
+        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'r') as f:
+            confidences = np.loadtxt(f)
+
     cloud_c_n_sn_co = np.concatenate((point_coords_arr, point_normals_arr, supernormals), axis=1)
     cloud_c_n_sn_co = np.concatenate((cloud_c_n_sn_co, np.array(confidences)[:, None]), axis=1)
 
-    viz_sn = cloud_c_sn[:, 3:]
-    # pick max value and mlt for all
-    viz_sn /= np.max(viz_sn)
-    # concat with coords
-    viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
+    # viz_sn = cloud_c_sn[:, 3:]
+    # # pick max value and mlt for all
+    # viz_sn /= np.max(viz_sn)
+    # # concat with coords
+    # viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
 
-    # store in txt
-    with open(f'{basepath}{config.general.project_path}data/parking/supernormals.txt', 'w') as f:
-        np.savetxt(f, cloud_c_sn, fmt='%.6f')
+
+
+    cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
+    ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
+    # write to txt readable by cloudcompare
+    with open(f'{basepath}{config.general.project_path}data/parking/ransac_clustered.txt', 'w') as f:
+        np.savetxt(f, ransac_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
 
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
     print(f'found {np.max(cloud_cluster_ids)} clusters')
@@ -436,7 +536,6 @@ if __name__ == "__main__":
 
     cloud_super_clustered = np.concatenate((cloud_clustered, np.array(super_clusters)[:, None]), axis=1)
 
-
     # DROPPING POINTS
     thresh = 20
     # drop all points that belong to super cluster size lower than 20
@@ -449,7 +548,6 @@ if __name__ == "__main__":
         super_cluster_point_ids.extend(np.where(super_clusters == super_cluster_id)[0].tolist())
     # drop all points that are not in super_cluster_point_ids
     cloud_super_clustered = cloud_super_clustered[super_cluster_point_ids, :]
-
 
     # write to txt readable by cloudcompare
     with open(f'{basepath}{config.general.project_path}data/parking/super_clustered.txt', 'w') as f:
