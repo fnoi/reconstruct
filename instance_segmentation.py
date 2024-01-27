@@ -520,7 +520,8 @@ if __name__ == "__main__":
 
 
     # cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
-    point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
+    point_labels = dev_outsource.ransac_dbscan_subsequent(cloud_c_n_sn_co, config)
+    #point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
     a = 0
 
 
