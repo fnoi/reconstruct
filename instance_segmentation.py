@@ -3,6 +3,8 @@ import pathlib
 import os
 import random
 
+import dev_outsource
+
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
@@ -42,15 +44,17 @@ def angle_between_normals(normal1, normal2):
 
 
 def region_growing_ransac(points_array, config):
-    clusters = []
-    cluster_ids = np.zeros(len(points_array))
+    array_true = copy.deepcopy(points_array)
+
     label = 1
     point_cloud = o3d.geometry.PointCloud()
     point_cloud.points = o3d.utility.Vector3dVector(points_array[:, :3])
-    point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-        radius=config.local.normals_radius, max_nn=config.local.max_nn))
 
     min_count = config.clustering.count_thresh_ransac
+    point_labels = np.zeros(len(points_array))
+    unsuccessful_dbscan_count = 0
+    ransac_count = 0
+
     while True:
 
         # print(f'running ransac with min_count {min_count}')
@@ -64,58 +68,57 @@ def region_growing_ransac(points_array, config):
             plane_model, inliers = point_cloud.segment_plane(distance_threshold=config.clustering.dist_thresh_ransac,
                                                              ransac_n=5,
                                                              num_iterations=config.clustering.iter_thresh_ransac)
-            if len(inliers) > min_count:
+            if len(inliers) > min_count:  # current (decreasing) min_count
             # if len(inliers) > config.clustering.count_thresh_ransac:
-                print(f'cluster {label} with {len(inliers)} points, iteration {iter}, remaining {len(point_cloud.points)}')
+                ransac_count += 1
+                print(f'RANSAC cluster {ransac_count} with {len(inliers)} points found in point cloud w {len(point_cloud.points)} points')
 
-                # DBSCAN clustering of inlier points
-                inlier_points = points_array[inliers, :3]
+                inlier_points_xyz = points_array[inliers, :3]  # get xyz of inlier points for dbscan clustering
                 clustering = DBSCAN(eps=config.clustering.dist_thresh_dbscan,
-                                    min_samples=config.clustering.count_thresh_dbscan).fit(inlier_points)
+                                    min_samples=config.clustering.count_thresh_dbscan).fit(inlier_points_xyz)
                 clustering_labels = clustering.labels_
                 unique_labels = np.unique(clustering_labels)
 
-                # drop -1 label from labels and inliers
-                unique_labels = unique_labels[unique_labels != -1]
-                if len(unique_labels) != 0:
-                    _ = np.where(clustering_labels != -1)[0]
-                    inliers = np.asarray(inliers)[_]
-                    inliers = inliers.tolist()
+                if len(unique_labels) > 1:
+                    # drop noise-labelled points from labels and inliers
+                    unique_labels = unique_labels[unique_labels != -1]
+                    print(f'{len(unique_labels)} clusters found with DBSCAN')
 
-                    # add inliers to clusters
-                    clusters.append(inliers)
+                    sucessfully_clustered_ids = np.where(clustering_labels != -1)[0]
 
-                    for cluster in unique_labels:
-                        # find inlier indices of cluster
-                        cluster_inliers = inliers[clustering_labels[inliers] == cluster]
-                        for inlier in cluster_inliers:
-                            # find index of inlier in original numpy cloud
-                            inlier_id = np.where(np.all(points_array[:, :3] == point_cloud.points[inlier], axis=1))[0][0]
+                    for cluster_label in unique_labels:
+                        cluster_label_ids = np.where(clustering_labels == cluster_label)[0]
+
+                        for cluster_labeled_point in cluster_label_ids:
+                            true_id = np.where(np.all(array_true[:, :3] == inlier_points_xyz[cluster_labeled_point], axis=1))[0][0]
+                            point_labels[true_id] = label
+                            # write acutal label to cluster
+                            # cluster.append(inlier_id)
                             # write label to ids
-                            cluster_ids[inlier_id] = label
-                            # remove inliers from point cloud
 
                         label += 1
-                    point_cloud = point_cloud.select_by_index(inliers, invert=True)
-                #
-                # for inlier in inliers:
-                #     # find index of inlier in original numpy cloud
-                #     inlier_id = np.where(np.all(points_array[:, :3] == point_cloud.points[inlier], axis=1))[0][0]
-                #     # write label to ids
-                #     cluster_ids[inlier_id] = label
-                #     # min_count = config.clustering.count_thresh_ransac
-                #     # remove inliers from point cloud
-                # point_cloud = point_cloud.select_by_index(inliers, invert=True)
-                # label += 1
+                    # remove sucessfully clustered points from point cloud
+                    mask = np.ones(len(point_cloud.points), dtype=bool)
+                    mask[sucessfully_clustered_ids] = False
+                    points_array = points_array[mask]
+                    # remaining_xyz = np.array(point_cloud.points)[mask]
+                    point_cloud = o3d.geometry.PointCloud()
+                    point_cloud.points = o3d.utility.Vector3dVector(points_array[:, :3])
+
+
+                else:
+                    unsuccessful_dbscan_count += 1
             else:
+
                 break
 
-        if min_count < config.clustering.count_thresh_ransac_rest:
+        if min_count < config.clustering.count_thresh_ransac_rest or unsuccessful_dbscan_count > 10:
             break
 
     # find idxed points in original numpy cloud
+    return point_labels
 
-    return clusters, cluster_ids
+    # return clusters, cluster_ids
 
 
 def region_growing_with_kdtree(points, feature_cloud_tree, config):
@@ -516,11 +519,19 @@ if __name__ == "__main__":
 
 
 
-    cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
-    ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
+    # cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
+    point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
+    a = 0
+
+
+    # point_labels = region_growing_ransac(cloud_c_n_sn_co, config)
+    ransac_cluster_cloud = np.concatenate((cloud_c_n_sn_co[:, :3], np.array(point_labels)[:, None]), axis=1)
+    # ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
     # write to txt readable by cloudcompare
     with open(f'{basepath}{config.general.project_path}data/parking/ransac_clustered.txt', 'w') as f:
         np.savetxt(f, ransac_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
+
+    raise "ina nich kucken"
 
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
     print(f'found {np.max(cloud_cluster_ids)} clusters')

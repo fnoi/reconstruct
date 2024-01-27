@@ -28,6 +28,6 @@ clustering:
   count_thresh_ransac: 1000
   iter_thresh_ransac: 100000000
   count_thresh_ransac_rest: 50
-  dist_thresh_dbscan: 0.02
+  dist_thresh_dbscan: 0.04
   count_thresh_dbscan: 10
 
