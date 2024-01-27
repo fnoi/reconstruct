@@ -11,49 +11,82 @@ def region_growing_ransac(array_working, config):
 
     min_count = config.clustering.count_thresh_ransac
     point_labels = np.zeros(len(array_source))
-    dbscan_fail_count = 0
+
+    ransac_iteration_count = 0
 
     while True:
 
         point_cloud_current = o3d.geometry.PointCloud()
-        point_cloud_current.points = o3d.utility.Vector3dVector(array_working)
+        point_cloud_current.points = o3d.utility.Vector3dVector(array_working[:, :3])
         ransac_plane, ransac_inliers = point_cloud_current.segment_plane(
             distance_threshold=config.clustering.dist_thresh_ransac,
-            ransac_n=3,
+            ransac_n=5,
             num_iterations=config.clustering.iter_thresh_ransac
         )
 
-        if len(ransac_inliers) > min_count:
-            point_labels = dbscan_clustering_on_plane(
-                working_points=array_working,
-                plane_ids=ransac_inliers,
-                source_points=array_source,
-                source_labels=point_labels,
-                config=config
-            )
 
+        if len(ransac_inliers) > min_count:
+            dbscan_fail_count = 0
+            print(np.max(point_labels))
+            while True:
+                print('entering dbscan')
+                point_labels, array_working, dbscan_fail_count = dbscan_clustering_on_plane(
+                    working_points=array_working,
+                    plane_ids=ransac_inliers,
+                    source_points=array_source,
+                    source_labels=point_labels,
+                    config=config,
+                    dbscan_fail_count=dbscan_fail_count
+                )
+                print(dbscan_fail_count)
+                if dbscan_fail_count == 0 or dbscan_fail_count > 10:
+                    break
 
         else:
             min_count -= 1
+
             if min_count < config.clustering.count_thresh_ransac_rest:
+                print('Minimum count threshold reached, stopping RANSAC.')
+
                 break
+
+        ransac_iteration_count += 1
+
+        if ransac_iteration_count > config.clustering.max_ransac_iterations:
+            print('Maximum RANSAC iterations reached, stopping RANSAC.')
+
+            break
 
     return point_labels
 
 def dbscan_clustering_on_plane(working_points, plane_ids,
                                source_points, source_labels,
-                               config):
+                               config, dbscan_fail_count):
+    dbscan_mask = np.ones(len(working_points), dtype=bool)
+    plane_points = working_points[plane_ids]
     dbscan_clustering = DBSCAN(
         eps=config.clustering.dist_thresh_dbscan,
         min_samples=config.clustering.count_thresh_dbscan
-    )
+    ).fit(plane_points[:, :3])
     dbscan_cluster_labels = dbscan_clustering.labels_
     # check if all labels are -1
-    if np.all(dbscan_cluster_labels == -1):
-        return source_labels
+    if np.all(dbscan_cluster_labels == -1):  # no valid clusters
+        return source_labels, working_points, dbscan_fail_count + 1
     else:
+        current_label = int(np.max(source_labels))
+        for i in range(np.max(dbscan_cluster_labels) + 1):
+            current_label += 1
 
+            for j in range(len(dbscan_cluster_labels)):
+                if dbscan_cluster_labels[j] == i:
+                    # per point find xyz
+                    point_xyz = plane_points[j, :3]
+                    # find id in source points
+                    source_point_id = np.where(np.all(source_points[:, :3] == point_xyz, axis=1))[0]
+                    source_labels[source_point_id] = current_label
+                    dbscan_mask[j] = False
 
+        # remove points from working points based on mask
+        working_points = working_points[dbscan_mask]
 
-
-    return point_labels
+        return source_labels, working_points, dbscan_fail_count

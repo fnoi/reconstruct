@@ -20,6 +20,7 @@ initial:
 
 clustering:
   max_dist_euc: 0.2  # re-think with cross and to-plane limits
+  max_ransac_iterations: 1000
   dist_thresh_normal: 0.1
   angle_thresh_normal: 30
   dist_thresh_supernormal: 0.5
