@@ -118,7 +118,6 @@ def region_growing_ransac(points_array, config):
     # find idxed points in original numpy cloud
     return point_labels
 
-    # return clusters, cluster_ids
 
 
 def region_growing_with_kdtree(points, feature_cloud_tree, config):
@@ -463,7 +462,6 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
 
 if __name__ == "__main__":
     config = OmegaConf.load('config.yaml')
-
     # local runs only, add docker support
     if os.name == 'nt':
         basepath = config.general.basepath_windows
@@ -471,68 +469,79 @@ if __name__ == "__main__":
         basepath = config.general.basepath_macos
     path = pathlib.Path(f'{basepath}{config.general.project_path}{config.segmentation.cloud_path}')
 
-    # read point cloud from file to numpy array
-    with open(path, 'r') as f:
-        point_coords_arr = np.loadtxt(f)[:, :3]
-    point_cloud = o3d.geometry.PointCloud()
-    point_cloud.points = o3d.utility.Vector3dVector(point_coords_arr)
-    point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-        radius=config.local.normals_radius, max_nn=config.local.max_nn))
+    compute = False
+    if compute:
 
-    point_normals_arr = np.asarray(point_cloud.normals)
-    # store point cloud to pcd file
-    o3d.io.write_point_cloud(f'{basepath}{config.general.project_path}data/parking/normals.ply', point_cloud)
+        # read point cloud from file to numpy array
+        with open(path, 'r') as f:
+            point_coords_arr = np.loadtxt(f)[:, :3]
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(point_coords_arr)
+        point_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+            radius=config.local.normals_radius, max_nn=config.local.max_nn))
 
-    point_ids_all = [i for i in range(point_coords_arr.shape[0])]
-    point_ids_done = []
-    point_cloud_tree = KDTree(point_coords_arr)
+        point_normals_arr = np.asarray(point_cloud.normals)
+        # store point cloud to pcd file
+        o3d.io.write_point_cloud(f'{basepath}{config.general.project_path}data/parking/normals.ply', point_cloud)
 
-    supernormal_flag = False
-    if supernormal_flag:
-        supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
+        point_ids_all = [i for i in range(point_coords_arr.shape[0])]
+        point_ids_done = []
+        point_cloud_tree = KDTree(point_coords_arr)
 
-        # concat with original point cloud
-        cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
+        supernormal_flag = False
+        if supernormal_flag:
+            supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
 
-        # store in txt
-        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'w') as f:
-            np.savetxt(f, cloud_c_sn, fmt='%.6f')
+            # concat with original point cloud
+            cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
 
-        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'w') as f:
-            np.savetxt(f, np.array(confidences), fmt='%.6f')
+            # store in txt
+            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'w') as f:
+                np.savetxt(f, cloud_c_sn, fmt='%.6f')
 
+            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'w') as f:
+                np.savetxt(f, np.array(confidences), fmt='%.6f')
+
+        else:
+            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'r') as f:
+                cloud_c_sn = np.loadtxt(f)
+            supernormals = cloud_c_sn[:, 3:]
+            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'r') as f:
+                confidences = np.loadtxt(f)
+
+        cloud_c_n_sn_co = np.concatenate((point_coords_arr, point_normals_arr, supernormals), axis=1)
+        cloud_c_n_sn_co = np.concatenate((cloud_c_n_sn_co, np.array(confidences)[:, None]), axis=1)
+
+        # viz_sn = cloud_c_sn[:, 3:]
+        # # pick max value and mlt for all
+        # viz_sn /= np.max(viz_sn)
+        # # concat with coords
+        # viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
+
+
+
+        # cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
+        point_labels = dev_outsource.ransac_dbscan_subsequent(cloud_c_n_sn_co, config)
+        #point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
+        a = 0
+
+
+        # point_labels = region_growing_ransac(cloud_c_n_sn_co, config)
+        ransac_cluster_cloud = np.concatenate((cloud_c_n_sn_co[:, :3], np.array(point_labels)[:, None]), axis=1)
+        # ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
+        # write to txt readable by cloudcompare
+        with open(f'{basepath}{config.general.project_path}data/parking/ransac_clustered.txt', 'w') as f:
+            np.savetxt(f, ransac_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
+
+        full_cloud = np.concatenate((cloud_c_n_sn_co, np.array(point_labels)[:, None]), axis=1)
+        # store full cloud as numpy array
+        with open(f'{basepath}{config.general.project_path}data/parking/full_cloud.npy', 'wb') as f:
+            np.save(f, full_cloud)
     else:
-        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'r') as f:
-            cloud_c_sn = np.loadtxt(f)
-        supernormals = cloud_c_sn[:, 3:]
-        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'r') as f:
-            confidences = np.loadtxt(f)
+        with open(f'{basepath}{config.general.project_path}data/parking/full_cloud.npy', 'rb') as f:
+            full_cloud = np.load(f)
 
-    cloud_c_n_sn_co = np.concatenate((point_coords_arr, point_normals_arr, supernormals), axis=1)
-    cloud_c_n_sn_co = np.concatenate((cloud_c_n_sn_co, np.array(confidences)[:, None]), axis=1)
-
-    # viz_sn = cloud_c_sn[:, 3:]
-    # # pick max value and mlt for all
-    # viz_sn /= np.max(viz_sn)
-    # # concat with coords
-    # viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
-
-
-
-    # cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
-    point_labels = dev_outsource.ransac_dbscan_subsequent(cloud_c_n_sn_co, config)
-    #point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
-    a = 0
-
-
-    # point_labels = region_growing_ransac(cloud_c_n_sn_co, config)
-    ransac_cluster_cloud = np.concatenate((cloud_c_n_sn_co[:, :3], np.array(point_labels)[:, None]), axis=1)
-    # ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
-    # write to txt readable by cloudcompare
-    with open(f'{basepath}{config.general.project_path}data/parking/ransac_clustered.txt', 'w') as f:
-        np.savetxt(f, ransac_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
-
-    raise "ina nich kucken"
+    cluster_labels = dev_outsource.region_growing_ransac_dbscan_supernormals(full_cloud, config)
 
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
     print(f'found {np.max(cloud_cluster_ids)} clusters')

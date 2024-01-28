@@ -24,7 +24,7 @@ clustering:
   dist_thresh_normal: 0.1
   angle_thresh_normal: 30
   dist_thresh_supernormal: 0.5
-  angle_thresh_supernormal: 12
+  angle_thresh_supernormal: 10
   dist_thresh_ransac: 0.0075
   count_thresh_ransac: 1000
   iter_thresh_ransac: 100000000

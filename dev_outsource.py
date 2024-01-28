@@ -172,3 +172,15 @@ def dbscan_clustering_on_plane(working_points, plane_ids,
         working_points = working_points[dbscan_mask]
 
         return source_labels, working_points, dbscan_fail_count
+
+def region_growing_ransac_dbscan_supernormals(points, config):
+    a = 0
+    # 1-3 coordinate 4-6 normal 7-9 supernormal 10 confidence 11 ransac/dbscan cluster label
+    # initiate first cluster with highest confidence supernormal point
+    first_point = np.argmax(points[:, 9])
+    ball_radius = config.clustering.dist_thresh_dbscan
+    # add all touched dbscan clusters to this cluster
+    # neighborhood checks for all points in the cluster
+    # grow where supernormal deviation within limits
+    # for each iteration add full dbscans if applicable
+    # store info to a new label column
