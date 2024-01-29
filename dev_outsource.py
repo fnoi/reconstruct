@@ -6,6 +6,7 @@ import open3d as o3d
 from sklearn.cluster import DBSCAN
 
 from instance_segmentation import angle_between_normals
+from tools.local import supernormal_svd
 
 
 def ransac_dbscan_subsequent(array_working, config):
@@ -187,45 +188,104 @@ def region_growing_ransac_dbscan_supernormals(points, config):
     points_tree = o3d.geometry.KDTreeFlann(points_cloud)
     ball_radius = config.clustering.dist_thresh_ball
 
-    label = 1
+    label = 0
     iter = 0
 
     while True:
-        # find point with highest confidence where column 12 is 0
-        filtered_rows = points_array[points_array[:, 11] == 0]
-        if len(filtered_rows) == 0:
+        # temporary array with only unlabelled points
+        _t = points_array[points_array[:, 11] == 0]
+        if len(_t) == 0:  # all points have been clustered
             break
         else:
-            max_value_row = filtered_rows[np.argmax(filtered_rows[:, 10])]
-            seed = np.where((points_array == max_value_row).all(axis=1))[0][0]
+            label += 1
+            # identify seed point by confidence (highest-rated supernormal in unlabelled points)
+            # temporary array with only dbscan labelled points
+            _t = _t[_t[:, 10] != 0]
+            # find id of point with lowest confidence
+            _i = np.argmin(_t[:, 9])
+            _s = _t[_i, :]
+
+            # find index of _s in points_array
+            seed = np.where((points_array == _s).all(axis=1))[0][0]
+
+            cluster_labels[seed] = label
+            points_array[seed, 11] = label
             cluster_ptx = [seed]
             visited_ptx = [seed]
+            print(f'seed {seed}, label {label}')
+            seed_id = 0
+
+            cluster_supernormal = points_array[seed, 6:9]
+
             while True:
-                candidates = points_tree.search_radius_vector_3d(points_array[seed, :3], ball_radius)[1]
-                candidates = list(np.asarray(candidates).flatten())
-                # remove points that are already clustered
-                valid_candidates = []
-                for candidate in candidates:
-                    if candidate not in cluster_ptx and points_array[candidate, 11] == 0:
-                        valid_candidates.append(candidate)
-
-                # if cache is empty, cluster growth stops.
-                if len(valid_candidates) == 0:
+                if seed_id > len(cluster_ptx):
                     break
+                else:
+                    seed = cluster_ptx[seed_id]
+                    # 1. find all potential candidates
+                    candidates = points_tree.search_radius_vector_3d(points_array[seed, :3], ball_radius)[1]
+                    candidates = list(np.asarray(candidates).flatten())
+                    # remove points that are already clustered
+                    valid_candidates = []
+                    for candidate in candidates:
+                        if candidate not in cluster_ptx and points_array[candidate, 11] == 0 and candidate not in visited_ptx:
+                            valid_candidates.append(candidate)
+                    print(f'seed id {seed_id}, seed {seed}, cluster size {len(cluster_ptx)}, {len(valid_candidates)} valid candidates, length visited {len(visited_ptx)}')
+                    # if cache is empty, cluster growth stops.
+                    if len(valid_candidates) == 0:
+                        break
 
-                for candidate in valid_candidates:
-                    # calculate supernormal deviation
-                    # if within limits add to cluster
-                    if angle_between_normals(points_array[seed, 6:9], points_array[candidate, 6:9]) < config.clustering.angle_thresh_supernormal:
-                        cluster_ptx.append(candidate)
-                        visited_ptx.append(candidate)
-                        seed = candidate
-                    else:
-                        visited_ptx.append(candidate)
+                    # cluster_normals = points_array[cluster_ptx, 3:6]
+                    # cluster_supernormal = supernormal_svd(cluster_normals)
+
+                    # 2. evaluate the narrowed down candidates, extend cluster, track cache
+                    for candidate in valid_candidates:
+                        # calculate supernormal deviation
+                        # if within limits add to cluster
+                        # calculate cluster-supernormal angle
+                        # cluster_normals = points_array[cluster_ptx, 3:6]
+                        # cluster_supernormal = supernormal_svd(cluster_normals)
+
+                        angular_diff = angle_between_normals(cluster_supernormal, points_array[candidate, 3:6])
+                        # print(np.rad2deg(angular_diff))
+                        angular_diff = abs(np.rad2deg(angular_diff) - 90)
+                        # print(angular_diff)
+
+                        if angular_diff < 5:
+
+                        # if angle_between_normals(points_array[seed, 6:9], points_array[candidate, 6:9]) < config.clustering.angle_thresh_supernormal:
+                            # find all points with same ransac/dbscan cluster label
+                            if points_array[candidate, 10] == 0:  # no cluster from ransac/dbscan: only 1 candidate
+                                ids = [candidate]
+                            else:  # cluster from ransac/dbscan: all points from same cluster
+                                ids = np.where(points_array[:, 10] == points_array[candidate, 10])[0]
+                                # remove ids are already in cluster_ptx
+                                ids = [id for id in ids if id not in cluster_ptx]
+                                # remove ids that are already clustered or labeled/ only unlabelled points label = 0
+                                ids = [id for id in ids if points_array[id, 11] == 0]
+
+
+                            # ids = np.where(points_array[:, 10] == points_array[candidate, 10])[0]
+                            # remove ids that are already clustered or labeled
+
+                            cluster_ptx.extend(ids)
+                            cluster_labels[ids] = label
+                            points_array[ids, 11] = label
+
+                            # print(f'cluster size: {len(cluster_ptx)}, of {len(points_array)}')
+                            # cluster_ptx.append(candidate)  # append all cluster points instead of just the seed
+                            visited_ptx = np.unique(visited_ptx + ids).tolist()
+
+
+                        else:
+                            visited_ptx = np.unique(visited_ptx + ids).tolist()
+
+
+                    seed_id += 1
 
             # assign the label to all points in the cluster
-            cluster_labels[cluster_ptx] = label
-            points_array[cluster_ptx, 11] = label
-            label += 1
+            # cluster_labels[cluster_ptx] = label
+            # points_array[cluster_ptx, 11] = label
+            # label += 1
 
     return cluster_labels

@@ -547,7 +547,7 @@ if __name__ == "__main__":
     with open(f'{basepath}{config.general.project_path}data/parking/new_clustered.txt', 'w') as f:
         np.savetxt(f, new_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
 
-
+    raise Exception('stop here')
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
     print(f'found {np.max(cloud_cluster_ids)} clusters')
 
