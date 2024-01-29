@@ -542,9 +542,16 @@ if __name__ == "__main__":
             full_cloud = np.load(f)
 
     cluster_labels = dev_outsource.region_growing_ransac_dbscan_supernormals(full_cloud, config)
+    new_cluster_cloud = np.concatenate((full_cloud[:, :3], np.array(cluster_labels)[:, None]), axis=1)
+    # write to txt readable by cloudcompare
+    with open(f'{basepath}{config.general.project_path}data/parking/new_clustered.txt', 'w') as f:
+        np.savetxt(f, new_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
+
 
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
     print(f'found {np.max(cloud_cluster_ids)} clusters')
+
+
 
     # align xyz with labels
     cloud_clustered = np.concatenate((cloud_c_n_sn_co, np.array(cloud_cluster_ids)[:, None]), axis=1)

@@ -5,6 +5,8 @@ import open3d as o3d
 
 from sklearn.cluster import DBSCAN
 
+from instance_segmentation import angle_between_normals
+
 
 def ransac_dbscan_subsequent(array_working, config):
     array_source = copy.deepcopy(array_working)
@@ -174,13 +176,56 @@ def dbscan_clustering_on_plane(working_points, plane_ids,
         return source_labels, working_points, dbscan_fail_count
 
 def region_growing_ransac_dbscan_supernormals(points, config):
-    a = 0
-    # 1-3 coordinate 4-6 normal 7-9 supernormal 10 confidence 11 ransac/dbscan cluster label
+    # 1-3 coordinate 4-6 normal 7-9 supernormal
+    # 10 confidence 11 ransac/dbscan cluster label 12 region growing cluster label
     # initiate first cluster with highest confidence supernormal point
-    first_point = np.argmax(points[:, 9])
-    ball_radius = config.clustering.dist_thresh_dbscan
-    # add all touched dbscan clusters to this cluster
-    # neighborhood checks for all points in the cluster
-    # grow where supernormal deviation within limits
-    # for each iteration add full dbscans if applicable
-    # store info to a new label column
+    cluster_labels = np.zeros(len(points))
+    points_array = np.concatenate((points, cluster_labels.reshape(-1, 1)), axis=1)
+    points_cloud = o3d.geometry.PointCloud()
+    points_cloud.points = o3d.utility.Vector3dVector(points_array[:, :3])
+    points_cloud.normals = o3d.utility.Vector3dVector(points_array[:, 3:6])
+    points_tree = o3d.geometry.KDTreeFlann(points_cloud)
+    ball_radius = config.clustering.dist_thresh_ball
+
+    label = 1
+    iter = 0
+
+    while True:
+        # find point with highest confidence where column 12 is 0
+        filtered_rows = points_array[points_array[:, 11] == 0]
+        if len(filtered_rows) == 0:
+            break
+        else:
+            max_value_row = filtered_rows[np.argmax(filtered_rows[:, 10])]
+            seed = np.where((points_array == max_value_row).all(axis=1))[0][0]
+            cluster_ptx = [seed]
+            visited_ptx = [seed]
+            while True:
+                candidates = points_tree.search_radius_vector_3d(points_array[seed, :3], ball_radius)[1]
+                candidates = list(np.asarray(candidates).flatten())
+                # remove points that are already clustered
+                valid_candidates = []
+                for candidate in candidates:
+                    if candidate not in cluster_ptx and points_array[candidate, 11] == 0:
+                        valid_candidates.append(candidate)
+
+                # if cache is empty, cluster growth stops.
+                if len(valid_candidates) == 0:
+                    break
+
+                for candidate in valid_candidates:
+                    # calculate supernormal deviation
+                    # if within limits add to cluster
+                    if angle_between_normals(points_array[seed, 6:9], points_array[candidate, 6:9]) < config.clustering.angle_thresh_supernormal:
+                        cluster_ptx.append(candidate)
+                        visited_ptx.append(candidate)
+                        seed = candidate
+                    else:
+                        visited_ptx.append(candidate)
+
+            # assign the label to all points in the cluster
+            cluster_labels[cluster_ptx] = label
+            points_array[cluster_ptx, 11] = label
+            label += 1
+
+    return cluster_labels
