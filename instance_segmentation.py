@@ -1,6 +1,7 @@
 import copy
 import pathlib
 import os
+import pickle
 import random
 
 import dev_outsource
@@ -8,6 +9,7 @@ import dev_outsource
 import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
+import pandas as pd
 import plotly.graph_objs as go
 from omegaconf import OmegaConf
 from scipy.spatial import KDTree
@@ -469,7 +471,7 @@ if __name__ == "__main__":
         basepath = config.general.basepath_macos
     path = pathlib.Path(f'{basepath}{config.general.project_path}{config.segmentation.cloud_path}')
 
-    compute = False
+    compute = False  # TODO switch back once we have nice confidenzia
     if compute:
 
         # read point cloud from file to numpy array
@@ -488,50 +490,20 @@ if __name__ == "__main__":
         point_ids_done = []
         point_cloud_tree = KDTree(point_coords_arr)
 
-        supernormal_flag = False
-        if supernormal_flag:
-            supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
+        supernormals, confidences = calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_cloud_tree)
 
-            # concat with original point cloud
-            cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
+        # concat with original point cloud
+        cloud_c_sn = np.concatenate((point_coords_arr, supernormals), axis=1)
 
-            # store in txt
-            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'w') as f:
-                np.savetxt(f, cloud_c_sn, fmt='%.6f')
+        cloud_c_sn_co = np.concatenate((cloud_c_sn, np.array(confidences)[:, None]), axis=1)
+        with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences2.txt', 'w') as f:
+            np.savetxt(f, cloud_c_sn_co, fmt='%.6f')
 
-            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'w') as f:
-                np.savetxt(f, np.array(confidences), fmt='%.6f')
-
-        else:
-            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals.txt', 'r') as f:
-                cloud_c_sn = np.loadtxt(f)
-            supernormals = cloud_c_sn[:, 3:]
-            with open(f'{basepath}{config.general.project_path}data/parking/handover_supernormals_confidences.txt', 'r') as f:
-                confidences = np.loadtxt(f)
 
         cloud_c_n_sn_co = np.concatenate((point_coords_arr, point_normals_arr, supernormals), axis=1)
         cloud_c_n_sn_co = np.concatenate((cloud_c_n_sn_co, np.array(confidences)[:, None]), axis=1)
 
-        # viz_sn = cloud_c_sn[:, 3:]
-        # # pick max value and mlt for all
-        # viz_sn /= np.max(viz_sn)
-        # # concat with coords
-        # viz_sn = np.concatenate((cloud_c_sn[:, :3], viz_sn), axis=1)
-
-
-
-        # cluster, cluster_ids = region_growing_ransac(cloud_c_sn, config)
         point_labels = dev_outsource.ransac_dbscan_subsequent(cloud_c_n_sn_co, config)
-        #point_labels = dev_outsource.region_growing_ransac(cloud_c_n_sn_co, config)
-        a = 0
-
-
-        # point_labels = region_growing_ransac(cloud_c_n_sn_co, config)
-        ransac_cluster_cloud = np.concatenate((cloud_c_n_sn_co[:, :3], np.array(point_labels)[:, None]), axis=1)
-        # ransac_cluster_cloud = np.concatenate((cloud_c_sn[:, :3], np.array(cluster_ids)[:, None]), axis=1)
-        # write to txt readable by cloudcompare
-        with open(f'{basepath}{config.general.project_path}data/parking/ransac_clustered.txt', 'w') as f:
-            np.savetxt(f, ransac_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
 
         full_cloud = np.concatenate((cloud_c_n_sn_co, np.array(point_labels)[:, None]), axis=1)
         # store full cloud as numpy array
@@ -541,11 +513,45 @@ if __name__ == "__main__":
         with open(f'{basepath}{config.general.project_path}data/parking/full_cloud.npy', 'rb') as f:
             full_cloud = np.load(f)
 
-    cluster_labels = dev_outsource.region_growing_ransac_dbscan_supernormals(full_cloud, config)
-    new_cluster_cloud = np.concatenate((full_cloud[:, :3], np.array(cluster_labels)[:, None]), axis=1)
+    paper_flag = False
+    if paper_flag:
+        full_cloud, dirt_cloud = dev_outsource.region_growing_ransac_dbscan_supernormals(full_cloud, config)
+        # delete all columns except xyz and labels
+
+    else:
+        with open(f'{basepath}{config.general.project_path}data/in_test/test_junction_segmentation_results.txt', 'r') as f:
+            full_cloud = np.loadtxt(f, delimiter=' ') # , usecols=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
+        cloud_frame = pd.DataFrame(full_cloud)
+        cloud_frame.columns = ['x', 'y', 'z', 'c', 'pp', 'pi', 'gj']
+
+        # find unique ids in pi
+        unique_ids = cloud_frame['pi'].unique()
+        dirs = {}
+        for pi in list(unique_ids):
+            if pi == 0:
+                continue
+            else:
+                segment_array = cloud_frame[cloud_frame['pi'] == pi].to_numpy()
+                dirs[str(pi)] = dev_outsource.orientation_estimation(segment_array)
+
+
+        # store the dir dict using pickle
+        with open(f'{basepath}{config.general.project_path}data/in_test/dirs.pkl', 'wb') as f:
+            pickle.dump(dirs, f, pickle.HIGHEST_PROTOCOL)
+
+        a = 0
+
+
+
+    save_cloud = full_cloud[:, [0, 1, 2, -3, -2, -1]]
+
+    # new_cluster_cloud = np.concatenate((full_cloud[:, :3], np.array(cluster_labels)[:, None]), axis=1)
     # write to txt readable by cloudcompare
     with open(f'{basepath}{config.general.project_path}data/parking/new_clustered.txt', 'w') as f:
-        np.savetxt(f, new_cluster_cloud, fmt='%.6f', delimiter=';', newline='\n')
+        np.savetxt(f, save_cloud, fmt='%.6f', delimiter=';', newline='\n')
+
+    with open(f'{basepath}{config.general.project_path}data/parking/dirt_cloud.txt', 'w') as f:
+        np.savetxt(f, dirt_cloud, fmt='%.6f', delimiter=';', newline='\n')
 
     raise Exception('stop here')
     cloud_cluster_ids = region_growing_with_kdtree(cloud_c_n_sn_co, point_cloud_tree, config)
