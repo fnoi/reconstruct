@@ -402,10 +402,11 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
         supernormal /= np.linalg.norm(supernormal) * 5
 
         plot_flag = False
+        plot_id = 3781
         if id_seed == plot_id:
             plot_flag = True
         # override
-        plot_flag = False
+        # plot_flag = False
         if plot_flag:
             fig = go.Figure()
 
@@ -417,9 +418,9 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
                 mode='markers',
                 # marker type +
                 marker=dict(
-                    size=4,
-                    color='grey',
-                    opacity=1  # ,
+                    size=3,
+                    color='black',
+                    opacity=0.6  # ,
                     # symbol='dot'
                 )
             ))
@@ -447,11 +448,19 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
                 y=[y0, y1],
                 z=[z0, z1],
                 mode='lines',  # Set to lines mode
-                line=dict(color='red', width=4)  # Adjust line color and width as needed
+                line=dict(color='green', width=10)  # Adjust line color and width as needed
             ))
             # headline
             fig.update_layout(
-                title_text=f'Point {id_seed} with {len(ids_neighbors)} neighbors, confidence {confidence:.2f}')
+                title_text=f'Point {id_seed} with {len(ids_neighbors)} neighbors, confidence {confidence:.2f}',
+                scene=dict(
+                    xaxis=dict(showbackground=False, showgrid=False, zeroline=False),
+                    yaxis=dict(showbackground=False, showgrid=False, zeroline=False),
+                    zaxis=dict(showbackground=False, showgrid=False, zeroline=False),
+                    bgcolor='white'  # Change plot background to white (or any other color)
+                )
+            )
+            fig.update_layout()
 
             # Show the figure
             fig.show()
@@ -471,7 +480,7 @@ if __name__ == "__main__":
         basepath = config.general.basepath_macos
     path = pathlib.Path(f'{basepath}{config.general.project_path}{config.segmentation.cloud_path}')
 
-    compute = False  # TODO switch back once we have nice confidenzia
+    compute = True  # TODO switch back once we have nice confidenzia
     if compute:
 
         # read point cloud from file to numpy array
