@@ -109,12 +109,6 @@ def calculate_miou_with_labels(points_array):
 
     return miou, label_pairs
 
-# Example usage
-# points_array = your_numpy_array_here
-# miou, label_pairs = calculate_miou_with_labels(points_array)
-# print("Mean IoU:", miou)
-# print("Label Pairs with Best Matches:", label_pairs)
-
 
 def calculate_view_direction(roll, pitch, yaw):
     # Convert angles from degrees to radians
@@ -145,6 +139,6 @@ def calculate_view_direction(roll, pitch, yaw):
     direction = np.array([0, 0, 1])
 
     # Apply rotations
-    direction_rotated = Rz @ (Ry @ (Rx @ direction))
+    direction_rotated = direction @ Rz @ Ry @ Rx
 
     return direction_rotated
