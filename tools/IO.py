@@ -1,7 +1,22 @@
 import os
+import pathlib
 import pickle
 
 import numpy as np
+
+from omegaconf import OmegaConf
+
+def get_is_conf():
+    config = OmegaConf.load('config.yaml')
+    if os.name == 'nt':
+        basepath = config.general.basepath_windows
+    else:  # os.name == 'posix':
+        basepath = config.general.basepath_macos
+    config.general.path = pathlib.Path(f'{basepath}{config.general.project_path}{config.segmentation.cloud_path}')
+    config.general.parking_path = pathlib.Path(f'{basepath}{config.general.project_path}{config.general.parking_path}')
+
+    return config
+
 
 
 def points2txt(pointset, path, topic):

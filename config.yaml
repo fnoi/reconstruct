@@ -1,7 +1,9 @@
 general:
+  # os dependent paths are hardcoded
   basepath_windows: C:/Users/ga25mal/
   basepath_macos: /Users/fnoic/
   project_path: PycharmProjects/reconstruct/
+  parking_path: data/parking/
 
 segmentation:
   cloud_path: /data/in_test/test_junction_snip.txt
