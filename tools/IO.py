@@ -63,3 +63,26 @@ def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 
         raise ValueError('lines must be a list of length 1, 2 or 3')
 
     return
+
+def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
+             instance_gt=False, instance_pred=False, path=None, cloud=None, cache_flag=None):
+    io_agenda = []
+    if xyz:
+        io_agenda.append('x')
+        io_agenda.append('y')
+        io_agenda.append('z')
+    if normals:
+        io_agenda.append('nx')
+        io_agenda.append('ny')
+        io_agenda.append('nz')
+    if supernormals:
+        io_agenda.append('supernormals')
+    if confidence:
+        io_agenda.append('confidence')
+    if instance_gt:
+        io_agenda.append('instance_gt')
+    if instance_pred:
+        io_agenda.append('instance_pred')
+
+    cloud_to_write = cloud.loc[:, io_agenda]
+    cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)

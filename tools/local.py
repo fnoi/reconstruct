@@ -1,4 +1,7 @@
+import random
+
 import numpy as np
+from tqdm import tqdm
 
 
 def supernormal_svd(normals):
@@ -46,3 +49,16 @@ def angular_deviation(vector, reference):
     reference /= np.linalg.norm(reference)
     angle = np.arccos(np.dot(vector, reference))
     return angle * 180 / np.pi
+
+
+def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
+    """
+    rev version of supernormal / confidence calculation
+    """
+    plot_ind = random.randint(0, len(cloud))
+    plot_flag = True
+
+    point_ids = np.arange(len(cloud))
+
+    for id_seed in tqdm(point_ids, desc="computing super normals", total=len(point_ids)):
+        point_seed = cloud.iloc[id_seed]
