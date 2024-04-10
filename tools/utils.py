@@ -1,4 +1,5 @@
 import numpy as np
+import plotly.graph_objs as go
 
 from tools.geometry import warped_vectors_intersection
 
@@ -142,3 +143,72 @@ def calculate_view_direction(roll, pitch, yaw):
     direction_rotated = direction @ Rz @ Ry @ Rx
 
     return direction_rotated
+
+
+def plot_patch(cloud_frame=None, seed_id=None, neighbor_ids=None):
+    """plot local patch with selected aspects"""
+    fig = go.Figure()
+    # neighbor points scatter plot
+    fig.add_trace(go.Scatter3d(
+        x=cloud_frame.loc[neighbor_ids, 'x'],
+        y=cloud_frame.loc[neighbor_ids, 'y'],
+        z=cloud_frame.loc[neighbor_ids, 'z'],
+        mode='markers',
+        marker=dict(
+            size=3,
+            color='black',
+            opacity=0.6
+        )
+    ))
+    # seed point highlight scatter
+    fig.add_trace(go.Scatter3d(
+        x=[cloud_frame.loc[seed_id, 'x']],
+        y=[cloud_frame.loc[seed_id, 'y']],
+        z=[cloud_frame.loc[seed_id, 'z']],
+        mode='markers',
+        marker=dict(
+            size=5,
+            color='red',
+            opacity=1
+        )
+    ))
+    # normals for neighbors and seed with lines
+    for i in neighbor_ids:
+        fig.add_trace(go.Scatter3d(
+            x=[cloud_frame.loc[i, 'x'], cloud_frame.loc[i, 'x'] + cloud_frame.loc[i, 'nx']],
+            y=[cloud_frame.loc[i, 'y'], cloud_frame.loc[i, 'y'] + cloud_frame.loc[i, 'ny']],
+            z=[cloud_frame.loc[i, 'z'], cloud_frame.loc[i, 'z'] + cloud_frame.loc[i, 'nz']],
+            mode='lines',
+            line=dict(
+                color='blue',
+                width=0.5
+            )
+        ))
+    # supernormal with thick orange line from seed
+    fig.add_trace(go.Scatter3d(
+        x=[cloud_frame.loc[seed_id, 'x'], cloud_frame.loc[seed_id, 'x'] + cloud_frame.loc[seed_id, 'snx']],
+        y=[cloud_frame.loc[seed_id, 'y'], cloud_frame.loc[seed_id, 'y'] + cloud_frame.loc[seed_id, 'sny']],
+        z=[cloud_frame.loc[seed_id, 'z'], cloud_frame.loc[seed_id, 'z'] + cloud_frame.loc[seed_id, 'snz']],
+        mode='lines',
+        line=dict(
+            color='orange',
+            width=10
+        )
+    ))
+    # header and layout, times new roman font
+    fig.update_layout(
+        title=f'local patch with seed point {seed_id}, {len(neighbor_ids)} neighbors, '
+              f'confidence {cloud_frame.loc[seed_id, "confidence"]}',
+        scene=dict(
+            xaxis=dict(showbackground=False, showgrid=False, showline=False, zeroline=False),
+            yaxis=dict(showbackground=False, showgrid=False, showline=False, zeroline=False),
+            zaxis=dict(showbackground=False, showgrid=False, showline=False, zeroline=False),
+            bgcolor='white'
+        ),
+        font=dict(
+            family='Times New Roman',
+            size=18,
+            color='black'
+        )
+    )
+    fig.show()

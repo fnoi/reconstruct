@@ -76,7 +76,9 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
         io_agenda.append('ny')
         io_agenda.append('nz')
     if supernormals:
-        io_agenda.append('supernormals')
+        io_agenda.append('snx')
+        io_agenda.append('sny')
+        io_agenda.append('snz')
     if confidence:
         io_agenda.append('confidence')
     if instance_gt:

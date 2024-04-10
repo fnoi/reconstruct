@@ -1,7 +1,11 @@
 import random
 
 import numpy as np
+import open3d as o3d
 from tqdm import tqdm
+from scipy.spatial import KDTree
+
+from tools.utils import plot_patch
 
 
 def supernormal_svd(normals):
@@ -55,10 +59,60 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     """
     rev version of supernormal / confidence calculation
     """
+
     plot_ind = random.randint(0, len(cloud))
-    plot_flag = True
+    plot_flag = False
 
     point_ids = np.arange(len(cloud))
 
-    for id_seed in tqdm(point_ids, desc="computing super normals", total=len(point_ids)):
-        point_seed = cloud.iloc[id_seed]
+    for seed_id in tqdm(point_ids, desc="computing supernormals", total=len(point_ids)):
+        seed_data = cloud.iloc[seed_id]
+
+        match config.local_features.neighbor_shape:
+            case "sphere":
+                cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+                neighbor_ids = cloud_tree.query_ball_point([seed_data['x'], seed_data['y'], seed_data['z']],
+                                                           r=config.local_features.supernormal_radius)
+            case "cylinder":
+                a = 0
+            case "cuboid":
+                a = 0
+            case "ellipsoid":
+                a = 0
+            case _:
+                raise ValueError("neighborhood shape not implemented")
+
+        neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
+        seed_supernormal = supernormal_svd(neighbor_normals)
+        seed_supernormal /= np.linalg.norm(seed_supernormal)
+        # consistent direction for supernormals
+        seed_supernormal = seed_supernormal * np.sign(seed_supernormal[0])
+        seed_confidence = supernormal_confidence(seed_supernormal, neighbor_normals)
+
+        cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
+        cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
+        cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
+        cloud.loc[seed_id, 'confidence'] = seed_confidence
+
+        if plot_flag and seed_id == plot_ind:
+            plot_patch(cloud_frame=cloud, seed_id=seed_id, neighbor_ids=neighbor_ids)
+
+    return cloud
+
+def region_growing_rev(cloud, config):
+    """"region growing using ransac and dbscan"""
+    ransac_label = 0
+    cloud_o3d = o3d.geometry.PointCloud()
+    cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+    cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
+    cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+
+    while True:
+        ransac_plane, ransac_inliers= cloud_o3d.segment_plane(
+            distance_threshold=config.clustering.ransac_dist_thresh,
+            ransac_n=config.clustering.ransac_n,
+            num_iterations=config.clustering.ransac_iterations
+        )
+        if len(ransac_inliers) > config.clustering.ransac_min_count:
+            ransac_label += 1
+
