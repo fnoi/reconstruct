@@ -99,6 +99,7 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
 
     return cloud
 
+
 def region_growing_rev(cloud, config):
     """"region growing using ransac and dbscan"""
     ransac_label = 0
@@ -106,13 +107,26 @@ def region_growing_rev(cloud, config):
     cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
     cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
     cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+    index_mask = np.ones(len(cloud), dtype=bool)
+    min_count_current = config.clustering.ransac_min_count
 
+    # ransac plane segmentation
     while True:
-        ransac_plane, ransac_inliers= cloud_o3d.segment_plane(
+        ransac_plane, ransac_inliers = cloud_o3d.segment_plane(
             distance_threshold=config.clustering.ransac_dist_thresh,
             ransac_n=config.clustering.ransac_n,
             num_iterations=config.clustering.ransac_iterations
         )
         if len(ransac_inliers) > config.clustering.ransac_min_count:
+            cloud[ransac_inliers, 'ransac_label'] = ransac_label
             ransac_label += 1
+            index_mask[ransac_inliers] = False
+            # remove points from cloud_o3d
+            cloud_o3d = cloud_o3d.select_by_index(np.where(index_mask)[0])
+
+        else:
+            min_count_current -= 1
+            if min_count_current <= config.clustering.:
+                break
+
 

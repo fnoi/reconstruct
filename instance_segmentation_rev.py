@@ -7,7 +7,7 @@ import open3d as o3d
 from omegaconf import OmegaConf
 
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev
+from tools.local import calculate_supernormals_rev, region_growing_rev
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
@@ -72,7 +72,8 @@ if __name__ == '__main__':
         cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
 
         cloud['instance_pred'] = None
-        cloud =
+        cloud = region_growing_rev(cloud, config)
+
 
 
         a = 0
