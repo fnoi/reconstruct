@@ -2,6 +2,7 @@ import random
 
 import numpy as np
 import open3d as o3d
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 from scipy.spatial import KDTree
 
@@ -100,6 +101,31 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     return cloud
 
 
+def ransac_patches(cloud, cloud_o3d, config):
+    print(f'ransac patching')
+    progress = tqdm()
+    a = 0
+    while True:
+        # get best ransac plane and inliers
+        # dbscan cluster them
+        # if cluster is big enough, label them
+        progress.update()
+        a += 1
+        if a > 10000:
+            break
+
+    # scatter plot with plt
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    # scatter with small dots color from instance_gt
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], c='purple', s=.5)
+    # ax.scatter(cloud['x'], cloud['y'], cloud['z'], c=cloud['ransac_patch'], s=.5)
+    fig.show()
+    a = 0
+
+
+
+
 def region_growing_rev(cloud, config):
     """"region growing using ransac and dbscan"""
     ransac_label = 0
@@ -118,15 +144,20 @@ def region_growing_rev(cloud, config):
             num_iterations=config.clustering.ransac_iterations
         )
         if len(ransac_inliers) > config.clustering.ransac_min_count:
-            cloud[ransac_inliers, 'ransac_label'] = ransac_label
+            # 0: no plane
             ransac_label += 1
+            print(ransac_label)
+            cloud.loc[ransac_inliers, 'ransac_label'] = ransac_label
+            # cloud[ransac_inliers, 'ransac_label'] = ransac_label
             index_mask[ransac_inliers] = False
             # remove points from cloud_o3d
             cloud_o3d = cloud_o3d.select_by_index(np.where(index_mask)[0])
 
         else:
             min_count_current -= 1
-            if min_count_current <= config.clustering.:
+            if min_count_current <= config.clustering.ransac_rest_thresh:
                 break
+
+    a = 0
 
 
