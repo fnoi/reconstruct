@@ -58,10 +58,6 @@ def angular_deviation(vector, reference):
 
 
 def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
-    """
-    rev version of supernormal / confidence calculation
-    """
-
     plot_ind = random.randint(0, len(cloud))
     plot_flag = False
 
@@ -70,19 +66,7 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     for seed_id in tqdm(point_ids, desc="computing supernormals", total=len(point_ids)):
         seed_data = cloud.iloc[seed_id]
 
-        match config.local_features.neighbor_shape:
-            case "sphere":
-                cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
-                neighbor_ids = cloud_tree.query_ball_point([seed_data['x'], seed_data['y'], seed_data['z']],
-                                                           r=config.local_features.supernormal_radius)
-            case "cylinder":
-                a = 0
-            case "cuboid":
-                a = 0
-            case "ellipsoid":
-                a = 0
-            case _:
-                raise ValueError("neighborhood shape not implemented")
+        neighbor_ids = neighborhood_search(cloud, seed_id, config)
 
         neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
         seed_supernormal = supernormal_svd(neighbor_normals)
@@ -182,6 +166,9 @@ def ransac_patches(cloud, config):
     return cloud
 
 
+
+
+
 def region_growing_rev(cloud, config):
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
@@ -191,8 +178,27 @@ def region_growing_rev(cloud, config):
 
         while True:  # loop until segment is complete / region stops growing
             # add patch for all (added) neighbors
-
+            a = 0
             # find cluster (!) neighbors
+
+
+def neighborhood_search(cloud, seed_id, config):
+    seed_data = cloud.iloc[seed_id]
+    match config.local_features.neighbor_shape:
+        case "sphere":
+            cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+            neighbor_ids = cloud_tree.query_ball_point([seed_data['x'], seed_data['y'], seed_data['z']],
+                                                       r=config.local_features.supernormal_radius)
+        case "cylinder":
+            neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
+        case "cuboid":
+            neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
+        case "ellipsoid":
+            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config)
+        case _:
+            raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
+
+    return neighbor_ids
 
 
 def neighbors_oriented_ellipsoid(cloud, seed_id, config):

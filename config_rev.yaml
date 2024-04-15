@@ -16,7 +16,7 @@ local_features:
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
   supernormal_radius: 0.25
-  neighbor_shape: sphere
+  neighbor_shape: banana
 
 initial:
   rnd_pick_ratio: 0.05
