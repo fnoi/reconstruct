@@ -15,8 +15,9 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
-
+    ##########
     cache_flag = 2  # 0: no cache, 1: load normals, 2: load supernormals and confidence
+    ##########
 
     if cache_flag <= 0:
         print('\n- compute normals')
@@ -72,8 +73,8 @@ if __name__ == '__main__':
         cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
 
         cloud['instance_pred'] = None
-        cloud = ransac_patches(cloud, cloud_o3d, config)
-        # cloud = region_growing_rev(cloud, config)
+        cloud = ransac_patches(cloud, config)
+        cloud = region_growing_rev(cloud, config)
 
 
 

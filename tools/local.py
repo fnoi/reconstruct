@@ -5,6 +5,7 @@ import open3d as o3d
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 from scipy.spatial import KDTree
+from sklearn.cluster import DBSCAN
 
 from tools.utils import plot_patch
 
@@ -101,63 +102,122 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     return cloud
 
 
-def ransac_patches(cloud, cloud_o3d, config):
+def ransac_patches(cloud, config):
     print(f'ransac patching')
+    cloud['ransac_patch'] = 0
+    mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
-    a = 0
+    blanks = config.clustering.ransac_blanks
+
+    label_id = 0
     while True:
-        # get best ransac plane and inliers
-        # dbscan cluster them
-        # if cluster is big enough, label them
-        progress.update()
-        a += 1
-        if a > 10000:
-            break
+        o3d_cloud_current = o3d.geometry.PointCloud()
+        o3d_cloud_current.points = o3d.utility.Vector3dVector(cloud.loc[mask_remaining, ['x', 'y', 'z']].values)
 
-    # scatter plot with plt
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    # scatter with small dots color from instance_gt
-    ax.scatter(cloud['x'], cloud['y'], cloud['z'], c='purple', s=.5)
-    # ax.scatter(cloud['x'], cloud['y'], cloud['z'], c=cloud['ransac_patch'], s=.5)
-    fig.show()
-    a = 0
-
-
-
-
-def region_growing_rev(cloud, config):
-    """"region growing using ransac and dbscan"""
-    ransac_label = 0
-    cloud_o3d = o3d.geometry.PointCloud()
-    cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
-    cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
-    cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
-    index_mask = np.ones(len(cloud), dtype=bool)
-    min_count_current = config.clustering.ransac_min_count
-
-    # ransac plane segmentation
-    while True:
-        ransac_plane, ransac_inliers = cloud_o3d.segment_plane(
+        # ransac plane fitting
+        ransac_plane, ransac_inliers = o3d_cloud_current.segment_plane(
             distance_threshold=config.clustering.ransac_dist_thresh,
             ransac_n=config.clustering.ransac_n,
             num_iterations=config.clustering.ransac_iterations
         )
-        if len(ransac_inliers) > config.clustering.ransac_min_count:
-            # 0: no plane
-            ransac_label += 1
-            print(ransac_label)
-            cloud.loc[ransac_inliers, 'ransac_label'] = ransac_label
-            # cloud[ransac_inliers, 'ransac_label'] = ransac_label
-            index_mask[ransac_inliers] = False
-            # remove points from cloud_o3d
-            cloud_o3d = cloud_o3d.select_by_index(np.where(index_mask)[0])
+        inliers_global_idx = np.where(mask_remaining)[0][ransac_inliers]
 
-        else:
-            min_count_current -= 1
-            if min_count_current <= config.clustering.ransac_rest_thresh:
+        # dbscan clustering of inliers
+        dbscan_clustering = DBSCAN(
+            eps=config.clustering.dbscan_eps_dist,
+            min_samples=config.clustering.dbscan_min_count
+        ).fit(cloud.loc[inliers_global_idx, ['x', 'y', 'z']].values)
+        active_idx = np.where(mask_remaining)[0]
+
+        if len(np.unique(dbscan_clustering.labels_)) == 1:
+            blanks -= 1
+            if blanks == 0:
+                print(f'over, {label_id} patches found')
                 break
 
-    a = 0
+        for cluster in np.unique(dbscan_clustering.labels_[dbscan_clustering.labels_ != -1]):
+            # these points form a valid cluster
+            # find the index of the points in the original cloud
+            label_id += 1
+            cluster_idx = np.where(dbscan_clustering.labels_ == cluster)[0]
+            external_cluster_idx = active_idx[ransac_inliers][cluster_idx]
+            cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
+            mask_remaining[external_cluster_idx] = False
 
+        progress.update()
+
+    debug_plot = False
+    if debug_plot:
+        # plot histogram for ransac_patch
+        plt.hist(cloud['ransac_patch'], bins=label_id)
+        plt.show()
+
+        # create plot with two subplots
+        ax_lims_x = (np.min(cloud['x']), np.max(cloud['x']))
+        ax_lims_y = (np.min(cloud['y']), np.max(cloud['y']))
+        ax_lims_z = (np.min(cloud['z']), np.max(cloud['z']))
+
+        plt.figure()
+        mask_done = np.invert(mask_remaining)
+        cloud_clustered = cloud.loc[mask_done]
+        ax1 = plt.subplot(121, projection='3d')
+        ax1.scatter(cloud_clustered['x'], cloud_clustered['y'], cloud_clustered['z'],
+                    c=plt.cm.tab10(np.mod(cloud_clustered['ransac_patch'], 10)),
+                    s=.5)
+        ax1.set_xlim(ax_lims_x)
+        ax1.set_ylim(ax_lims_y)
+        ax1.set_zlim(ax_lims_z)
+
+        cloud_unclustered = cloud.loc[mask_remaining]
+        ax2 = plt.subplot(122, projection='3d')
+        ax2.scatter(cloud_unclustered['x'], cloud_unclustered['y'], cloud_unclustered['z'], c='grey', s=.5)
+        ax1.set_xlim(ax_lims_x)
+        ax1.set_ylim(ax_lims_y)
+        ax1.set_zlim(ax_lims_z)
+
+        # set tight
+        plt.tight_layout()
+        plt.show()
+
+    return cloud
+
+
+def region_growing_rev(cloud, config):
+    mask_remaining = np.ones(len(cloud), dtype=bool)
+    progress = tqdm()
+    label_id = 0
+    while True:  # loop until no more points are left (thresh)
+        # find seed point
+
+        while True:  # loop until segment is complete / region stops growing
+            # add patch for all (added) neighbors
+
+            # find cluster (!) neighbors
+
+
+def neighbors_oriented_ellipsoid(cloud, seed_id, config):
+    """
+    find neighbors of seed_id in ellipsoid shape
+    """
+    seed_data = cloud.iloc[seed_id]
+
+    return idx
+
+
+def neighbors_oriented_cylinder(cloud, seed_id, config):
+    """
+    find neighbors of seed_id in cylinder shape
+    """
+    seed_data = cloud.iloc[seed_id]
+
+    return idx
+
+
+def neighbors_oriented_cuboid(cloud, seed_id, config):
+    """
+    find neighbors of seed_id in cuboid shape
+    """
+    seed_data = cloud.iloc[seed_id]
+
+    return idx
 
