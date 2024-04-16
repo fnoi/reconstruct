@@ -1,3 +1,4 @@
+import copy
 import random
 
 import numpy as np
@@ -57,34 +58,50 @@ def angular_deviation(vector, reference):
     return angle * 180 / np.pi
 
 
+def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=None, plot_flag=False):
+    neighbor_ids = neighborhood_search(cloud, seed_id, config)
+
+    if plot_flag and seed_id == plot_ind:
+        neighborhood_plot(cloud, seed_id, neighbor_ids, config)
+
+    neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
+    seed_normal = cloud.loc[seed_id, ['nx', 'ny', 'nz']].values
+    seed_supernormal = supernormal_svd(neighbor_normals)
+    seed_supernormal /= np.linalg.norm(seed_supernormal)
+    seed_confidence = supernormal_confidence(seed_supernormal, neighbor_normals)
+
+    cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
+    cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
+    cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
+    cloud.loc[seed_id, 'confidence'] = seed_confidence
+
+    return cloud
+
+
 def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     plot_ind = random.randint(0, len(cloud))
+    print(f'plot ind is {plot_ind}')
     plot_flag = True
 
     point_ids = np.arange(len(cloud))
 
     for seed_id in tqdm(point_ids, desc="computing supernormals", total=len(point_ids)):
-        seed_data = cloud.iloc[seed_id]
+        if config.local_features.neighbor_shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
+            cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
+                                              plot_ind=plot_ind, plot_flag=plot_flag)
+            # no second step of computation needed
+        elif config.local_features.neighbor_shape in ['oriented_ellipsoid', 'oriented_cylinder', 'oriented_cuboid']:
+            real_config = copy.copy(config)  # save config
+            config.local_features.neighbor_shape = "sphere"  # override for precomputation
+            cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
+                                              plot_ind=plot_ind, plot_flag=plot_flag)
+            config = real_config  # reset config
+            # oriented neighborhoods require supernormals as input
+            cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
+                                              plot_ind=plot_ind, plot_flag=plot_flag)
 
-        neighbor_ids = neighborhood_search(cloud, seed_id, config)
-
-        if plot_flag and seed_id == plot_ind:
-            neighborhood_plot(cloud, seed_id, neighbor_ids, config)
-
-        neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
-        seed_supernormal = supernormal_svd(neighbor_normals)
-        seed_supernormal /= np.linalg.norm(seed_supernormal)
-        # consistent direction for supernormals
-        seed_supernormal = seed_supernormal * np.sign(seed_supernormal[0])
-        seed_confidence = supernormal_confidence(seed_supernormal, neighbor_normals)
-
-        cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
-        cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
-        cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
-        cloud.loc[seed_id, 'confidence'] = seed_confidence
-
-        if plot_flag and seed_id == plot_ind:
-            plot_patch(cloud_frame=cloud, seed_id=seed_id, neighbor_ids=neighbor_ids)
+        else:
+            raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return cloud
 
@@ -195,9 +212,11 @@ def neighborhood_search(cloud, seed_id, config):
         case "cuboid":
             neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
         case "ellipsoid":
-            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config)
+            neighbor_ids = neighbors_ellipsoid(cloud, seed_id, config)
         case "cube":
             neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config)
+        case "oriented_ellipsoid":
+            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config)
         case _:
             raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
@@ -208,7 +227,7 @@ def neighborhood_plot(cloud, seed_id, neighbors, config):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c='grey')
-    ax.scatter(cloud.loc[neighbors, 'x'], cloud.loc[neighbors, 'y'], cloud.loc[neighbors, 'z'], s=0.8, c='r')
+    ax.scatter(cloud.loc[neighbors, 'x'], cloud.loc[neighbors, 'y'], cloud.loc[neighbors, 'z'], s=1, c='r')
 
     cage_color = 'b'
     cage_width = 0.5
@@ -247,14 +266,57 @@ def neighborhood_plot(cloud, seed_id, neighbors, config):
             x = radius * np.outer(np.cos(u), np.sin(v)) + center[0]
             y = radius * np.outer(np.sin(u), np.sin(v)) + center[1]
             z = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
-            ax.plot_surface(x, y, z, color='b', alpha=0.1)
+            # ax.plot_surface(x, y, z, color='b', alpha=0.1)
             # wireframe
             for i in range(n_segments):
                 ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
                 ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
 
+        case "ellipsoid":
+            # plot ellipsoid around seed point
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
+            b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = a * np.outer(np.cos(u), np.sin(v)) + center[0]
+            y = b * np.outer(np.sin(u), np.sin(v)) + center[1]
+            z = b * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
+            # ax.plot_surface(x, y, z, color='b', alpha=0.1)
+            # wireframe
+            for i in range(n_segments):
+                ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
+
+        case "oriented_ellipsoid":
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
+            b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = a * np.outer(np.cos(u), np.sin(v))
+            y = b * np.outer(np.sin(u), np.sin(v))
+            z = b * np.outer(np.ones(np.size(u)), np.cos(v))
+
+            direction = cloud.loc[seed_id, ['snx', 'sny', 'snz']].values
+
+            rot_mat = find_orthonormal_basis(direction)
+
+            ellipsoid_points = np.vstack([x.ravel(), y.ravel(), z.ravel()])
+            rotated_points = rot_mat @ ellipsoid_points
+
+            x_rotated = rotated_points[0, :].reshape(x.shape) + center[0]
+            y_rotated = rotated_points[1, :].reshape(y.shape) + center[1]
+            z_rotated = rotated_points[2, :].reshape(z.shape) + center[2]
+
+            for i in range(n_segments):
+                ax.plot(x_rotated[i, :], y_rotated[i, :], z_rotated[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x_rotated[:, i], y_rotated[:, i], z_rotated[:, i], c=cage_color, linewidth=cage_width)
+
         case _:
-            pass
+            print(f'\nno cage plot implemented for the neighborhood shape of {config.local_features.neighbor_shape}')
 
     ax.set_aspect('equal')
     ax.scatter(cloud.loc[seed_id, 'x'], cloud.loc[seed_id, 'y'], cloud.loc[seed_id, 'z'], s=10, c='orange')
@@ -262,14 +324,74 @@ def neighborhood_plot(cloud, seed_id, neighbors, config):
     plt.show()
 
 
+def find_orthonormal_basis(direction):
+    """
+    find orthonormal basis from direction vector
+    """
+    direction = np.array(direction, dtype=float)
+    direction /= np.linalg.norm(direction)
+    if np.allclose(direction, [0, 0, 1]) or np.allclose(direction, [0, 1, 0]):
+        other = np.array([1, 0, 1])
+    else:
+        other = np.array([0, 0, 1])
+    y_axis = np.cross(direction, other)
+    y_axis /= np.linalg.norm(y_axis)
+    z_axis = np.cross(direction, y_axis)
+
+    return np.column_stack((direction, y_axis, z_axis))
+
+
 def neighbors_oriented_ellipsoid(cloud, seed_id, config):
     """
     find neighbors of seed_id in ellipsoid shape
     """
-    orientation = np.array([cloud.iloc[seed_id]['snx'], cloud.iloc[seed_id]['sny'], cloud.iloc[seed_id]['snz']])
-    coordinates = cloud[['x', 'y', 'z']].values
+    seed_data = cloud.iloc[seed_id]
+    seed_coords = seed_data[['x', 'y', 'z']].values
+    cloud_coords = cloud[['x', 'y', 'z']].values
+    a = config.local_features.supernormal_ellipsoid_a
+    b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axis along y and z
 
-    return idx
+    orientation = seed_data[['snx', 'sny', 'snz']].values
+    rot_mat = find_orthonormal_basis(orientation)
+
+    rotated_cloud = (cloud_coords - seed_coords) @ rot_mat
+    rotated_seed_coords = np.array([0, 0, 0])
+
+    # calculate squared distances normalized by the squared semi-axis lengths
+    x_dist_norm = (rotated_cloud[:, 0] / a) ** 2
+    y_dist_norm = (rotated_cloud[:, 1] / b) ** 2
+    z_dist_norm = (rotated_cloud[:, 2] / b) ** 2
+
+    neighbor_ids = np.where(x_dist_norm + y_dist_norm + z_dist_norm <= 1)[0]
+
+    neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
+
+    return neighbor_ids
+
+
+def neighbors_ellipsoid(cloud, seed_id, config):
+    """
+    find neighbors of seed_id within an ellipsoidal shape.
+    """
+    seed_data = cloud.iloc[seed_id]
+    coordinates_seed = seed_data[['x', 'y', 'z']].values
+    coordinates_cloud = cloud[['x', 'y', 'z']].values
+
+    a = config.local_features.supernormal_ellipsoid_a
+    b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axis along y and z
+
+    # Calculate squared distances normalized by the squared semi-axis lengths
+    x_dist_norm = ((coordinates_cloud[:, 0] - coordinates_seed[0]) / a) ** 2
+    y_dist_norm = ((coordinates_cloud[:, 1] - coordinates_seed[1]) / b) ** 2
+    z_dist_norm = ((coordinates_cloud[:, 2] - coordinates_seed[2]) / b) ** 2
+
+    # Sum the normalized distances and find indices where the sum is less than or equal to 1
+    neighbor_ids = np.where(x_dist_norm + y_dist_norm + z_dist_norm <= 1)[0]
+
+    # Remove seed_id from neighbor_ids to exclude the point itself
+    neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
+
+    return neighbor_ids
 
 
 def neighbors_oriented_cylinder(cloud, seed_id, config):

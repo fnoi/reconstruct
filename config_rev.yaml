@@ -15,9 +15,11 @@ local_features:
   max_nn: 30
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
-  supernormal_radius: 0.2
-  neighbor_shape: sphere
-  supernormal_cube_dist: 0.1
+  supernormal_radius: 0.15
+  neighbor_shape: oriented_ellipsoid
+  supernormal_cube_dist: 0.15
+  supernormal_ellipsoid_a: 0.15
+  supernormal_ellipsoid_bc: 0.075
 
 initial:
   rnd_pick_ratio: 0.05
