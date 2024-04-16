@@ -16,7 +16,7 @@ if __name__ == '__main__':
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
     ##########
-    cache_flag = 2  # 0: no cache, 1: load normals, 2: load supernormals and confidence
+    cache_flag = 1  # 0: no cache, 1: load normals, 2: load supernormals and confidence
     ##########
 
     if cache_flag <= 0:

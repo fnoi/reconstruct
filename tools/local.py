@@ -59,7 +59,7 @@ def angular_deviation(vector, reference):
 
 def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     plot_ind = random.randint(0, len(cloud))
-    plot_flag = False
+    plot_flag = True
 
     point_ids = np.arange(len(cloud))
 
@@ -67,6 +67,9 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
         seed_data = cloud.iloc[seed_id]
 
         neighbor_ids = neighborhood_search(cloud, seed_id, config)
+
+        if plot_flag and seed_id == plot_ind:
+            neighborhood_plot(cloud, seed_id, neighbor_ids, config)
 
         neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
         seed_supernormal = supernormal_svd(neighbor_normals)
@@ -130,7 +133,7 @@ def ransac_patches(cloud, config):
 
         progress.update()
 
-    debug_plot = False
+    debug_plot = True
     if debug_plot:
         # plot histogram for ransac_patch
         plt.hist(cloud['ransac_patch'], bins=label_id)
@@ -166,13 +169,11 @@ def ransac_patches(cloud, config):
     return cloud
 
 
-
-
-
 def region_growing_rev(cloud, config):
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
     label_id = 0
+    raise NotImplementedError('region growing not implemented')
     while True:  # loop until no more points are left (thresh)
         # find seed point
 
@@ -195,17 +196,78 @@ def neighborhood_search(cloud, seed_id, config):
             neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
         case "ellipsoid":
             neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config)
+        case "cube":
+            neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config)
         case _:
             raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return neighbor_ids
 
 
+def neighborhood_plot(cloud, seed_id, neighbors, config):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c='grey')
+    ax.scatter(cloud.loc[neighbors, 'x'], cloud.loc[neighbors, 'y'], cloud.loc[neighbors, 'z'], s=0.8, c='r')
+
+    cage_color = 'b'
+    cage_width = 0.5
+    match config.local_features.neighbor_shape:
+        case "cube":
+            # cornerpoints from seed and supernormal_cube_dist as edge length of cube
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            edge_length = config.local_features.supernormal_cube_dist
+            p0 = center + np.array([-edge_length, -edge_length, -edge_length])
+            p1 = center + np.array([-edge_length, -edge_length, edge_length])
+            p2 = center + np.array([-edge_length, edge_length, -edge_length])
+            p3 = center + np.array([-edge_length, edge_length, edge_length])
+            p4 = center + np.array([edge_length, -edge_length, -edge_length])
+            p5 = center + np.array([edge_length, -edge_length, edge_length])
+            p6 = center + np.array([edge_length, edge_length, -edge_length])
+            p7 = center + np.array([edge_length, edge_length, edge_length])
+            ax.plot([p0[0], p1[0]], [p0[1], p1[1]], [p0[2], p1[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p1[0], p3[0]], [p1[1], p3[1]], [p1[2], p3[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p3[0], p2[0]], [p3[1], p2[1]], [p3[2], p2[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p2[0], p0[0]], [p2[1], p0[1]], [p2[2], p0[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p4[0], p5[0]], [p4[1], p5[1]], [p4[2], p5[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p5[0], p7[0]], [p5[1], p7[1]], [p5[2], p7[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p7[0], p6[0]], [p7[1], p6[1]], [p7[2], p6[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p6[0], p4[0]], [p6[1], p4[1]], [p6[2], p4[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p0[0], p4[0]], [p0[1], p4[1]], [p0[2], p4[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p1[0], p5[0]], [p1[1], p5[1]], [p1[2], p5[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p2[0], p6[0]], [p2[1], p6[1]], [p2[2], p6[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p3[0], p7[0]], [p3[1], p7[1]], [p3[2], p7[2]], c=cage_color, linewidth=cage_width)
+        case "sphere":
+            # plot sphere around seed point
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            radius = config.local_features.supernormal_radius
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = radius * np.outer(np.cos(u), np.sin(v)) + center[0]
+            y = radius * np.outer(np.sin(u), np.sin(v)) + center[1]
+            z = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
+            ax.plot_surface(x, y, z, color='b', alpha=0.1)
+            # wireframe
+            for i in range(n_segments):
+                ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
+
+        case _:
+            pass
+
+    ax.set_aspect('equal')
+    ax.scatter(cloud.loc[seed_id, 'x'], cloud.loc[seed_id, 'y'], cloud.loc[seed_id, 'z'], s=10, c='orange')
+
+    plt.show()
+
+
 def neighbors_oriented_ellipsoid(cloud, seed_id, config):
     """
     find neighbors of seed_id in ellipsoid shape
     """
-    seed_data = cloud.iloc[seed_id]
+    orientation = np.array([cloud.iloc[seed_id]['snx'], cloud.iloc[seed_id]['sny'], cloud.iloc[seed_id]['snz']])
+    coordinates = cloud[['x', 'y', 'z']].values
 
     return idx
 
@@ -227,3 +289,26 @@ def neighbors_oriented_cuboid(cloud, seed_id, config):
 
     return idx
 
+
+def neighbors_aabb_cube(cloud, seed_id, config):
+    """
+    find neighbors of seed_id in axis aligned bounding box shape
+    """
+    seed_data = cloud.iloc[seed_id]
+    coordinates_seed = seed_data[['x', 'y', 'z']].values
+    coordinates_cloud = cloud[['x', 'y', 'z']].values
+    dist = config.local_features.supernormal_cube_dist
+
+    # find neighbors in x direction
+    neighbor_ids = np.where(np.abs(coordinates_cloud[:, 0] - coordinates_seed[0]) < dist)[0]
+    # find neighbors in y direction
+    neighbor_ids = np.intersect1d(neighbor_ids,
+                                  np.where(np.abs(coordinates_cloud[:, 1] - coordinates_seed[1]) < dist)[0])
+    # find neighbors in z direction
+    neighbor_ids = np.intersect1d(neighbor_ids,
+                                  np.where(np.abs(coordinates_cloud[:, 2] - coordinates_seed[2]) < dist)[0])
+
+    # remove seed_id from neighbor_ids
+    neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
+
+    return neighbor_ids
