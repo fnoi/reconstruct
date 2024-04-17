@@ -52,9 +52,20 @@ def supernormal_confidence(supernormal, normals):
 
 
 def angular_deviation(vector, reference):
-    vector /= np.linalg.norm(vector)
-    reference /= np.linalg.norm(reference)
-    angle = np.arccos(np.dot(vector, reference))
+    norm_vector = np.linalg.norm(vector)
+    norm_reference = np.linalg.norm(reference)
+    if norm_vector == 0 or norm_reference == 0:
+        raise ValueError("Input vectors must be non-zero.")
+
+    vector_normalized = vector / norm_vector
+    reference_normalized = reference / norm_reference
+
+    # compute dot product and clamp it to the valid range for arccos
+    dot_product = np.dot(vector_normalized, reference_normalized)
+    dot_product = np.clip(dot_product, -1.0, 1.0)
+
+    # compute the angle in radians and then convert to degrees
+    angle = np.arccos(dot_product)
     return angle * 180 / np.pi
 
 
@@ -113,7 +124,7 @@ def ransac_patches(cloud, config):
     progress = tqdm()
     blanks = config.clustering.ransac_blanks
 
-    label_id = 0
+    label_id = 0  # label 0 indicates unclustered
     while True:
         o3d_cloud_current = o3d.geometry.PointCloud()
         o3d_cloud_current.points = o3d.utility.Vector3dVector(cloud.loc[mask_remaining, ['x', 'y', 'z']].values)
@@ -190,14 +201,50 @@ def region_growing_rev(cloud, config):
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
     label_id = 0
-    raise NotImplementedError('region growing not implemented')
-    while True:  # loop until no more points are left (thresh)
-        # find seed point
+    clustered_patches = []
+    cloud.replace([np.inf, -np.inf], np.nan, inplace=True)
 
-        while True:  # loop until segment is complete / region stops growing
+    while True:  # region growing until no more points are left / threshold
+        # find seed point
+        seed_id = cloud.idxmax()['confidence']
+        new_in = [seed_id]
+        cluster_ids = [seed_id]
+        angle_checked = []
+
+        while True:  # loop until segment is complete / region stops growing: cluster loop
             # add patch for all (added) neighbors
+            for new_id in new_in:
+                patch_id = cloud.loc[new_id, 'ransac_patch']
+                if patch_id not in clustered_patches and patch_id != 0:
+                    new_in += cloud[cloud['ransac_patch'] == patch_id].index.tolist()
+                    cluster_ids += cloud[cloud['ransac_patch'] == patch_id].index.tolist()
+                    clustered_patches.append(patch_id)
+            # check growing criterion (sn deviation) / can be extended for multiple
+            neighbor_ids = []
+            for new_id in new_in:
+                neighbor_ids.extend(neighborhood_search(cloud, new_id, config))
+            neighbor_ids = np.unique(neighbor_ids)
+            neighbor_ids = [x for x in neighbor_ids if x not in angle_checked]
+            new_in = []
+            for neighbor_id in neighbor_ids:
+                # calculate supernormal deviation angle
+                supernormal_seed = cloud.loc[seed_id, ['snx', 'sny', 'snz']].values
+                supernormal_neighbor = cloud.loc[neighbor_id, ['snx', 'sny', 'snz']].values
+                sn_deviation = angular_deviation(supernormal_seed, cloud.loc[neighbor_id, ['snx', 'sny', 'snz']].values)
+                if sn_deviation <= config.region_growing.supernormal_angle_deviation:
+                    new_in.append(neighbor_id)
+                    cluster_ids.append(neighbor_id)
+                else:
+                    angle_checked.append(neighbor_id)
+
+            print(f'iteration done, cluster size: {len(cluster_ids)}')
+
+            neighborhood_plot(cloud, seed_id, cluster_ids, config, cage_override=True)
+            plot_patch(cloud_frame=cloud, seed_id=seed_id, neighbor_ids=neighbor_ids)
+
+
             a = 0
-            # find cluster (!) neighbors
+            # find cluster (!) neighbors using specified neighborhood shape
 
 
 def neighborhood_search(cloud, seed_id, config):
@@ -217,13 +264,15 @@ def neighborhood_search(cloud, seed_id, config):
             neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config)
         case "oriented_ellipsoid":
             neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config)
+        case "oriented_octahedron":
+            neighbor_ids = neighbors_oriented_octahedron(cloud, seed_id, config)  # TODO: add this fct
         case _:
             raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return neighbor_ids
 
 
-def neighborhood_plot(cloud, seed_id, neighbors, config):
+def neighborhood_plot(cloud, seed_id, neighbors, config, cage_override=None):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c='grey')
@@ -231,6 +280,9 @@ def neighborhood_plot(cloud, seed_id, neighbors, config):
 
     cage_color = 'b'
     cage_width = 0.5
+    if cage_override is not None:
+        config.local_features.neighbor_shape = "unicorn"
+
     match config.local_features.neighbor_shape:
         case "cube":
             # cornerpoints from seed and supernormal_cube_dist as edge length of cube

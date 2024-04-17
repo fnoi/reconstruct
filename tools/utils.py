@@ -173,11 +173,12 @@ def plot_patch(cloud_frame=None, seed_id=None, neighbor_ids=None):
         )
     ))
     # normals for neighbors and seed with lines  # TODO: reduce length of normals
+    len_fac_n = 0.2
     for i in neighbor_ids:
         fig.add_trace(go.Scatter3d(
-            x=[cloud_frame.loc[i, 'x'], cloud_frame.loc[i, 'x'] + cloud_frame.loc[i, 'nx']],
-            y=[cloud_frame.loc[i, 'y'], cloud_frame.loc[i, 'y'] + cloud_frame.loc[i, 'ny']],
-            z=[cloud_frame.loc[i, 'z'], cloud_frame.loc[i, 'z'] + cloud_frame.loc[i, 'nz']],
+            x=[cloud_frame.loc[i, 'x'], cloud_frame.loc[i, 'x'] + len_fac_n * cloud_frame.loc[i, 'nx']],
+            y=[cloud_frame.loc[i, 'y'], cloud_frame.loc[i, 'y'] + len_fac_n * cloud_frame.loc[i, 'ny']],
+            z=[cloud_frame.loc[i, 'z'], cloud_frame.loc[i, 'z'] + len_fac_n * cloud_frame.loc[i, 'nz']],
             mode='lines',
             line=dict(
                 color='blue',
@@ -185,10 +186,11 @@ def plot_patch(cloud_frame=None, seed_id=None, neighbor_ids=None):
             )
         ))
     # supernormal with thick orange line from seed  # TODO: reduce length of supernormal
+    len_fac_sn = 0.25
     fig.add_trace(go.Scatter3d(
-        x=[cloud_frame.loc[seed_id, 'x'], cloud_frame.loc[seed_id, 'x'] + cloud_frame.loc[seed_id, 'snx']],
-        y=[cloud_frame.loc[seed_id, 'y'], cloud_frame.loc[seed_id, 'y'] + cloud_frame.loc[seed_id, 'sny']],
-        z=[cloud_frame.loc[seed_id, 'z'], cloud_frame.loc[seed_id, 'z'] + cloud_frame.loc[seed_id, 'snz']],
+        x=[cloud_frame.loc[seed_id, 'x'], cloud_frame.loc[seed_id, 'x'] + len_fac_sn * cloud_frame.loc[seed_id, 'snx']],
+        y=[cloud_frame.loc[seed_id, 'y'], cloud_frame.loc[seed_id, 'y'] + len_fac_sn * cloud_frame.loc[seed_id, 'sny']],
+        z=[cloud_frame.loc[seed_id, 'z'], cloud_frame.loc[seed_id, 'z'] + len_fac_sn * cloud_frame.loc[seed_id, 'snz']],
         mode='lines',
         line=dict(
             color='orange',

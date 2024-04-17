@@ -65,7 +65,8 @@ def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 
     return
 
 def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
-             instance_gt=False, instance_pred=False, path=None, cloud=None, cache_flag=None):
+             instance_gt=False, instance_pred=False, ransac_patch=False,
+             path=None, cloud=None, cache_flag=None):
     io_agenda = []
     if xyz:
         io_agenda.append('x')
@@ -85,6 +86,8 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
         io_agenda.append('instance_gt')
     if instance_pred:
         io_agenda.append('instance_pred')
+    if ransac_patch:
+        io_agenda.append('ransac_patch')
 
     cloud_to_write = cloud.loc[:, io_agenda]
     cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)

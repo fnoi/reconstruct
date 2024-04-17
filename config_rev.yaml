@@ -47,3 +47,6 @@ clustering:
   dbscan_eps_dist: 0.03
   dbscan_min_count: 10
 
+region_growing:
+  supernormal_angle_deviation: 10
+
