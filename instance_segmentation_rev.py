@@ -1,13 +1,14 @@
 import os
 import pathlib
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import open3d as o3d
 from omegaconf import OmegaConf
 
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, region_growing_rev, ransac_patches
+from tools.local import calculate_supernormals_rev, region_growing_rev, ransac_patches, neighborhood_plot
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
@@ -16,7 +17,7 @@ if __name__ == '__main__':
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
     ##########
-    cache_flag = 3  # 0: no cache, 1: load normals, 2: load supernormals and confidence 3: load ransac patches
+    cache_flag = 2  # 0: no cache, 1: load normals, 2: load supernormals and confidence 3: load ransac patches
     ##########
 
     if cache_flag <= 0:
@@ -58,6 +59,13 @@ if __name__ == '__main__':
         cloud['confidence'] = None
 
         cloud = calculate_supernormals_rev(cloud, cloud_o3d, config)
+        # confidence histogram
+        # plt.hist(cloud['confidence'], bins=100)
+        # plt.show()
+        # neighborhood_plot(cloud=cloud, confidence=True)
+        # raise ValueError('stop here')
+
+
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True,
                  path=config.project.parking_path, cloud=cloud, cache_flag=cache_flag)
 
