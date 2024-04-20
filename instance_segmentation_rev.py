@@ -8,7 +8,7 @@ import open3d as o3d
 from omegaconf import OmegaConf
 
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, region_growing_rev, ransac_patches, neighborhood_plot
+from tools.local import calculate_supernormals_rev, region_growing_rev, ransac_patches, neighborhood_plot, patch_growing
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
@@ -82,6 +82,7 @@ if __name__ == '__main__':
         print('\n- compute instance predictions through region growing')
         with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
+        cloud = patch_growing(cloud, config)
         cloud = region_growing_rev(cloud, config)
 
 

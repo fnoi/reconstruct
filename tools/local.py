@@ -199,6 +199,50 @@ def patch_growing(cloud, config):
 
     while True:
         seed = int(cloud.idxmax()['confidence'])
+        seed_patch = cloud.loc[seed, 'ransac_patch']
+        cluster_sn = cloud.loc[seed, ['snx', 'sny', 'snz']].values
+        cluster_rn = cloud.loc[seed, ['rnx', 'rny', 'rnz']].values
+        # int list of point ids in cluster
+        cluster_points = cloud.loc[cloud['ransac_patch'] == seed_patch].index
+        cluster_points = cluster_points.tolist()
+        cluster_patches = [int(cloud.loc[seed, 'ransac_patch'])]
+
+        while True:
+            # identify neighboring clusters through neighboring points (as before)
+            neighbor_points = []
+            for cluster_point in cluster_points:
+                neighbor_points.extend(neighborhood_search(cloud, cluster_point, config))
+            neighbor_points = np.unique(neighbor_points)
+            neighbor_patches = np.unique(cloud.loc[neighbor_points, 'ransac_patch'])
+            neighbor_patches = [x for x in neighbor_patches if x != 0]
+            # check if neighboring patches are cool
+            for neighbor_patch in neighbor_patches:
+                # check criteria: 1. angle between sn and sn (should be 0) 2. angle between sn (0) and rn (1) should be 90
+                neighbor_patch_sn = cloud.loc[cloud['ransac_patch'] == neighbor_patch, ['snx', 'sny', 'snz']].values
+                neighbor_patch_sn = np.mean(neighbor_patch_sn, axis=0)
+                neighbor_patch_sn /= np.linalg.norm(neighbor_patch_sn)
+                neighbor_patch_rn = cloud.loc[cloud['ransac_patch'] == neighbor_patch, ['rnx', 'rny', 'rnz']].values
+                neighbor_patch_rn = np.mean(neighbor_patch_rn, axis=0)
+                neighbor_patch_rn /= np.linalg.norm(neighbor_patch_rn)
+
+                sn_deviation = angular_deviation(cluster_sn, neighbor_patch_sn)
+                sn_deviation_0 = min(abs(sn_deviation - 0), abs(sn_deviation - 360))
+                sn_deviation_180 = abs(sn_deviation - 180)
+                sn_deviation = min(sn_deviation_0, sn_deviation_180)
+
+                rn_deviation = angular_deviation(cluster_sn, neighbor_patch_rn) - 90
+
+                print('sn deviation: ', sn_deviation, 'rn deviation: ', rn_deviation)
+                if sn_deviation <= config.region_growing.supernormal_patch_angle_deviation and \
+                        rn_deviation <= config.region_growing.ransacnormal_patch_angle_deviation:
+                    # add neighbor patch to cluster
+                    cluster_points.extend(cloud.loc[cloud['ransac_patch'] == neighbor_patch].index)
+                    cluster_patches.append(neighbor_patch)
+                print('cluster size: ', len(cluster_points))
+                a = 0
+                # continue  etx and then next cluster
+
+        a = 0
 
 
 def region_growing_rev(cloud, config):

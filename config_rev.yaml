@@ -49,6 +49,7 @@ clustering:
 
 region_growing:
   neighbors_found_min: 10
-  supernormal_angle_deviation: 30
-  supernormal_patch_angle_deviation: 30
+  supernormal_angle_deviation: 20
+  supernormal_patch_angle_deviation: 20
+  ransacnormal_patch_angle_deviation: 20
 
