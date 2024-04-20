@@ -108,6 +108,9 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
 
 def ransac_patches(cloud, config):
     print(f'ransac patching')
+    cloud['rnx'] = 0.0
+    cloud['rny'] = 0.0
+    cloud['rnz'] = 0.0
     cloud['ransac_patch'] = 0
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
@@ -124,7 +127,7 @@ def ransac_patches(cloud, config):
             ransac_n=config.clustering.ransac_n,
             num_iterations=config.clustering.ransac_iterations
         )
-        normal
+        ransac_normal = ransac_plane[0:3]
         inliers_global_idx = np.where(mask_remaining)[0][ransac_inliers]
 
         # dbscan clustering of inliers
@@ -147,6 +150,9 @@ def ransac_patches(cloud, config):
             cluster_idx = np.where(dbscan_clustering.labels_ == cluster)[0]
             external_cluster_idx = active_idx[ransac_inliers][cluster_idx]
             cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
+            cloud.loc[external_cluster_idx, 'rnx'] = ransac_normal[0]
+            cloud.loc[external_cluster_idx, 'rny'] = ransac_normal[1]
+            cloud.loc[external_cluster_idx, 'rnz'] = ransac_normal[2]
             mask_remaining[external_cluster_idx] = False
 
         progress.update()

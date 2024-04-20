@@ -65,7 +65,7 @@ def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 
     return
 
 def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
-             instance_gt=False, instance_pred=False, ransac_patch=False,
+             instance_gt=False, instance_pred=False, ransac_patch=False, ransac_normals=False,
              path=None, cloud=None, cache_flag=None):
     io_agenda = []
     if xyz:
@@ -80,6 +80,10 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
         io_agenda.append('snx')
         io_agenda.append('sny')
         io_agenda.append('snz')
+    if ransac_normals:
+        io_agenda.append('rnx')
+        io_agenda.append('rny')
+        io_agenda.append('rnz')
     if confidence:
         io_agenda.append('confidence')
     if instance_gt:

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
     ##########
-    cache_flag = 2
+    cache_flag = 3
     ##########
 
     if cache_flag <= 0:
@@ -76,7 +76,7 @@ if __name__ == '__main__':
 
         cloud = ransac_patches(cloud, config)
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
-                    path=config.project.parking_path, cloud=cloud, cache_flag=2)
+                 ransac_normals=True, path=config.project.parking_path, cloud=cloud, cache_flag=2)
 
     if cache_flag <= 3:
         print('\n- compute instance predictions through region growing')
