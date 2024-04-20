@@ -31,15 +31,12 @@ def supernormal_confidence(supernormal, normals):
     supernormal /= np.linalg.norm(supernormal)
     normals /= np.linalg.norm(normals, axis=1)[:, None]
     angles = np.arccos(np.dot(supernormal, normals.T))
-    angles = np.rad2deg(angles)
-    # angles *= 180 / np.pi
-
-    angles -= 90
-    angles = np.abs(angles)
-    # plt.hist(angles, bins=100)
-    # plt.show()
-
-    c = np.log(np.median(angles) / np.sqrt(len(normals)) + 1)
+    angles = np.abs(np.rad2deg(angles))
+    angles = np.abs(angles - 90)
+    angles = np.clip(angles, 0, 90)
+    normalized_angles = angles / 90
+    c = np.average(1 - normalized_angles)
+    c *= len(normals)
 
     return c
 
@@ -69,21 +66,20 @@ def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=No
         neighborhood_plot(cloud, seed_id, neighbor_ids, config)
 
     neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
-    seed_normal = cloud.loc[seed_id, ['nx', 'ny', 'nz']].values
     seed_supernormal = supernormal_svd(neighbor_normals)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
-    seed_confidence = supernormal_confidence(seed_supernormal, neighbor_normals)
 
     cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
     cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
     cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
-    cloud.loc[seed_id, 'confidence'] = seed_confidence
+    cloud.loc[seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals)
 
     return cloud
 
 
 def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
     plot_ind = random.randint(0, len(cloud))
+    plot_ind = 762
     print(f'plot ind is {plot_ind}')
     plot_flag = True
 
@@ -128,6 +124,7 @@ def ransac_patches(cloud, config):
             ransac_n=config.clustering.ransac_n,
             num_iterations=config.clustering.ransac_iterations
         )
+        normal
         inliers_global_idx = np.where(mask_remaining)[0][ransac_inliers]
 
         # dbscan clustering of inliers
@@ -190,54 +187,86 @@ def ransac_patches(cloud, config):
     return cloud
 
 
+def patch_growing(cloud, config):
+    patches_in = np.unique(cloud['ransac_patch'])
+    patches_out = []
+
+    while True:
+        seed = int(cloud.idxmax()['confidence'])
+
+
 def region_growing_rev(cloud, config):
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm()
     label_id = 0
     clustered_patches = []
-    cloud.replace([np.inf, -np.inf], np.nan, inplace=True)
+    cloud['instance_pred'] = None
 
-    while True:  # region growing until no more points are left / threshold
-        # find seed point
-        seed_id = cloud.idxmin()['confidence']
-        new_in = [seed_id]
-        cluster_ids = [seed_id]
+    while True:  # top level loop
+        seed = int(cloud.idxmax()['confidence'])
+        cluster_active = [seed]
+        cluster_passive = []
+        candidates_failed = []
+        add_candidates = []
+        patch_additions = []
         angle_checked = []
+        patch_failed = []
 
-        while True:  # loop until segment is complete / region stops growing: cluster loop
+        while True:  # mid level loop
+            # growth check, clean up temps???
+            growth_plot(cloud, seed, cluster_active, cluster_passive, add_candidates, patch_additions, angle_checked)
             # add patch for all (added) neighbors
-            for new_id in new_in:
+            for new_id in cluster_active:
                 patch_id = cloud.loc[new_id, 'ransac_patch']
-                if patch_id not in clustered_patches and patch_id != 0:
-                    new_in += cloud[cloud['ransac_patch'] == patch_id].index.tolist()
-                    cluster_ids += cloud[cloud['ransac_patch'] == patch_id].index.tolist()
-                    clustered_patches.append(patch_id)
-            # check growing criterion (sn deviation) / can be extended for multiple
-            neighbor_ids = []
-            for new_id in new_in:
-                neighbor_ids.extend(neighborhood_search(cloud, new_id, config))
-            neighbor_ids = np.unique(neighbor_ids)
-            neighbor_ids = [x for x in neighbor_ids if x not in angle_checked]
-            new_in = []
-            for neighbor_id in neighbor_ids:
-                # calculate supernormal deviation angle
-                supernormal_seed = cloud.loc[seed_id, ['snx', 'sny', 'snz']].values
-                supernormal_neighbor = cloud.loc[neighbor_id, ['snx', 'sny', 'snz']].values
-                sn_deviation = angular_deviation(supernormal_seed, cloud.loc[neighbor_id, ['snx', 'sny', 'snz']].values)
+                if patch_id not in clustered_patches and patch_id != 0 and patch_id not in patch_failed:
+                    # check patch angle deviation to seed  # TODO: alternative: mean cluster sn, needs testing
+                    patch_sn = np.mean(cloud[cloud['ransac_patch'] == patch_id][['snx', 'sny', 'snz']].values, axis=0)
+                    sn_deviation = angular_deviation(
+                        np.abs(patch_sn),
+                        np.abs(cloud.loc[seed, ['snx', 'sny', 'snz']].values)
+                    )
+                    if sn_deviation <= config.region_growing.supernormal_patch_angle_deviation:
+                        clustered_patches.append(patch_id)
+                        patch_additions.extend(cloud[cloud['ransac_patch'] == patch_id].index)
+                        cluster_active.extend(cloud[cloud['ransac_patch'] == patch_id].index)
+                    else:
+                        patch_failed.append(patch_id)
+            # check plot after patches have been added
+            growth_plot(cloud, seed, cluster_active, cluster_passive, add_candidates, patch_additions, angle_checked)
+            # identify patch neighborhood
+            add_candidates = []
+            for new_id in cluster_active:
+                add_candidates.extend(neighborhood_search(cloud, new_id, config))
+            add_candidates = np.unique(add_candidates)
+            add_candidates = [x for x in add_candidates
+                              if x not in cluster_active
+                              and x not in cluster_passive
+                              and x not in angle_checked]
+            if len(add_candidates) <= config.region_growing.neighbors_found_min:
+                label_id += 1
+                cloud.loc[cluster_active, 'instance_pred'] = label_id
+                break
+            # check plot for neighborhood logic
+            growth_plot(cloud, seed, cluster_active, cluster_passive, add_candidates, patch_additions, angle_checked)
+            # check if the neighbors are cool
+            for candidate in add_candidates:
+                sn_deviation = angular_deviation(cloud.loc[candidate, ['snx', 'sny', 'snz']].values,
+                                                 cloud.loc[seed, ['snx', 'sny', 'snz']].values)
                 if sn_deviation <= config.region_growing.supernormal_angle_deviation:
-                    new_in.append(neighbor_id)
-                    cluster_ids.append(neighbor_id)
+                    cluster_active.append(candidate)
                 else:
-                    angle_checked.append(neighbor_id)
+                    angle_checked.append(candidate)
 
-            print(f'iteration done, cluster size: {len(cluster_ids)}')
+            add_candidates = []
+            patch_additions = []
 
-            neighborhood_plot(cloud, seed_id, cluster_ids, config, cage_override=True)
-            plot_patch(cloud_frame=cloud, seed_id=seed_id, neighbor_ids=neighbor_ids)
-
+            growth_plot(cloud, seed, cluster_active, cluster_passive, add_candidates, patch_additions, angle_checked)
 
             a = 0
-            # find cluster (!) neighbors using specified neighborhood shape
+
+        # encode id to cloud
+        # check remaining ptx
+        # break criterion
 
 
 def neighborhood_search(cloud, seed_id, config):
@@ -263,6 +292,70 @@ def neighborhood_search(cloud, seed_id, config):
             raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return neighbor_ids
+
+
+def growth_plot(cloud, seed_id, cluster_active, cluster_passive, add_candidates, patch_additions, angle_checked):
+    # create mask for cloud to exclude any id in clustered_inactive, add_candidates, patch_additions
+    mask = np.ones(len(cloud), dtype=bool)
+
+    mask[cluster_active] = False
+    mask[add_candidates] = False
+    mask[patch_additions] = False
+    mask[cluster_passive] = False
+    mask[angle_checked] = False
+    mask[seed_id] = False
+
+    # remove patch additions from cluster_active
+    cluster_active = [x for x in cluster_active if x not in patch_additions]
+
+    fig = plt.figure()
+
+    subplots = [221, 222, 223, 224]
+    perspectives = [(0, 0), (90, 90), (45, 225), (45, 315)]
+    _ax = [fig.add_subplot(subplot, projection='3d') for subplot in subplots]
+
+    for ax_ in _ax:
+        ax_.scatter(cloud.loc[mask, 'x'],
+                    cloud.loc[mask, 'y'],
+                    cloud.loc[mask, 'z'],
+                    s=0.2, c='grey')
+        ax_.scatter(cloud.loc[cluster_passive, 'x'],
+                    cloud.loc[cluster_passive, 'y'],
+                    cloud.loc[cluster_passive, 'z'],
+                    s=0.6, c='grey')
+        ax_.scatter(cloud.loc[cluster_active, 'x'],
+                    cloud.loc[cluster_active, 'y'],
+                    cloud.loc[cluster_active, 'z'],
+                    s=0.6, c='blue')
+        ax_.scatter(cloud.loc[patch_additions, 'x'],
+                    cloud.loc[patch_additions, 'y'],
+                    cloud.loc[patch_additions, 'z'],
+                    s=0.6, c='green')
+        ax_.scatter(cloud.loc[add_candidates, 'x'],
+                    cloud.loc[add_candidates, 'y'],
+                    cloud.loc[add_candidates, 'z'],
+                    s=0.6, c='yellow')
+        ax_.scatter(cloud.loc[angle_checked, 'x'],
+                    cloud.loc[angle_checked, 'y'],
+                    cloud.loc[angle_checked, 'z'],
+                    s=0.6, c='red')
+        ax_.scatter(cloud.loc[seed_id, 'x'],
+                    cloud.loc[seed_id, 'y'],
+                    cloud.loc[seed_id, 'z'],
+                    s=10, c='orange')
+        ax_.view_init(elev=perspectives[_ax.index(ax_)][0], azim=perspectives[_ax.index(ax_)][1])
+        ax_.set_aspect('equal')
+        ax_.set_xticks([])
+        ax_.set_yticks([])
+        ax_.set_zticks([])
+
+    # make a legend for the colors and force the dots larger
+    fig.legend(['unclustered', 'cluster_passive', 'cluster_active', 'patch_additions', 'add_candidates', 'angle_checked', 'seed'],
+               loc='center left', bbox_to_anchor=(0.4, 0.5))
+    # make bigger
+    fig.tight_layout()
+    fig.set_size_inches(7, 7)
+    plt.show()
 
 
 def neighborhood_plot(cloud, seed_id=None, neighbors=None, config=None, cage_override=None, confidence=False):
@@ -367,7 +460,8 @@ def neighborhood_plot(cloud, seed_id=None, neighbors=None, config=None, cage_ove
                     ax.plot(x_rotated[:, i], y_rotated[:, i], z_rotated[:, i], c=cage_color, linewidth=cage_width)
 
             case _:
-                print(f'\nno cage plot implemented for the neighborhood shape of {config.local_features.neighbor_shape}')
+                print(
+                    f'\nno cage plot implemented for the neighborhood shape of {config.local_features.neighbor_shape}')
 
     ax.set_aspect('equal')
 

@@ -91,3 +91,5 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
 
     cloud_to_write = cloud.loc[:, io_agenda]
     cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)
+    # serialize without structure loss pickle or json
+    cloud_to_write.to_pickle(f'{path}cache_cloud_{cache_flag}.pickle')

@@ -17,7 +17,7 @@ if __name__ == '__main__':
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
     ##########
-    cache_flag = 2  # 0: no cache, 1: load normals, 2: load supernormals and confidence 3: load ransac patches
+    cache_flag = 2
     ##########
 
     if cache_flag <= 0:
@@ -40,13 +40,12 @@ if __name__ == '__main__':
         cloud['nz'] = normals[:, 2]
 
         cache_io(xyz=True, normals=True, instance_gt=True,
-                 path=config.project.parking_path, cloud=cloud, cache_flag=cache_flag)
+                 path=config.project.parking_path, cloud=cloud, cache_flag=0)
 
     if cache_flag <= 1:
         print('\n- compute supernormals')
-        with open(f'{config.project.parking_path}/cache_cloud_0.txt', 'r') as f:
-            cloud = pd.read_csv(f, sep=' ', header=None)
-            cloud.columns = ['x', 'y', 'z', 'nx', 'ny', 'nz', 'instance_gt']
+        with open(f'{config.project.parking_path}/cache_cloud_0.pickle', 'rb') as f:
+            cloud = pd.read_pickle(f)
         del f
 
         cloud_o3d = o3d.geometry.PointCloud()
@@ -67,25 +66,22 @@ if __name__ == '__main__':
 
 
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True,
-                 path=config.project.parking_path, cloud=cloud, cache_flag=cache_flag)
+                 path=config.project.parking_path, cloud=cloud, cache_flag=1)
 
     if cache_flag <= 2:
         print('\n- compute ransac patches')
-        with open(f'{config.project.parking_path}/cache_cloud_1.txt', 'r') as f:
-            cloud = pd.read_csv(f, sep=' ', header=None)
-            cloud.columns = ['x', 'y', 'z', 'nx', 'ny', 'nz', 'snx', 'sny', 'snz', 'confidence', 'instance_gt']
+        with open(f'{config.project.parking_path}/cache_cloud_1.pickle', 'rb') as f:
+            cloud = pd.read_pickle(f)
         del f
 
         cloud = ransac_patches(cloud, config)
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
-                    path=config.project.parking_path, cloud=cloud, cache_flag=cache_flag)
+                    path=config.project.parking_path, cloud=cloud, cache_flag=2)
 
     if cache_flag <= 3:
         print('\n- compute instance predictions through region growing')
-        with open(f'{config.project.parking_path}/cache_cloud_2.txt', 'r') as f:
-            cloud = pd.read_csv(f, sep=' ', header=None)
-            cloud.columns = ['x', 'y', 'z', 'nx', 'ny', 'nz',
-                             'snx', 'sny', 'snz', 'confidence', 'instance_gt', 'ransac_patch']
+        with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
+            cloud = pd.read_pickle(f)
         cloud = region_growing_rev(cloud, config)
 
 

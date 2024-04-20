@@ -48,5 +48,7 @@ clustering:
   dbscan_min_count: 10
 
 region_growing:
-  supernormal_angle_deviation: 10
+  neighbors_found_min: 10
+  supernormal_angle_deviation: 30
+  supernormal_patch_angle_deviation: 30
 
