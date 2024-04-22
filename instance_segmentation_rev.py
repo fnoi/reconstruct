@@ -8,7 +8,7 @@ import open3d as o3d
 from omegaconf import OmegaConf
 
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, region_growing_rev, ransac_patches, neighborhood_plot, patch_growing
+from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
