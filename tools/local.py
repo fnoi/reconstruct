@@ -4,6 +4,7 @@ import random
 import numpy as np
 import open3d as o3d
 from matplotlib import pyplot as plt
+import matplotlib.colors as mcolors
 from tqdm import tqdm
 from scipy.spatial import KDTree
 from sklearn.cluster import DBSCAN
@@ -194,11 +195,29 @@ def ransac_patches(cloud, config):
 
 
 def patch_growing(cloud, config):
-    patches_in = np.unique(cloud['ransac_patch'])
-    patches_out = []
+    cloud['grown_patch'] = 0
+    plot_patch_v3(cloud)
+    label_id = 0
+    mask_available = np.ones(len(cloud), dtype=bool)
+    patches_clustered = []
 
     while True:
-        seed = int(cloud.idxmax()['confidence'])
+
+        # count trues in mask_available
+        if np.sum(mask_available) <= config.region_growing.leftover_thresh * len(cloud):
+            break
+
+        masked_cloud = cloud.loc[mask_available]
+        seed = masked_cloud.idxmax()['confidence']
+        seed_data = masked_cloud.loc[seed]
+        # find seed in full cloud
+        # Find the row with the given values
+        seed = cloud.index[
+            (cloud['x'] == seed_data['x']) &
+            (cloud['y'] == seed_data['y']) &
+            (cloud['z'] == seed_data['z'])
+            ][0]
+
         seed_patch = cloud.loc[seed, 'ransac_patch']
         cluster_sn = cloud.loc[seed, ['snx', 'sny', 'snz']].values
         cluster_rn = cloud.loc[seed, ['rnx', 'rny', 'rnz']].values
@@ -228,11 +247,20 @@ def patch_growing(cloud, config):
             #     neighbor_points.extend(neighborhood_search(masked_cloud, cluster_point, config, step='patch growing'))
             # neighbor_points = np.unique(neighbor_points)
             neighbor_patches = np.unique(cloud.loc[neighbor_ids, 'ransac_patch'])
-            neighbor_patches = [x for x in neighbor_patches if x != 0 and
+            neighbor_patches = [x for x in neighbor_patches if
+                                x != 0 and
                                 x not in cluster_patches and
-                                x not in cluster_patches_out]
+                                x not in cluster_patches_out and
+                                x not in patches_clustered]
             if len(neighbor_patches) == 0:
                 # patch growth stopped.
+                label_id += 1
+                cloud.loc[cluster_points, 'grown_patch'] = label_id
+                mask_available[cluster_points] = False
+
+                plot_patch_v3(cloud)
+
+                print(f'patch grown: {label_id}, size: {len(cluster_points)}')
                 break
 
             # check if neighboring patches are cool
@@ -266,30 +294,32 @@ def patch_growing(cloud, config):
 
                 rn_deviation = angular_deviation(cluster_sn, neighbor_patch_rn) - 90
 
-                grow_plot_v2(cloud, cluster_points, patch_ids,
-                             cluster_sn, neighbor_patch_sn,
-                             cluster_rn, neighbor_patch_rn,
-                             seed, patch_center_point)
+                # grow_plot_v2(cloud, cluster_points, patch_ids,
+                #              cluster_sn, neighbor_patch_sn,
+                #              cluster_rn, neighbor_patch_rn,
+                #              seed, patch_center_point)
 
-                print('sn deviation: ', sn_deviation, 'rn deviation: ', rn_deviation)
+                report_flag = False
+                if report_flag:
+                    print('sn deviation: ', sn_deviation, 'rn deviation: ', rn_deviation)
 
                 if sn_deviation <= config.region_growing.supernormal_patch_angle_deviation and \
                         rn_deviation <= config.region_growing.ransacnormal_patch_angle_deviation:
                     # add neighbor patch to cluster
                     cluster_points.extend(cloud.loc[cloud['ransac_patch'] == neighbor_patch].index)
                     cluster_patches.append(neighbor_patch)
+                    patches_clustered.append(neighbor_patch)
 
-                    growth_plot(cloud, seed, cluster_points, [], [], [], [])
-                    print('cool')
+                    # growth_plot(cloud, seed, cluster_points, [], [], [], [])
+                    if report_flag:
+                        print('cool')
                 else:
                     cluster_patches_out.append(neighbor_patch)
-                    print('not cool')
+                    if report_flag:
+                        print('not cool')
 
-                print('cluster size: ', len(cluster_points))
-                a = 0
-
-        a = 0
-
+                if report_flag:
+                    print('cluster size: ', len(cluster_points))
 
 def grow_plot_v2(cloud, cluster_points, patch_ids,
                  cluster_sn, neighbor_patch_sn,
@@ -332,6 +362,29 @@ def grow_plot_v2(cloud, cluster_points, patch_ids,
     plt.show()
 
 
+def plot_patch_v3(cloud):
+    plt.figure()
+
+    n_colors = 10
+    cmap = plt.cm.get_cmap('gist_rainbow', n_colors)
+    colors = cmap(np.arange(n_colors))
+    colors[0] = np.array([0.8, 0.8, 0.8, 1.0])
+    cmap = mcolors.ListedColormap(colors)
+
+    norm = mcolors.BoundaryNorm(boundaries=np.arange(-0.5, n_colors + 0.5, 1), ncolors=n_colors)
+
+    ax = plt.subplot(111, projection='3d')
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['grown_patch'],
+               cmap=plt.cm.tab20, vmin=0, vmax=10)
+
+    scatter = ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['grown_patch'], cmap=cmap,
+                         norm=norm)
+
+    # Add a colorbar to show the mapping from grown_patch values to colors
+    cbar = plt.colorbar(scatter, ticks=np.arange(n_colors))
+    cbar.set_label('Grown Patch Value')
+
+    plt.show()
 
 
 def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None):

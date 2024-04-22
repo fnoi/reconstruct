@@ -64,7 +64,6 @@ if __name__ == '__main__':
         # neighborhood_plot(cloud=cloud, confidence=True)
         # raise ValueError('stop here')
 
-
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True,
                  path=config.project.parking_path, cloud=cloud, cache_flag=1)
 

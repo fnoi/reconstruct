@@ -50,8 +50,9 @@ clustering:
 region_growing:
   neighbors_found_min: 10
   supernormal_angle_deviation: 20
-  supernormal_patch_angle_deviation: 20
-  ransacnormal_patch_angle_deviation: 45
+  supernormal_patch_angle_deviation: 25
+  ransacnormal_patch_angle_deviation: 30
   neighborhood_radius_a: 0.3
   neighborhood_radius_bc: 0.1
+  leftover_thresh: 0.025
 
