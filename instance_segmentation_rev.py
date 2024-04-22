@@ -81,12 +81,17 @@ if __name__ == '__main__':
         print('\n- compute instance predictions through region growing')
         with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
+        del f
         cloud = patch_growing(cloud, config)
-        cloud = region_growing_rev(cloud, config)
+
+        cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
+                 ransac_normals=True, grown_patch=True, path=config.project.parking_path, cloud=cloud, cache_flag=3)
 
 
+    if cache_flag <= 4:
+        print('\n- compute instance prediction metrics')
+        with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
+            cloud = pd.read_pickle(f)
+        del f
 
-        a = 0
 
-
-    a = 0
