@@ -58,8 +58,8 @@ def find_pairs_greedy_pred(pred, gt):
     unique_pred, pred_counts = np.unique(pred, return_counts=True)
 
     # sort uniques by count
-    unique_gt = unique_gt[np.argsort(gt_counts)[::-1]]
-    unique_pred = unique_pred[np.argsort(pred_counts)[::-1]]
+    unique_gt = unique_gt[np.argsort(gt_counts)]
+    unique_pred = unique_pred[np.argsort(pred_counts)]
 
     label_pairs = []
     for pred_label in unique_pred:
@@ -68,6 +68,8 @@ def find_pairs_greedy_pred(pred, gt):
         best_gt_label = None
         best_iou = 0
         for gt_label in unique_gt:
+            if gt_label == 0:
+                continue
             intersection = np.sum((pred == pred_label) & (gt == gt_label))
             union = np.sum((pred == pred_label) | (gt == gt_label))
             iou = intersection / union if union > 0 else 0
@@ -81,37 +83,39 @@ def find_pairs_greedy_pred(pred, gt):
     return label_pairs
 
 
-
 def find_pairs_hungarian(pred, gt):
     """
-    find the best matching between predicted and ground truth instances using the Hungarian algorithm
+    Find the best matching between predicted and ground truth instances using the Hungarian algorithm,
+    excluding the unlabeled class (label 0).
     """
-    unique_gt, gt_counts = np.unique(gt, return_counts=True)
-    unique_pred, pred_counts = np.unique(pred, return_counts=True)
+    # Filter out the zero labels and get unique labels with their counts
+    unique_gt, gt_counts = np.unique(gt[gt != 0], return_counts=True)
+    unique_pred, pred_counts = np.unique(pred[pred != 0], return_counts=True)
 
-    num_gt_pad = max(0, len(unique_gt) - len(unique_pred))
-    num_pred_pad = max(0, len(unique_pred) - len(unique_gt))
+    # Pad labels to equalize the dimensions of the cost matrix if necessary
+    num_gt_pad = max(0, len(unique_pred) - len(unique_gt))
+    num_pred_pad = max(0, len(unique_gt) - len(unique_pred))
 
-    # pad labels and ignore 0 (bc unlabeled)
     pred_labels = np.pad(unique_pred, (0, num_pred_pad), constant_values=0)
     gt_labels = np.pad(unique_gt, (0, num_gt_pad), constant_values=0)
     pred_counts = np.concatenate([pred_counts, np.zeros(num_pred_pad)])
     gt_counts = np.concatenate([gt_counts, np.zeros(num_gt_pad)])
 
-    # create cost matrix with 1-iou as cost
+    # Create cost matrix with 1 - IOU as the cost
     cost_matrix = np.zeros((len(pred_labels), len(gt_labels)))
     for i, pred_label in enumerate(pred_labels):
         for j, gt_label in enumerate(gt_labels):
-            intersection = np.sum((pred == pred_label) & (gt == gt_label))
-            union = np.sum((pred == pred_label) | (gt == gt_label))
-            iou = intersection / union if union > 0 else 0
-            cost_matrix[i, j] = 1 - iou
+            if pred_label != 0 and gt_label != 0:
+                intersection = np.sum((pred == pred_label) & (gt == gt_label))
+                union = np.sum((pred == pred_label) | (gt == gt_label))
+                iou = intersection / union if union > 0 else 0
+                cost_matrix[i, j] = 1 - iou
 
-    # hungarian algorithm for minimum cost assignment (1-iou)
+    # Hungarian algorithm to find the minimum cost assignment (1 - IOU)
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-    # return label pairs
-    label_pairs = [(pred_labels[i], gt_labels[j]) for i, j in zip(row_ind, col_ind)]
+    # Return label pairs excluding those involving the padded zeros if any
+    label_pairs = [(pred_labels[i], gt_labels[j]) for i, j in zip(row_ind, col_ind) if pred_labels[i] != 0 and gt_labels[j] != 0]
 
     return label_pairs
 
@@ -141,12 +145,12 @@ def calculate_precision_recall(pred, gt, id_map, thresholds=None):
     pred = -pred
     for _pred, _gt in id_map:
         pred[pred == -_pred] = _gt
-    pred[pred == 0] = -1
-    gt[gt == 0] = -1
+    # pred[pred == 0] = -1
+    # gt[gt == 0] = -1
 
     pr_raw = {}
     for label in np.unique(gt):
-        if label == -1:
+        if label == 0:
             continue
         tp = np.sum((pred == label) & (gt == label))
         fp = np.sum((pred == label) & (gt != label))
@@ -166,7 +170,7 @@ def calculate_precision_recall(pred, gt, id_map, thresholds=None):
     if thresholds is None:
         thresholds = [0.0, 0.5]
 
-    gt_total_valid = np.sum(gt != -1)
+    gt_total_valid = np.sum(gt != 0)
     pr_thresh = {}
     for threshold in thresholds:
         precision, recall, iou, gt_weighted_iou, gt_weighted_precision = [], [], [], [], []
@@ -205,8 +209,8 @@ def calculate_precision_recall(pred, gt, id_map, thresholds=None):
 
 
 def calculate_metrics(df_cloud, config):
-    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
-    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
+    inst_pred = df_cloud['grown_patch'].to_numpy()
+    inst_gt = df_cloud['instance_gt'].to_numpy()
 
     print('hungarian matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='hungarian')
@@ -215,9 +219,6 @@ def calculate_metrics(df_cloud, config):
     map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
     print(f'miou global:   {miou:.4f}')
 
-    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
-    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
-
     print('greedy_gt matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')
     print(f'mapped pairs {len(id_map)}, {id_map}')
@@ -225,14 +226,9 @@ def calculate_metrics(df_cloud, config):
     miou = calculate_miou(inst_pred, inst_gt, id_map)
     print(f'miou global:   {miou:.4f}')
 
-    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
-    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
-
     print('greedy_pred matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_pred')
     print(f'mapped pairs {len(id_map)}, {id_map}')
     map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
     miou = calculate_miou(inst_pred, inst_gt, id_map)
     print(f'miou global: {miou:.4f}')
-
-
