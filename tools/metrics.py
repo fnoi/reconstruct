@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -25,11 +27,13 @@ def find_pairs_greedy_gt(pred, gt):
     unique_pred, pred_counts = np.unique(pred, return_counts=True)
 
     # sort uniques by count
-    unique_gt = unique_gt[np.argsort(gt_counts)[::-1]]
-    unique_pred = unique_pred[np.argsort(pred_counts)[::-1]]
+    unique_gt = unique_gt[np.argsort(gt_counts)]
+    unique_pred = unique_pred[np.argsort(pred_counts)]
 
     label_pairs = []
     for gt_label in unique_gt:
+        if gt_label == 0:
+            continue
         best_pred_label = None
         best_iou = 0
         for pred_label in unique_pred:
@@ -59,6 +63,8 @@ def find_pairs_greedy_pred(pred, gt):
 
     label_pairs = []
     for pred_label in unique_pred:
+        if pred_label == 0:
+            continue
         best_gt_label = None
         best_iou = 0
         for gt_label in unique_gt:
@@ -120,46 +126,47 @@ def calculate_miou(inst_pred, inst_gt, id_map):
         union = np.sum((inst_pred == pred_label) | (inst_gt == gt_label))
 
         if union == 0:
-            continue
+            iou_scores.append(0)
+        else:
+            iou = intersection / union
+            iou_scores.append(iou)
 
-        iou = intersection / union
-        iou_scores.append(iou)
-
+    print(f'number of ious going in miou: {len(iou_scores)}')
     miou = np.mean(iou_scores) if iou_scores else 0
 
     return miou
 
 
-def calculate_precision_recall(inst_pred, inst_gt, id_map, thresholds=None):
-    inst_pred = -inst_pred
-    for pred, gt in id_map:
-        inst_pred[inst_pred == -pred] = gt
-    inst_pred[inst_pred == 0] = -1
-    inst_gt[inst_gt == 0] = -1
+def calculate_precision_recall(pred, gt, id_map, thresholds=None):
+    pred = -pred
+    for _pred, _gt in id_map:
+        pred[pred == -_pred] = _gt
+    pred[pred == 0] = -1
+    gt[gt == 0] = -1
 
     pr_raw = {}
-    for label in np.unique(inst_gt):
+    for label in np.unique(gt):
         if label == -1:
             continue
-        tp = np.sum((inst_pred == label) & (inst_gt == label))
-        fp = np.sum((inst_pred == label) & (inst_gt != label))
-        tn = np.sum((inst_pred != label) & (inst_gt != label))
-        fn = np.sum((inst_pred != label) & (inst_gt == label))
+        tp = np.sum((pred == label) & (gt == label))
+        fp = np.sum((pred == label) & (gt != label))
+        tn = np.sum((pred != label) & (gt != label))
+        fn = np.sum((pred != label) & (gt == label))
 
         precision = tp / (tp + fp) if tp + fp > 0 else 0
         recall = tp / (tp + fn) if tp + fn > 0 else 0
         iou = tp / (tp + fp + fn) if tp + fp + fn > 0 else 0
 
         # count label in gt
-        n_gt = np.sum(inst_gt == label)
-        n_pred = np.sum(inst_pred == label)
+        n_gt = np.sum(gt == label)
+        n_pred = np.sum(pred == label)
 
         pr_raw[label] = (precision, recall, iou, n_gt, n_pred)
 
     if thresholds is None:
         thresholds = [0.0, 0.5]
 
-    gt_total_valid = np.sum(inst_gt != -1)
+    gt_total_valid = np.sum(gt != -1)
     pr_thresh = {}
     for threshold in thresholds:
         precision, recall, iou, gt_weighted_iou, gt_weighted_precision = [], [], [], [], []
@@ -198,23 +205,32 @@ def calculate_precision_recall(inst_pred, inst_gt, id_map, thresholds=None):
 
 
 def calculate_metrics(df_cloud, config):
-    inst_pred = df_cloud['grown_patch'].to_numpy()
-    inst_gt = df_cloud['instance_gt'].to_numpy()
+    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
+    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
 
     print('hungarian matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='hungarian')
+    print(f'mapped pairs {len(id_map)}, {id_map}')
     miou = calculate_miou(inst_pred, inst_gt, id_map)
     map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
     print(f'miou global:   {miou:.4f}')
+
+    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
+    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
 
     print('greedy_gt matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')
+    print(f'mapped pairs {len(id_map)}, {id_map}')
     map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
     miou = calculate_miou(inst_pred, inst_gt, id_map)
     print(f'miou global:   {miou:.4f}')
 
+    inst_pred = copy.deepcopy(df_cloud['grown_patch']).to_numpy()
+    inst_gt = copy.deepcopy(df_cloud['instance_gt']).to_numpy()
+
     print('greedy_pred matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_pred')
+    print(f'mapped pairs {len(id_map)}, {id_map}')
     map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
     miou = calculate_miou(inst_pred, inst_gt, id_map)
     print(f'miou global: {miou:.4f}')
