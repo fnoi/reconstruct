@@ -14,6 +14,65 @@ def find_pairs(pred, gt, method):
             raise ValueError(f"Invalid method: {method}")
 
 
+def find_pairs_greedy_gt(pred, gt):
+    """
+    find the best matching between predicted and ground truth instances using a greedy algorithm
+    """
+    unique_gt, gt_counts = np.unique(gt, return_counts=True)
+    unique_pred, pred_counts = np.unique(pred, return_counts=True)
+
+    # sort uniques by count
+    unique_gt = unique_gt[np.argsort(gt_counts)[::-1]]
+    unique_pred = unique_pred[np.argsort(pred_counts)[::-1]]
+
+    label_pairs = []
+    for gt_label in unique_gt:
+        best_pred_label = None
+        best_iou = 0
+        for pred_label in unique_pred:
+            intersection = np.sum((pred == pred_label) & (gt == gt_label))
+            union = np.sum((pred == pred_label) | (gt == gt_label))
+            iou = intersection / union if union > 0 else 0
+            if iou > best_iou:
+                best_iou = iou
+                best_pred_label = pred_label
+        if best_pred_label is not None:
+            label_pairs.append((best_pred_label, gt_label))
+            unique_pred = unique_pred[unique_pred != best_pred_label]
+
+    return label_pairs
+
+
+def find_pairs_greedy_pred(pred, gt):
+    """
+    find the best matching between predicted and ground truth instances using a greedy algorithm
+    """
+    unique_gt, gt_counts = np.unique(gt, return_counts=True)
+    unique_pred, pred_counts = np.unique(pred, return_counts=True)
+
+    # sort uniques by count
+    unique_gt = unique_gt[np.argsort(gt_counts)[::-1]]
+    unique_pred = unique_pred[np.argsort(pred_counts)[::-1]]
+
+    label_pairs = []
+    for pred_label in unique_pred:
+        best_gt_label = None
+        best_iou = 0
+        for gt_label in unique_gt:
+            intersection = np.sum((pred == pred_label) & (gt == gt_label))
+            union = np.sum((pred == pred_label) | (gt == gt_label))
+            iou = intersection / union if union > 0 else 0
+            if iou > best_iou:
+                best_iou = iou
+                best_gt_label = gt_label
+        if best_gt_label is not None:
+            label_pairs.append((pred_label, best_gt_label))
+            unique_gt = unique_gt[unique_gt != best_gt_label]
+
+    return label_pairs
+
+
+
 def find_pairs_hungarian(pred, gt):
     """
     find the best matching between predicted and ground truth instances using the Hungarian algorithm
@@ -48,11 +107,39 @@ def find_pairs_hungarian(pred, gt):
     return label_pairs
 
 
+def calculate_miou(inst_pred, inst_gt, id_map):
+    iou_scores = []
+
+    for pred_label, gt_label in id_map:
+        intersection = np.sum((inst_pred == pred_label) & (inst_gt == gt_label))
+        union = np.sum((inst_pred == pred_label) | (inst_gt == gt_label))
+
+        if union == 0:
+            continue
+
+        iou = intersection / union
+        iou_scores.append(iou)
+
+    miou = np.mean(iou_scores) if iou_scores else 0
+
+    return miou
+
+
 def calculate_metrics(df_cloud, config):
     inst_pred = df_cloud['grown_patch'].to_numpy()
     inst_gt = df_cloud['instance_gt'].to_numpy()
 
-    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method=config.evaluation.pairing_method)
+    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='hungarian')
+    miou = calculate_miou(inst_pred, inst_gt, id_map)
+    print(f'hungarian miou:   {miou:.4f}')
+
+    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')
+    miou = calculate_miou(inst_pred, inst_gt, id_map)
+    print(f'greedy_gt miou:   {miou:.4f}')
+
+    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_pred')
+    miou = calculate_miou(inst_pred, inst_gt, id_map)
+    print(f'greedy_pred miou: {miou:.4f}')
 
     inst_pred_unique = np.unique(inst_pred)
     inst_gt_unique = np.unique(inst_gt)
