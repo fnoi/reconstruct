@@ -56,3 +56,5 @@ region_growing:
   neighborhood_radius_bc: 0.1
   leftover_thresh: 0.025
 
+evaluation:
+  pairing_method: hungarian

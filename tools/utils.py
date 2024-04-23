@@ -56,6 +56,7 @@ def calculate_miou(points_array):
     miou = np.mean(iou_scores) if iou_scores else 0
     return miou
 
+
 # Example usage
 # points_array = your_numpy_array_here
 # miou = calculate_miou(points_array)
@@ -63,6 +64,10 @@ def calculate_miou(points_array):
 
 
 import numpy as np
+
+
+
+
 
 def calculate_miou_with_labels(points_array):
     predicted_labels = points_array[:, 5]  # Predicted instance labels are in column 10 (index 9)

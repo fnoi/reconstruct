@@ -321,6 +321,9 @@ def patch_growing(cloud, config):
                 if report_flag:
                     print('cluster size: ', len(cluster_points))
 
+    return cloud
+
+
 def grow_plot_v2(cloud, cluster_points, patch_ids,
                  cluster_sn, neighbor_patch_sn,
                  cluster_rn, neighbor_patch_rn,

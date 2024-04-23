@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 
 from tools.IO import cache_io
 from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing
+from tools.metrics import calculate_metrics
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
@@ -17,7 +18,7 @@ if __name__ == '__main__':
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
     ##########
-    cache_flag = 3
+    cache_flag = 4
     ##########
 
     if cache_flag <= 0:
@@ -85,7 +86,7 @@ if __name__ == '__main__':
         cloud = patch_growing(cloud, config)
 
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
-                 ransac_normals=True, grown_patch=True, path=config.project.parking_path, cloud=cloud, cache_flag=3)
+                 ransac_normals=True, path=config.project.parking_path, cloud=cloud, cache_flag=3)
 
 
     if cache_flag <= 4:
@@ -93,5 +94,5 @@ if __name__ == '__main__':
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
-
+        miou = calculate_metrics(cloud, config)
 

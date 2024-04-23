@@ -67,6 +67,9 @@ def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 
 def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
              instance_gt=False, instance_pred=False, ransac_patch=False, ransac_normals=False,
              path=None, cloud=None, cache_flag=None):
+    # serialize without structure loss pickle or json
+    cloud.to_pickle(f'{path}cache_cloud_{cache_flag}.pickle')
+
     io_agenda = []
     if xyz:
         io_agenda.append('x')
@@ -95,5 +98,4 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
 
     cloud_to_write = cloud.loc[:, io_agenda]
     cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)
-    # serialize without structure loss pickle or json
-    cloud_to_write.to_pickle(f'{path}cache_cloud_{cache_flag}.pickle')
+
