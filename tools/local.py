@@ -226,6 +226,7 @@ def patch_growing(cloud, config):
     label_id = 0
     mask_available = np.ones(len(cloud), dtype=bool)
     patches_clustered = []
+    clustered_tracker = []
 
     while True:
 
@@ -237,8 +238,8 @@ def patch_growing(cloud, config):
         masked_cloud = cloud.loc[mask_available]
         seed = masked_cloud.idxmax()['confidence']
         seed_data = masked_cloud.loc[seed]
-        # find seed in full cloud
-        # Find the row with the given values
+
+        # find seed in full unmasked cloud
         seed = cloud.index[
             (cloud['x'] == seed_data['x']) &
             (cloud['y'] == seed_data['y']) &
@@ -247,7 +248,7 @@ def patch_growing(cloud, config):
 
         seed_patch = cloud.loc[seed, 'ransac_patch']
         cluster_sn = cloud.loc[seed, ['snx', 'sny', 'snz']].values
-        cluster_rn = cloud.loc[seed, ['rnx', 'rny', 'rnz']].values
+        cluster_rn = cloud.loc[seed, ['rnx', 'rny', 'rnz']].values  # unused?
         # int list of point ids in cluster
         cluster_points = cloud.loc[cloud['ransac_patch'] == seed_patch].index
         cluster_points = cluster_points.tolist()
@@ -268,7 +269,7 @@ def patch_growing(cloud, config):
             # TODO: neighborhood search is bottleneck...
             #  mask cloud for speed? (already checked / pre-filter box)
             neighbor_ids = neighborhood_search(cloud, seed_id=None, config=config,
-                                           step='bbox_mask', cluster_lims=cluster_lims)
+                                               step='bbox_mask', cluster_lims=cluster_lims)
             # masked_cloud = cloud.loc[mask_ids]
             # for cluster_point in cluster_points:
             #     neighbor_points.extend(neighborhood_search(masked_cloud, cluster_point, config, step='patch growing'))
