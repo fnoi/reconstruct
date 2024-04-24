@@ -6,7 +6,7 @@ project:
   parking_path: data/parking/
 
 segmentation:
-  cloud_path: /data/in_test/test_junction_snip.txt
+  cloud_path: /data/in_test/test_junction_snip_rev.txt
   # path to raw cloud
   #  cloud_path: /data/in_instances/beams.txt
 
@@ -16,10 +16,10 @@ local_features:
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
   supernormal_radius: 0.15
-  neighbor_shape: oriented_ellipsoid
+  neighbor_shape: sphere
   supernormal_cube_dist: 0.15
-  supernormal_ellipsoid_a: 0.15
-  supernormal_ellipsoid_bc: 0.075
+  supernormal_ellipsoid_a: 0.1
+  supernormal_ellipsoid_bc: 0.2
 
 initial:
   rnd_pick_ratio: 0.05

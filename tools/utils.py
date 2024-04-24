@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objs as go
+from omegaconf import OmegaConf
 
 from tools.geometry import warped_vectors_intersection
 
@@ -219,3 +220,14 @@ def plot_patch(cloud_frame=None, seed_id=None, neighbor_ids=None):
         )
     )
     fig.show()
+
+
+def load_angles(yaml_path):
+    orientation_gt = OmegaConf.load(yaml_path)
+    vecs = {}
+    for key in orientation_gt:
+        rpy = orientation_gt[str(int(key))]
+        rpy = [rpy.X1, rpy.Y2, rpy.Z3]
+        gt_orientation = calculate_view_direction(rpy[0], rpy[1], rpy[2])
+        vecs[int(key)] = gt_orientation
+    return vecs

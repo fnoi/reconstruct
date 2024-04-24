@@ -7,9 +7,10 @@ import pandas as pd
 import open3d as o3d
 from omegaconf import OmegaConf
 
+import tools.utils
 from tools.IO import cache_io
 from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing
-from tools.metrics import calculate_metrics
+from tools.metrics import calculate_metrics, supernormal_evaluation
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_rev.yaml')
@@ -17,8 +18,9 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
+
     ##########
-    cache_flag = 4
+    cache_flag = 0
     ##########
 
     if cache_flag <= 0:
@@ -26,9 +28,9 @@ if __name__ == '__main__':
         with open(config.project.path, 'r') as f:
             # TODO: add option to load rgb here, currently XYZ, label only
             cloud = pd.read_csv(f, sep=' ', header=None).values
-            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'r', 'g', 'b', 'instance_gt'])
+            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
-            cloud.drop(['r', 'g', 'b'], axis=1, inplace=True)
+            # cloud.drop(['r', 'g', 'b'], axis=1, inplace=True)
         del f
 
         cloud_o3d = o3d.geometry.PointCloud()
@@ -59,11 +61,6 @@ if __name__ == '__main__':
         cloud['confidence'] = None
 
         cloud = calculate_supernormals_rev(cloud, cloud_o3d, config)
-        # confidence histogram
-        # plt.hist(cloud['confidence'], bins=100)
-        # plt.show()
-        # neighborhood_plot(cloud=cloud, confidence=True)
-        # raise ValueError('stop here')
 
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True,
                  path=config.project.parking_path, cloud=cloud, cache_flag=1)
@@ -74,25 +71,38 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
 
+        # upstream check, optional
+        # should be in supernormal computation but slowwwww
+        control_supernormals = True
+        if control_supernormals:
+            supernormal_evaluation(cloud, config)
+
+        a = 0
+
+
         cloud = ransac_patches(cloud, config)
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
                  ransac_normals=True, path=config.project.parking_path, cloud=cloud, cache_flag=2)
 
     if cache_flag <= 3:
-        print('\n- compute instance predictions through region growing')
+        print('\n- compute instance predictions through region growing, report metrics')
         with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
         cloud = patch_growing(cloud, config)
+        miou_weighted, miou_unweighted = calculate_metrics(cloud, config)
 
         cache_io(xyz=True, normals=True, supernormals=True, confidence=True, instance_gt=True, ransac_patch=True,
                  ransac_normals=True, path=config.project.parking_path, cloud=cloud, cache_flag=3)
 
-
     if cache_flag <= 4:
-        print('\n- compute instance prediction metrics')
-        with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
-            cloud = pd.read_pickle(f)
-        del f
-        miou = calculate_metrics(cloud, config)
+        print('\n- compute instance orientation, report metrics')
 
+    if cache_flag <= 5:
+        print('\n- project instance points to plane, fit cs, lookup params')
+
+    if cache_flag <= 6:
+        print('\n- define initial skeleton and refine by semantics')
+
+    if cache_flag <= 7:
+        print('\n- collision-free reconstruction with FreeCAD')

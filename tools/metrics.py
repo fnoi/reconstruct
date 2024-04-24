@@ -6,6 +6,8 @@ from matplotlib import pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
+from tools.utils import load_angles
+
 
 def find_pairs(pred, gt, method):
     match method:
@@ -115,33 +117,13 @@ def find_pairs_hungarian(pred, gt):
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
     # Return label pairs excluding those involving the padded zeros if any
-    label_pairs = [(pred_labels[i], gt_labels[j]) for i, j in zip(row_ind, col_ind) if pred_labels[i] != 0 and gt_labels[j] != 0]
+    label_pairs = [(pred_labels[i], gt_labels[j]) for i, j in zip(row_ind, col_ind) if
+                   pred_labels[i] != 0 and gt_labels[j] != 0]
 
     return label_pairs
 
 
-def calculate_miou(inst_pred, inst_gt, id_map):
-    iou_scores = []
-
-    for pred_label, gt_label in id_map:
-        if pred_label == 0 or gt_label == 0:
-            continue
-        intersection = np.sum((inst_pred == pred_label) & (inst_gt == gt_label))
-        union = np.sum((inst_pred == pred_label) | (inst_gt == gt_label))
-
-        if union == 0:
-            iou_scores.append(0)
-        else:
-            iou = intersection / union
-            iou_scores.append(iou)
-
-    print(f'number of ious going in miou: {len(iou_scores)}')
-    miou = np.mean(iou_scores) if iou_scores else 0
-
-    return miou
-
-
-def calculate_precision_recall(pred, gt, id_map, thresholds=None):
+def calculate_precision_recall_iou(pred, gt, id_map, thresholds=None):
     pred = -pred
     for _pred, _gt in id_map:
         pred[pred == -_pred] = _gt
@@ -210,7 +192,8 @@ def calculate_precision_recall(pred, gt, id_map, thresholds=None):
     if report_flag:
         return pr_thresh
     else:
-        return pr_thresh[0.5]['mean_iou_weighted']
+        # set desired iou threshold here (has to be included in thresholds)
+        return pr_thresh[0.0]['mean_iou_weighted'], pr_thresh[0.0]['mean_iou']
 
 
 def calculate_metrics(df_cloud, config):
@@ -220,20 +203,61 @@ def calculate_metrics(df_cloud, config):
     print('hungarian matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='hungarian')
     print(f'mapped pairs {len(id_map)}, {id_map}')
-    miou = calculate_miou(inst_pred, inst_gt, id_map)
-    map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
-    print(f'miou global:   {miou:.4f}')
+    metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
+    print(metrics)
 
-    print('greedy_gt matching')
-    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')
-    print(f'mapped pairs {len(id_map)}, {id_map}')
-    map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
-    miou = calculate_miou(inst_pred, inst_gt, id_map)
-    print(f'miou global:   {miou:.4f}')
+    greedy_compare = False
+    if not greedy_compare:
+        return metrics
+    else:
+        print('greedy_gt matching')
+        id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')
+        print(f'mapped pairs {len(id_map)}, {id_map}')
+        metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
+        print(metrics)
 
-    print('greedy_pred matching')
-    id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_pred')
-    print(f'mapped pairs {len(id_map)}, {id_map}')
-    map_dict = calculate_precision_recall(inst_pred, inst_gt, id_map)
-    miou = calculate_miou(inst_pred, inst_gt, id_map)
-    print(f'miou global: {miou:.4f}')
+        print('greedy_pred matching')
+        id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_pred')
+        print(f'mapped pairs {len(id_map)}, {id_map}')
+        metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
+        print(metrics)
+
+        raise ValueError('endefined return for greedy comparison')
+
+
+def supernormal_evaluation(cloud, config):
+    orientation_gt = load_angles('instance_orientation.yaml')
+    # iterate over rows in cloud
+    cloud['supernormal_dev_gt'] = None
+    for idx, row in cloud.iterrows():
+        # get instance id
+        instance_id = row['instance_gt']
+        # get orientation from yaml
+        gt_orientation = orientation_gt[instance_id]
+        # get supernormal
+        sn = [row['snx'], row['sny'], row['snz']]
+        # calculate angle
+        angle = np.rad2deg(np.arccos(np.dot(gt_orientation, sn)))
+        if angle > 90:
+            angle = 180 - angle
+        # append to list
+        cloud.at[idx, 'supernormal_dev_gt'] = angle
+
+    # plot histogram
+    fig = plt.figure()
+    plt.hist(cloud['supernormal_dev_gt'], bins=90)
+    plt.xlabel('angle between supernormal and ground truth orientation')
+    plt.ylabel('frequency')
+    plt.show()
+
+    # plot cloud
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='jet')
+    plt.show()
+
+    # calculate mean and median deviation
+    mean_dev = np.mean(cloud['supernormal_dev_gt'])
+    median_dev = np.median(cloud['supernormal_dev_gt'])
+    print(f'mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
+

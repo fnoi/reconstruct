@@ -66,6 +66,15 @@ def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=No
     if plot_flag and seed_id == plot_ind:
         neighborhood_plot(cloud, seed_id, neighbor_ids, config)
 
+    if cloud.loc[seed_id, 'confidence'] is not None:
+        # sort neighborhood_ids by confidence
+        neighbor_confidences = cloud.loc[neighbor_ids, 'confidence']
+        neighbor_ids = neighbor_ids[np.argsort(neighbor_confidences)]
+        # choose the worst 80% of the neighborhood
+        relative_neighborhood_size = 0.6
+        start_index = int(len(neighbor_ids) * (1 - relative_neighborhood_size))
+        neighbor_ids = neighbor_ids[start_index:]
+
     neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
     seed_supernormal = supernormal_svd(neighbor_normals)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
@@ -86,23 +95,28 @@ def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
 
     point_ids = np.arange(len(cloud))
 
-    for seed_id in tqdm(point_ids, desc="computing supernormals", total=len(point_ids)):
-        if config.local_features.neighbor_shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
-            cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
-                                              plot_ind=plot_ind, plot_flag=plot_flag)
-            # no second step of computation needed
-        elif config.local_features.neighbor_shape in ['oriented_ellipsoid', 'oriented_cylinder', 'oriented_cuboid']:
+    if config.local_features.neighbor_shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
+        for seed_id in tqdm(point_ids, desc="computing supernormals, one step", total=len(point_ids)):
+                cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
+                                                  plot_ind=plot_ind, plot_flag=plot_flag)
+        # no second step of computation needed
+
+    elif config.local_features.neighbor_shape in ['oriented_ellipsoid', 'oriented_cylinder', 'oriented_cuboid']:
+        for seed_id in tqdm(point_ids, desc="computing supernormals (1/2)", total=len(point_ids)):
+
             real_config = copy.copy(config)  # save config
             config.local_features.neighbor_shape = "sphere"  # override for precomputation
             cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
                                               plot_ind=plot_ind, plot_flag=plot_flag)
             config = real_config  # reset config
+
+        for seed_id in tqdm(point_ids, desc="computing supernormals (2/2)", total=len(point_ids)):
             # oriented neighborhoods require supernormals as input
             cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
                                               plot_ind=plot_ind, plot_flag=plot_flag)
 
-        else:
-            raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
+    else:
+        raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return cloud
 
@@ -404,7 +418,7 @@ def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None):
                                                        r=config.local_features.supernormal_radius)
         case "cylinder":
             neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
-        case "cuboid":
+        case "oriented_cuboid":
             neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
         case "ellipsoid":
             neighbor_ids = neighbors_ellipsoid(cloud, seed_id, config)
