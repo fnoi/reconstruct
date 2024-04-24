@@ -15,6 +15,7 @@ local_features:
   max_nn: 30
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
+  supernormal_input: ransac
   supernormal_radius: 0.15
   neighbor_shape: sphere
   supernormal_cube_dist: 0.15
@@ -50,8 +51,8 @@ clustering:
 region_growing:
   neighbors_found_min: 10
   supernormal_angle_deviation: 20
-  supernormal_patch_angle_deviation: 25
-  ransacnormal_patch_angle_deviation: 30
+  supernormal_patch_angle_deviation: 10
+  ransacnormal_patch_angle_deviation: 10
   neighborhood_radius_a: 0.3
   neighborhood_radius_bc: 0.1
   leftover_thresh: 0.025

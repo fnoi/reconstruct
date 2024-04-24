@@ -30,7 +30,12 @@ def supernormal_confidence(supernormal, normals):
     (is the idea, lets check)
     """
     supernormal /= np.linalg.norm(supernormal)
-    normals /= np.linalg.norm(normals, axis=1)[:, None]
+
+    norms = np.linalg.norm(normals, axis=1)[:, None]
+    norms = norms + 1e-10  # avoid division by zero
+    normals /= norms
+
+    # normals /= np.linalg.norm(normals, axis=1)[:, None]
     angles = np.arccos(np.dot(supernormal, normals.T))
     angles = np.abs(np.rad2deg(angles))
     angles = np.abs(angles - 90)
@@ -75,7 +80,10 @@ def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=No
         start_index = int(len(neighbor_ids) * (1 - relative_neighborhood_size))
         neighbor_ids = neighbor_ids[start_index:]
 
-    neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
+    if config.local_features.supernormal_input == 'ransac':
+        neighbor_normals = cloud.loc[neighbor_ids][['rnx', 'rny', 'rnz']].values
+    else:
+        neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
     seed_supernormal = supernormal_svd(neighbor_normals)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
 
@@ -87,7 +95,12 @@ def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=No
     return cloud
 
 
-def calculate_supernormals_rev(cloud=None, cloud_o3d=None, config=None):
+def calculate_supernormals_rev(cloud=None, config=None):
+    cloud['snx'] = None
+    cloud['sny'] = None
+    cloud['snz'] = None
+    cloud['confidence'] = None
+
     plot_ind = random.randint(0, len(cloud))
     plot_ind = 762
     print(f'plot ind is {plot_ind}')
@@ -210,7 +223,6 @@ def ransac_patches(cloud, config):
 
 def patch_growing(cloud, config):
     cloud['grown_patch'] = 0
-    plot_patch_v3(cloud)
     label_id = 0
     mask_available = np.ones(len(cloud), dtype=bool)
     patches_clustered = []
@@ -219,6 +231,7 @@ def patch_growing(cloud, config):
 
         # count trues in mask_available
         if np.sum(mask_available) <= config.region_growing.leftover_thresh * len(cloud):
+            plot_patch_v3(cloud, num_colors=label_id)
             break
 
         masked_cloud = cloud.loc[mask_available]
@@ -271,8 +284,6 @@ def patch_growing(cloud, config):
                 label_id += 1
                 cloud.loc[cluster_points, 'grown_patch'] = label_id
                 mask_available[cluster_points] = False
-
-                plot_patch_v3(cloud)
 
                 print(f'patch grown: {label_id}, size: {len(cluster_points)}')
                 break
@@ -379,10 +390,13 @@ def grow_plot_v2(cloud, cluster_points, patch_ids,
     plt.show()
 
 
-def plot_patch_v3(cloud):
+def plot_patch_v3(cloud, num_colors=None):
     plt.figure()
 
-    n_colors = 10
+    if num_colors is None:
+        n_colors = 10
+    else:
+        n_colors = num_colors
     cmap = plt.cm.get_cmap('gist_rainbow', n_colors)
     colors = cmap(np.arange(n_colors))
     colors[0] = np.array([0.8, 0.8, 0.8, 1.0])

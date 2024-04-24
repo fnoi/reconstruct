@@ -6,6 +6,7 @@ import numpy as np
 
 from omegaconf import OmegaConf
 
+
 def get_is_conf():
     config = OmegaConf.load('config.yaml')
     if os.name == 'nt':
@@ -16,7 +17,6 @@ def get_is_conf():
     config.general.parking_path = pathlib.Path(f'{basepath}{config.general.project_path}{config.general.parking_path}')
 
     return config
-
 
 
 def points2txt(pointset, path, topic):
@@ -35,7 +35,7 @@ def cache_meta(data, path, topic):
 
 
 def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 0.0])):
-    a= 0
+    a = 0
     if len(lines) == 1:
         with open(f'{path}/{topic}.obj', 'w') as f:
             f.write(f'v {lines[0][0][0]} {lines[0][0][1]} {lines[0][0][2]} \n'
@@ -64,11 +64,15 @@ def lines2obj(lines, path=os.getcwd(), topic='None', center=np.array([0.0, 0.0, 
 
     return
 
+
 def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
              instance_gt=False, instance_pred=False, ransac_patch=False, ransac_normals=False,
              path=None, cloud=None, cache_flag=None):
     # serialize without structure loss pickle or json
     cloud.to_pickle(f'{path}cache_cloud_{cache_flag}.pickle')
+
+    if not any([xyz, normals, supernormals, confidence, instance_gt, instance_pred, ransac_patch, ransac_normals]):
+        return
 
     io_agenda = []
     if xyz:
@@ -99,3 +103,4 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
     cloud_to_write = cloud.loc[:, io_agenda]
     cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)
 
+    return

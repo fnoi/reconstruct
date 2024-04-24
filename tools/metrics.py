@@ -261,3 +261,47 @@ def supernormal_evaluation(cloud, config):
     median_dev = np.median(cloud['supernormal_dev_gt'])
     print(f'mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
 
+
+def normal_evaluation(cloud, config):
+    orientation_gt = load_angles('instance_orientation.yaml')
+    # iterate over rows in cloud
+    cloud['normal_dev_gt'] = None
+    for idx, row in cloud.iterrows():
+        # get instance id
+        instance_id = row['instance_gt']
+        # get orientation from yaml
+        gt_orientation = orientation_gt[instance_id]
+        # get normal
+        n = [row['nx'], row['ny'], row['nz']]
+        # get ransac normal
+        rn = [row['rnx'], row['rny'], row['rnz']]
+        # calculate angle
+        n_angle = 90 - np.rad2deg(np.arccos(np.dot(gt_orientation, n)))
+        rn_angle = 90 - np.rad2deg(np.arccos(np.dot(gt_orientation, rn)))
+        # append to list
+        cloud.at[idx, 'normal_dev_gt'] = abs(n_angle)
+        cloud.at[idx, 'ransac_normal_dev_gt'] = abs(rn_angle)
+
+    # plot both histograms
+    fig = plt.figure()
+    plt.hist(cloud['normal_dev_gt'], bins=90, alpha=0.5, label='normal')
+    plt.hist(cloud['ransac_normal_dev_gt'], bins=90, alpha=0.5, label='ransac normal')
+    plt.xlabel('angle between normal and ground truth orientation')
+    plt.ylabel('frequency')
+    plt.legend()
+    plt.show()
+
+    # calculate mean and median deviation
+    mean_dev = np.mean(cloud['normal_dev_gt'])
+    median_dev = np.median(cloud['normal_dev_gt'])
+    print(f'estimated normals vs. orientation gt: mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
+    mean_dev = np.mean(cloud['ransac_normal_dev_gt'])
+    median_dev = np.median(cloud['ransac_normal_dev_gt'])
+    print(f'ransac normals vs. orientation gt:    mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
+    a = 0
+
+
+
+
+
+
