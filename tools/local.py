@@ -52,7 +52,7 @@ def angular_deviation(vector, reference):
     norm_vector = np.linalg.norm(vector)
     norm_reference = np.linalg.norm(reference)
     if norm_vector == 0 or norm_reference == 0:
-        raise ValueError("Input vectors must be non-zero.")
+        raise ValueError("input vectors must be non-zero.")
 
     vector_normalized = vector / norm_vector
     reference_normalized = reference / norm_reference
@@ -598,10 +598,8 @@ def growth_plot(cloud, seed_id, cluster_active, cluster_passive, add_candidates,
         ax_.set_yticks([])
         ax_.set_zticks([])
 
-    # make a legend for the colors and force the dots larger
     fig.legend(['unclustered', 'cluster_passive', 'cluster_active', 'patch_additions', 'add_candidates', 'angle_checked', 'seed'],
                loc='center left', bbox_to_anchor=(0.4, 0.5))
-    # make bigger
     fig.tight_layout()
     fig.set_size_inches(7, 7)
     plt.show()

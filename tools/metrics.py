@@ -197,7 +197,7 @@ def calculate_precision_recall_iou(pred, gt, id_map, thresholds=None):
 
 
 def calculate_metrics(df_cloud, config):
-    inst_pred = df_cloud['grown_patch'].to_numpy()
+    inst_pred = df_cloud['instance_pr'].to_numpy()
     inst_gt = df_cloud['instance_gt'].to_numpy()
 
     print('hungarian matching')
