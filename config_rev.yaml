@@ -54,8 +54,9 @@ region_growing:
   supernormal_patch_angle_deviation: 10
   ransacnormal_patch_angle_deviation: 10
   neighborhood_radius_a: 0.3
-  neighborhood_radius_bc: 0.1
+  neighborhood_radius_bc: 0.05
   leftover_thresh: 0.025
+  neighbor_shape: oriented_ellipsoid
 
 evaluation:
   pairing_method: hungarian

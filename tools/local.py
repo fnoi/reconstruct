@@ -3,6 +3,7 @@ import random
 
 import numpy as np
 import open3d as o3d
+import pandas as pd
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from tqdm import tqdm
@@ -221,6 +222,96 @@ def ransac_patches(cloud, config):
     return cloud
 
 
+def cluster_extent(cloud, patch_ids):
+    """
+    calculate the extent of a cluster
+    :param cloud: point cloud
+    :param patch_ids: list of ransac_patch_ids
+    :return: extent of cluster
+    """
+    cluster_points = cloud.loc[cloud['ransac_patch'].isin(patch_ids)]
+    cluster_lims = [
+        np.min(cluster_points['x']),
+        np.max(cluster_points['x']),
+        np.min(cluster_points['y']),
+        np.max(cluster_points['y']),
+        np.min(cluster_points['z']),
+        np.max(cluster_points['z'])
+    ]
+    return cluster_lims
+
+
+def grow_stage_1(cloud, config):
+    cloud['grown_patch'] = 0
+    patch_label = 0
+    cloud_local = cloud.copy()
+    # mask points that have ransac patch 0
+    cloud_local = cloud_local[cloud_local['ransac_patch'] != 0]
+    patch_source = np.unique(cloud_local['ransac_patch'])
+    patch_sink = []
+    patch_active = []
+
+    patch_dict = {}
+    for ransac_patch in patch_source:
+        center_point = np.mean(
+            cloud_local.loc[cloud_local['ransac_patch'] == ransac_patch, ['x', 'y', 'z']].values,
+            axis=0
+        )
+        # find the row in the patch with max confidence
+        confident_point = cloud_local.loc[cloud_local['ransac_patch'] == ransac_patch].idxmax()['confidence']
+
+        patch_dict[ransac_patch] = {    # this would be a good place to reduce sn influence by voting
+            'cx': center_point[0],
+            'cy': center_point[1],
+            'cz': center_point[2],
+            'snx': cloud_local.loc[confident_point]['snx'],
+            'sny': cloud_local.loc[confident_point]['sny'],
+            'snz': cloud_local.loc[confident_point]['snz'],
+            'rnx': cloud_local.loc[confident_point]['rnx'],
+            'rny': cloud_local.loc[confident_point]['rny'],
+            'rnz': cloud_local.loc[confident_point]['rnz'],
+            'max_confidence': cloud_local.loc[confident_point]['confidence']
+        }
+    patch_data = pd.DataFrame.from_dict(patch_dict, orient='index')
+
+    while True:
+        # find max confidence patch for those patches in source
+        patch_data_masked = patch_data[patch_data.index.isin(patch_source)]
+        max_confidence_patch = patch_data_masked.idxmax()['max_confidence']
+        patch_active.append(max_confidence_patch)
+        max_confidence_patch_data = patch_data.loc[max_confidence_patch]
+
+        while True:
+            # find closest patch
+            patch_data_masked = patch_data[patch_data.index.isin(patch_source)]
+            patch_data_masked['distance'] = np.sqrt(
+                (patch_data_masked['cx'] - max_confidence_patch_data['cx']) ** 2 +
+                (patch_data_masked['cy'] - max_confidence_patch_data['cy']) ** 2 +
+                (patch_data_masked['cz'] - max_confidence_patch_data['cz']) ** 2
+            )
+
+
+
+
+    a = 0
+
+    while True:
+        if len(patch_source) == 0:
+            plot_patch_v3(cloud, num_colors=patch_label)
+            break
+
+        seed = cloud_local.idxmax()['confidence']
+        seed_patch = cloud_local.loc[seed, 'ransac_patch']
+
+        while True:
+            print(f'patch {seed_patch} growing')
+
+
+
+
+    a = 0
+
+
 def patch_growing(cloud, config):
     cloud['grown_patch'] = 0
     label_id = 0
@@ -419,10 +510,13 @@ def plot_patch_v3(cloud, num_colors=None):
     plt.show()
 
 
-def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None):
+def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None, patch_sn=None):
 
     if step == 'bbox_mask':
         shape = "cube"
+    elif step == 'patch growing':
+        shape = config.region_growing.neighbor_shape
+        seed_data = cloud.iloc[seed_id]
     else:
         shape = config.local_features.neighbor_shape
         seed_data = cloud.iloc[seed_id]
@@ -440,7 +534,7 @@ def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None):
         case "cube":
             neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims)
         case "oriented_ellipsoid":
-            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step)
+            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step, patch_sn)
         case "oriented_octahedron":
             neighbor_ids = neighbors_oriented_octahedron(cloud, seed_id, config)  # TODO: add this fct
         case _:
@@ -643,7 +737,7 @@ def find_orthonormal_basis(direction):
     return np.column_stack((direction, y_axis, z_axis))
 
 
-def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None):
+def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None, patch_sn=None):
     """
     find neighbors of seed_id in ellipsoid shape
     """
@@ -654,11 +748,15 @@ def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None):
     if step == 'patch growing':
         a = config.region_growing.neighborhood_radius_a
         b = config.region_growing.neighborhood_radius_bc
+
+        orientation = patch_sn
+
     else:
         a = config.local_features.supernormal_ellipsoid_a
         b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axis along y and z
 
-    orientation = seed_data[['snx', 'sny', 'snz']].values
+        orientation = seed_data[['snx', 'sny', 'snz']].values
+
     rot_mat = find_orthonormal_basis(orientation)
 
     rotated_cloud = (cloud_coords - seed_coords) @ rot_mat
