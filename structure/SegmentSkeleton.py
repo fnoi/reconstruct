@@ -8,7 +8,7 @@ from tools.geometry import warped_vectors_intersection
 
 
 class Skeleton:
-    def __init__(self, path: str, types: list, src=None):
+    def __init__(self, path: str, types: list, src=None, config=None):
 
         self.potential = None
         self.path = path
@@ -32,6 +32,8 @@ class Skeleton:
         self.bone_count = 0
         self.joints_in = None
         self.joints_array = None
+
+        self.config = config  # logic from dataframe revision
 
     def add_cloud(self, cloud):
         self.bones.append(cloud)

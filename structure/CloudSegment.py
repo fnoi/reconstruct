@@ -15,7 +15,7 @@ from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, l
 
 
 class Segment(object):
-    def __init__(self, name: str = None):
+    def __init__(self, name: str = None, config=None):
         self.dir = None
         self.points_cleaned = None
         self.intermediate_points = []
@@ -36,6 +36,9 @@ class Segment(object):
         self.points = None
         self.parent_path = f'data/out/'
         self.outpath = f'data/out/{name}'
+
+        self.config = config
+
         # check if directory name exists
         if not os.path.exists(self.outpath):
             os.makedirs(self.outpath)
@@ -70,7 +73,14 @@ class Segment(object):
         plane = pyrsc.Plane()
         planes = []
         points = copy.deepcopy(self.points)
+        o3d_cloud = o3d.geometry.PointCloud()
+        o3d_cloud.points = o3d.utility.Vector3dVector(points)
         while True:
+
+            plane_params, plane_inliers = o3d_cloud.segment_plane(
+                distance_threshold=self.config.skeleton.ransac_dist_thresh,
+                ransac_n=self.config.skeleton.ransac_min_count,
+                num_iterations=self.config.skeleton.ransac_iterations)
             res = plane.fit(pts=points, thresh=0.005, minPoints=0.2 * len(points), maxIteration=100000)
             planes.append(res[0])
             points = np.delete(points, res[1], axis=0)

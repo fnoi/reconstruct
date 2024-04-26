@@ -17,7 +17,8 @@ from tools.test_plots import plot_test_in, plot_test_out
 def inst2skeleton(cloud_df, config, df_cloud_flag=False):
     # new approach has cloud with beams as dataframe. inject alternative from here
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out_rev/skeleton',
-                        types=['beams'])  # beams only
+                        types=['beams'],
+                        config=config)  # beams only
 
     if skeleton.beams:
         segments: list = [f'beam_{i}' for i in np.unique(cloud_df['instance_pr']) if i != 0]
@@ -25,13 +26,15 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
         # segment_files: list = [_ for _ in os.listdir(f'{str(os.getcwd())}/data/in_beam/')]
         # segments: list = [_[:-4] for _ in segment_files]
         for segment in tqdm(segments, desc='loading segment data', total=len(segments)):
-            cloud = Segment(name=segment)
+            cloud = Segment(name=segment, config=config)
             if df_cloud_flag:
                 cloud.load_from_df(cloud_df, segment)
             else:
                 cloud.load_from_txt(segment)
+            skeleton.add_cloud(cloud)
 
         for segment in tqdm(segments, desc='instance orientation and point projection (axes)', total=len(segments)):
+            skeleton
             cloud.calc_axes()
             # cloud.calc_pca_o3d()
 
