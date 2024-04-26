@@ -222,7 +222,7 @@ def calculate_metrics(df_cloud, config):
         metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
         print(metrics)
 
-        raise ValueError('endefined return for greedy comparison')
+        raise ValueError('undefined return for greedy comparison')
 
 
 def supernormal_evaluation(cloud, config):

@@ -8,6 +8,7 @@ import open3d as o3d
 from omegaconf import OmegaConf
 
 import tools.utils
+from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
 from tools.IO import cache_io
 from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1
@@ -85,17 +86,14 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
 
     if cache_flag <= 4:
-        print('\n- compute instance orientation, report metrics')  # existing, revise
+        print('\n- project instance points to plane, fit cs, lookup params')  # 1. ok, 2. help 3. easy
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
-
+        skeleton = inst2skeleton(cloud, config, df_cloud_flag=True)
 
     if cache_flag <= 5:
-        print('\n- project instance points to plane, fit cs, lookup params')  # 1. ok, 2. help 3. easy
-
-    if cache_flag <= 6:
         print('\n- define initial skeleton and refine by semantics')  # baseline exists but omg
 
-    if cache_flag <= 7:
+    if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)

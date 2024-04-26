@@ -6,12 +6,6 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
-import sympy as sym
-
-from scipy.spatial import distance
-from math import degrees, acos
-
-from feature_test import plot_cloud
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
@@ -51,6 +45,14 @@ class Segment(object):
             for file in files:
                 os.remove(f'{self.outpath}/{file}')
 
+    def load_from_df(self, df, name: str):
+        label = name.split('_')[1]
+        data = df[df['instance_pr'] == int(label)]
+        self.data = data
+        self.points = data[['x', 'y', 'z']].values
+        # self.points = data[:, :3]
+        self.center = np.mean(self.points, axis=0)
+
     def load_from_txt(self, name: str):
         path = f'data/in/{name}.txt'
         with open(path, 'r') as f:
@@ -58,10 +60,13 @@ class Segment(object):
             data = [line.strip().split(' ') for line in data]
             data = np.array(data, dtype=np.float32)
 
-            self.points = data[:, :3]
-            self.center = np.mean(self.points, axis=0)
+        self.points = data[:, :3]
+        self.center = np.mean(self.points, axis=0)
 
     def calc_axes(self):
+        """
+        calculate the principal axes of the segment (core + overpowered function, consider modularizing)
+        """
         plane = pyrsc.Plane()
         planes = []
         points = copy.deepcopy(self.points)
@@ -69,6 +74,7 @@ class Segment(object):
             res = plane.fit(pts=points, thresh=0.005, minPoints=0.2 * len(points), maxIteration=100000)
             planes.append(res[0])
             points = np.delete(points, res[1], axis=0)
+
             # calculate angle between planes
             if len(planes) > 1:
                 combinations = itertools.combinations(range(len(planes)), 2)
@@ -81,7 +87,6 @@ class Segment(object):
                         # point, line = line_of_intersection(plane1, plane2)
                         point, line = intersecting_line(plane1, plane2)
                         # line = line / np.linalg.norm(line)
-
 
                         points_on_line = project_points_to_line(self.points, point, line)
 
@@ -180,7 +185,8 @@ class Segment(object):
                         fig.show()
 
                         rotated_pts = rotate_points_to_xy_plane(proj_pts_2, self.dir)
-                        rotated_linepts = rotate_points_to_xy_plane(np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
+                        rotated_linepts = rotate_points_to_xy_plane(
+                            np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
 
                         fig = plt.figure()
                         ax = fig.add_subplot(111)
@@ -197,7 +203,8 @@ class Segment(object):
                         fig.show()
 
                         # calculate angle between line plane 1 and x-axis
-                        angle = np.arctan2(rotated_linepts[1, 1] - rotated_linepts[0, 1], rotated_linepts[1, 0] - rotated_linepts[0, 0])
+                        angle = np.arctan2(rotated_linepts[1, 1] - rotated_linepts[0, 1],
+                                           rotated_linepts[1, 0] - rotated_linepts[0, 0])
                         # rotate points to align line with x-axis
                         rotated_pivot = rotate_points(np.array([self.left]), angle, np.array([0, 0, 1]))[0]
                         rotated_pts = rotate_points(rotated_pts, angle, np.array([0, 0, 1]))
@@ -206,7 +213,6 @@ class Segment(object):
                         if np.mean(rotated_pts[:, 1]) < rotated_pivot[1]:
                             rotated_pts = rotate_points(rotated_pts, np.deg2rad(180), np.array([0, 0, 1]))
                             rotated_linepts = rotate_points(rotated_linepts, np.deg2rad(180), np.array([0, 0, 1]))
-
 
                         fig = plt.figure()
                         ax = fig.add_subplot(111)
@@ -222,12 +228,7 @@ class Segment(object):
                         ax.set_aspect('equal')
                         fig.show()
 
-
-
-
-
                         points_proj = rotated_pts
-
 
                         # points_dist = np.dot(self.points - self.left, self.dir)
                         # points_proj = self.points - np.outer(points_dist, self.dir)
@@ -246,8 +247,6 @@ class Segment(object):
                         # find intersecting point on plane
                         plane_point = intersection_point_of_line_and_plane(point, self.dir, proj_plane)
 
-
-
                         a = 0
 
                         break
@@ -256,7 +255,6 @@ class Segment(object):
 
             if type(self.right) == np.ndarray and type(self.left) == np.ndarray:
                 break
-
 
         a = 0
 

@@ -8,7 +8,8 @@ from tools.geometry import warped_vectors_intersection
 
 
 class Skeleton:
-    def __init__(self, path: str, types: list):
+    def __init__(self, path: str, types: list, src=None):
+
         self.potential = None
         self.path = path
         if not os.path.exists(self.path):
