@@ -21,7 +21,7 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
 
     ##########
-    cache_flag = 3
+    cache_flag = 4
     ##########
 
     if cache_flag <= 1:
@@ -80,14 +80,16 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
         cloud = region_growing(cloud, config)
-        # cloud = grow_stage_1(cloud, config)
-        # cloud = patch_growing(cloud, config)
         miou_weighted, miou_unweighted = calculate_metrics(cloud, config)
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
 
     if cache_flag <= 4:
         print('\n- compute instance orientation, report metrics')  # existing, revise
+        with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
+            cloud = pd.read_pickle(f)
+        del f
+
 
     if cache_flag <= 5:
         print('\n- project instance points to plane, fit cs, lookup params')  # 1. ok, 2. help 3. easy
