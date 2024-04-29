@@ -1,6 +1,7 @@
 import copy
 import itertools
 import os
+import time
 
 import numpy as np
 import open3d as o3d
@@ -11,7 +12,8 @@ from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
-    rotate_points
+    rotate_points, orientation_estimation
+from tools import visual as vis
 
 
 class Segment(object):
@@ -70,20 +72,76 @@ class Segment(object):
         """
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
-        plane = pyrsc.Plane()
-        planes = []
-        points = copy.deepcopy(self.points)
-        o3d_cloud = o3d.geometry.PointCloud()
-        o3d_cloud.points = o3d.utility.Vector3dVector(points)
+        points = self.points
+        normals = self.data[['nx', 'ny', 'nz']].values
+        planes, axis_dir = orientation_estimation(np.concatenate((normals, points), axis=1), step="skeleton")
+
+        origin, direction = intersecting_line(planes[0], planes[1])
+        points_on_line = project_points_to_line(points, origin, direction)
+
+        ref_x = -1000
+        ref_t = (ref_x - origin[0]) / direction[0]
+        ref_pt = origin + ref_t * direction
+        vecs = points_on_line - ref_pt
+        dists = np.linalg.norm(vecs, axis=1)
+        l_ind = np.argmin(dists)
+        r_ind = np.argmax(dists)
+
+        self.left = points_on_line[l_ind]
+        self.right = points_on_line[r_ind]
+        self.dir = direction
+
+        proj_plane = normal_and_point_to_plane(self.dir, self.left)
+        proj_line_pt_0, proj_line_0 = intersecting_line(proj_plane, planes[0])
+        proj_line_pt_1, proj_line_1 = intersecting_line(proj_plane, planes[1])
+
+        proj_pts_2 = points_to_actual_plane(self.points, self.dir, self.left)
+
+        lengthy_boi = 0.2
+        linepts_0_0 = [
+            self.left[0] - proj_line_0[0] * lengthy_boi,
+            self.left[1] - proj_line_0[1] * lengthy_boi,
+            self.left[2] - proj_line_0[2] * lengthy_boi
+        ]
+        linepts_0_1 = [
+            self.left[0] + proj_line_0[0] * lengthy_boi,
+            self.left[1] + proj_line_0[1] * lengthy_boi,
+            self.left[2] + proj_line_0[2] * lengthy_boi
+        ]
+        linepts_1_0 = [
+            self.left[0] - proj_line_1[0] * lengthy_boi,
+            self.left[1] - proj_line_1[1] * lengthy_boi,
+            self.left[2] - proj_line_1[2] * lengthy_boi
+        ]
+        linepts_1_1 = [
+            self.left[0] + proj_line_1[0] * lengthy_boi,
+            self.left[1] + proj_line_1[1] * lengthy_boi,
+            self.left[2] + proj_line_1[2] * lengthy_boi
+        ]
+
+        rotated_pts = rotate_points_to_xy_plane(proj_pts_2, self.dir)
+        rotated_linepts = rotate_points_to_xy_plane(
+            np.array([linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1]), self.dir)
+
+
+        vis.vis_segment_planes_3D(self, origin, planes, proj_plane)
+        vis.vis_segment_projection_A(proj_pts_2, linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1)
+        vis.vis_segment_projection_B(rotated_pts, rotated_linepts)
+
+        a = 0
+
         while True:
+
+
 
             plane_params, plane_inliers = o3d_cloud.segment_plane(
                 distance_threshold=self.config.skeleton.ransac_dist_thresh,
-                ransac_n=self.config.skeleton.ransac_min_count,
+                ransac_n=int(round(self.config.skeleton.ransac_min_count_rel * len(points), 0)),
                 num_iterations=self.config.skeleton.ransac_iterations)
-            res = plane.fit(pts=points, thresh=0.005, minPoints=0.2 * len(points), maxIteration=100000)
-            planes.append(res[0])
-            points = np.delete(points, res[1], axis=0)
+            end = time.time()
+
+            planes.append(plane_params)
+            points = np.delete(points, plane_inliers, axis=0)
 
             # calculate angle between planes
             if len(planes) > 1:
@@ -95,14 +153,14 @@ class Segment(object):
                     angle = angle_between_planes(plane1, plane2)
                     if 45 < angle % 180 < 135:  # qualified pair, look no further
                         # point, line = line_of_intersection(plane1, plane2)
-                        point, line = intersecting_line(plane1, plane2)
+                        origin, direction = intersecting_line(plane1, plane2)
                         # line = line / np.linalg.norm(line)
 
-                        points_on_line = project_points_to_line(self.points, point, line)
+                        points_on_line = project_points_to_line(self.points, origin, direction)
 
                         ref_x = -1000
-                        ref_t = (ref_x - point[0]) / line[0]
-                        ref_pt = point + ref_t * line
+                        ref_t = (ref_x - origin[0]) / direction[0]
+                        ref_pt = origin + ref_t * direction
                         vecs = points_on_line - ref_pt
                         dists = np.linalg.norm(vecs, axis=1)
                         l_ind = np.argmin(dists)
@@ -110,7 +168,7 @@ class Segment(object):
 
                         self.left = points_on_line[l_ind]
                         self.right = points_on_line[r_ind]
-                        self.dir = line
+                        self.dir = direction
 
                         proj_plane = normal_and_point_to_plane(self.dir, self.left)
                         proj_line_pt_0, proj_line_0 = intersecting_line(proj_plane, plane1)
@@ -169,7 +227,7 @@ class Segment(object):
                         ax.plot_surface(x2, y2, z2, alpha=0.3)
 
                         ax.scatter(self.left[0], self.left[1], self.left[2], marker='o', s=10)
-                        ax.scatter(point[0], point[1], point[2], marker='o', s=10)
+                        ax.scatter(origin[0], origin[1], origin[2], marker='o', s=10)
 
                         ax.set_xlim = xlim
                         ax.set_ylim = ylim
@@ -255,7 +313,7 @@ class Segment(object):
                         ax.set_xlim(mini[0], maxi[0])
                         ax.set_ylim(mini[1], maxi[1])
                         # find intersecting point on plane
-                        plane_point = intersection_point_of_line_and_plane(point, self.dir, proj_plane)
+                        plane_point = intersection_point_of_line_and_plane(origin, self.dir, proj_plane)
 
                         a = 0
 

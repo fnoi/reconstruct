@@ -25,17 +25,21 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
 
         # segment_files: list = [_ for _ in os.listdir(f'{str(os.getcwd())}/data/in_beam/')]
         # segments: list = [_[:-4] for _ in segment_files]
+        cache = []
         for segment in tqdm(segments, desc='loading segment data', total=len(segments)):
             cloud = Segment(name=segment, config=config)
             if df_cloud_flag:
                 cloud.load_from_df(cloud_df, segment)
             else:
                 cloud.load_from_txt(segment)
-            skeleton.add_cloud(cloud)
+            cache.append((segment, cloud))
 
-        for segment in tqdm(segments, desc='instance orientation and point projection (axes)', total=len(segments)):
-            skeleton
+        for cache_entry in tqdm(cache, desc='instance orientation and point projection (axes)', total=len(cache)):
+            segment = cache_entry[0]
+            cloud = cache_entry[1]
             cloud.calc_axes()
+
+
             # cloud.calc_pca_o3d()
 
             # cloud.plot_flats()

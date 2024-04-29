@@ -17,6 +17,7 @@ from scipy.spatial.distance import cdist
 from tqdm import tqdm
 from sklearn.cluster import DBSCAN
 
+import tools.geometry
 from tools.local import supernormal_svd, supernormal_confidence, angular_deviation
 from tools.utils import find_random_id
 
@@ -541,7 +542,7 @@ if __name__ == "__main__":
                 continue
             else:
                 segment_array = cloud_frame[cloud_frame['pi'] == pi].to_numpy()
-                dirs[str(pi)] = dev_outsource.orientation_estimation(segment_array)
+                dirs[str(pi)] = tools.geometry.orientation_estimation(segment_array)
 
 
         # store the dir dict using pickle

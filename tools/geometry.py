@@ -1,4 +1,8 @@
+from typing import Tuple, Any
+
 import numpy as np
+import open3d as o3d
+from numpy import ndarray, dtype, object_
 # from structure.CloudSegment import CloudSegment
 
 from scipy.spatial import distance
@@ -49,7 +53,7 @@ def intersecting_line(plane1, plane2):
     normal1, d1 = np.array(plane1[:3], dtype=np.float64), plane1[3]
     normal2, d2 = np.array(plane2[:3], dtype=np.float64), plane2[3]
     direction = np.cross(normal1, normal2)
-    point_on_line = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction)**2
+    point_on_line = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction) ** 2
     return point_on_line, direction
 
 
@@ -208,8 +212,6 @@ def rotate_points(points, angle, axis):
     return np.dot(points, rotation_matrix)
 
 
-
-
 def manipulate_skeleton(segment1, segment2,
                         bridgepoint1: np.ndarray, bridgepoint2: np.ndarray,
                         case: int):
@@ -316,7 +318,6 @@ def project_points_to_plane(points, plane_normal, point_on_plane):
     return projected_points
 
 
-
 def project_points_to_line(points, point_on_line, direction):
     direction_normalized = direction / np.linalg.norm(direction)
     vec_to_points = points - point_on_line
@@ -352,3 +353,52 @@ def rotate_points_to_xy_plane(points, normal):
     # Rotate the points
     rotated_points = np.dot(points, rot_matrix.T)
     return rotated_points
+
+
+def orientation_estimation(cluster_ptx_array: np.ndarray, step: str = None)\
+        -> tuple[tuple[Any, Any], ndarray[Any, dtype[Any]] | ndarray[Any, dtype[object_ | object_]] | Any]:
+    """takes in xyz array of points, performs ransac until 2 non-planar planes are found
+    then returns vector describing the line of intersection between the two planes"""
+
+    # convert to open3d point cloud
+    point_cloud = o3d.geometry.PointCloud()
+    point_cloud.points = o3d.utility.Vector3dVector(cluster_ptx_array[:, :3])
+    point_cloud.normals = o3d.utility.Vector3dVector(cluster_ptx_array[:, 3:6])
+    # perform ransac
+    f_0, inliers_0 = point_cloud.segment_plane(
+        distance_threshold=0.01,
+        ransac_n=3,
+        num_iterations=10000000
+    )
+    # remove inliers from point cloud
+    point_cloud = point_cloud.select_by_index(inliers_0, invert=True)
+    while True:
+        # perform ransac again
+        f_1, inliers_1 = point_cloud.segment_plane(
+            distance_threshold=0.01,
+            ransac_n=3,
+            num_iterations=10000000
+        )
+        angle = np.rad2deg(
+            np.arccos(
+                np.dot(
+                    f_0[:3],
+                    f_1[:3]
+                )
+            )
+        )
+        if 80 < angle < 100:
+            break
+        else:
+            print('shit')
+            point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
+
+    orientation = np.cross(
+        f_0[:3],
+        f_1[:3]
+    )
+
+    if step == "skeleton":
+        return (f_0, f_1), orientation
+    else:
+        return orientation

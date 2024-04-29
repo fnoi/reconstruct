@@ -6,7 +6,6 @@ import open3d as o3d
 from sklearn.cluster import DBSCAN
 
 from instance_segmentation import angle_between_normals
-from tools.local import supernormal_svd
 
 
 def ransac_dbscan_subsequent(array_working, config):
@@ -411,46 +410,3 @@ def region_growing_ransac_dbscan_supernormals(points, config):
     #
     # return cluster_labels
 
-def orientation_estimation(cluster_ptx_array) -> np.ndarray:
-    """takes in xyz array of points, performs ransac until 2 non-planar planes are found
-    then returns vector describing the line of intersection between the two planes"""
-
-    # convert to open3d point cloud
-    point_cloud = o3d.geometry.PointCloud()
-    point_cloud.points = o3d.utility.Vector3dVector(cluster_ptx_array[:, :3])
-    point_cloud.normals = o3d.utility.Vector3dVector(cluster_ptx_array[:, 3:6])
-    # perform ransac
-    f_0, inliers_0 = point_cloud.segment_plane(
-        distance_threshold=0.01,
-        ransac_n=3,
-        num_iterations=10000000
-    )
-    # remove inliers from point cloud
-    point_cloud = point_cloud.select_by_index(inliers_0, invert=True)
-    while True:
-        # perform ransac again
-        f_1, inliers_1 = point_cloud.segment_plane(
-            distance_threshold=0.01,
-            ransac_n=3,
-            num_iterations=10000000
-        )
-        angle = np.rad2deg(
-            np.arccos(
-                np.dot(
-                    f_0[:3],
-                    f_1[:3]
-                )
-            )
-        )
-        if angle > 80 and angle < 100:
-            break
-        else:
-            print('shit')
-            point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
-
-    orientation = np.cross(
-        f_0[:3],
-        f_1[:3]
-    )
-
-    return orientation
