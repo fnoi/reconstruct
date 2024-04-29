@@ -16,8 +16,8 @@ def plot_test_out(skeleton, path):
     ax = fig.add_subplot(111)
     for line in skeleton.bones:
         ax.plot(
-            [line.left[0], line.right[0]],
-            [line.left[1], line.right[1]]
+            [line.line_raw_left[0], line.line_raw_right[0]],
+            [line.line_raw_left[1], line.line_raw_right[1]]
         )
     ax.set_aspect('equal')
     plt.title('test out\n' + path)

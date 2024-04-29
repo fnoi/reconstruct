@@ -63,6 +63,11 @@ evaluation:
   pairing_method: hungarian
 
 skeleton:
-  ransac_dist_thresh: 0.01
+  ransac_method: open3d
+  ransac_dist_thresh: 0.0005
+  ransac_picks: 3
   ransac_min_count_rel: 0.2
-  ransac_iterations: 100000000
+  ransac_iterations: 30000
+
+skeleton_visualization:
+  line_length_projection: 0.2

@@ -30,7 +30,7 @@ def vis_segment_planes_3D(segment, point, planes, proj_plane):
     x2 = (- b2 * y2 - c2 * z2 - d2) / a2
     ax.plot_surface(x2, y2, z2, alpha=0.3)
 
-    ax.scatter(segment.left[0], segment.left[1], segment.left[2], marker='o', s=10)
+    ax.scatter(segment.line_raw_left[0], segment.line_raw_left[1], segment.line_raw_left[2], marker='o', s=10)
     ax.scatter(point[0], point[1], point[2], marker='o', s=10)
 
     ax.set_xlim = xlim
@@ -40,35 +40,46 @@ def vis_segment_planes_3D(segment, point, planes, proj_plane):
     fig.show()
 
 
-def vis_segment_projection_A(proj_pts_2, linepts_0_0, linepts_0_1, linepts_1_0, linepts_1_1):
+def segment_projection_3D(points, lines):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(proj_pts_2[:, 0], proj_pts_2[:, 1], proj_pts_2[:, 2])
+    # ax.scatter(points[0], points[1], points[2], s=10, c='orange')
+    ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.5, alpha=0.4)
     # ax.scatter(points_on_line[:, 0], points_on_line[:, 1], points_on_line[:, 2], color='red')
-    ax.plot(
-        [linepts_0_0[0], linepts_0_1[0]],
-        [linepts_0_0[1], linepts_0_1[1]],
-        [linepts_0_0[2], linepts_0_1[2]],
-        color='red')
-    ax.plot(
-        [linepts_1_0[0], linepts_1_1[0]],
-        [linepts_1_0[1], linepts_1_1[1]],
-        [linepts_1_0[2], linepts_1_1[2]],
-        color='purple')
+    # ax.plot(
+    #     lines[:, 0], lines[:, 1], lines[:, 2],
+    #     color='green'
+    # )
+    colors = ['red', 'purple']
+    for color, line in zip(colors, lines):
+        ax.plot(
+            line[:, 0], line[:, 1], line[:, 2],
+            color=color
+        )
+        # )
+    # ax.plot(
+    #     lines[0:1, 0], lines[0:1, 1], lines[0:1, 2],
+    #     color='red')
+    # ax.plot(lines[1:2, 0], lines[1:2, 1], lines[1:2, 2],
+    #     color='purple')
+    ax.set_aspect('equal')
+    # put perspective to x axis
+    ax.view_init(elev=0, azim=0)
+    fig.show()
+
+
+def segment_projection_2D(points, lines):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(points[:, 0], points[:, 1], s=0.05)
+    # ax.plot(
+    #     [lines[0, 0], lines[1, 0]],
+    #     [lines[0, 1], lines[1, 1]],
+    #     color='red')
+    # ax.plot(
+    #     [lines[2, 0], lines[3, 0]],
+    #     [lines[2, 1], lines[3, 1]],
+    #     color='purple')
     ax.set_aspect('equal')
     fig.show()
 
-def vis_segment_projection_B(rotated_pts, rotated_linepts):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.scatter(rotated_pts[:, 0], rotated_pts[:, 1], s=0.05)
-    ax.plot(
-        [rotated_linepts[0, 0], rotated_linepts[1, 0]],
-        [rotated_linepts[0, 1], rotated_linepts[1, 1]],
-        color='red')
-    ax.plot(
-        [rotated_linepts[2, 0], rotated_linepts[3, 0]],
-        [rotated_linepts[2, 1], rotated_linepts[3, 1]],
-        color='purple')
-    ax.set_aspect('equal')
-    fig.show()

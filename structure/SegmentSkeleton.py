@@ -38,8 +38,8 @@ class Skeleton:
     def add_cloud(self, cloud):
         self.bones.append(cloud)
         with open(f'{self.path}/fresh_bone_{self.bone_count}.obj', 'w') as f:
-            f.write(f'v {cloud.left[0]} {cloud.left[1]} {cloud.left[2]} \n'
-                    f'v {cloud.right[0]} {cloud.right[1]} {cloud.right[2]} \n'
+            f.write(f'v {cloud.line_raw_left[0]} {cloud.line_raw_left[1]} {cloud.line_raw_left[2]} \n'
+                    f'v {cloud.line_raw_right[0]} {cloud.line_raw_right[1]} {cloud.line_raw_right[2]} \n'
                     f'l 1 2 \n')
         self.bone_count += 1
 
@@ -51,13 +51,13 @@ class Skeleton:
         for i, bone in enumerate(self.bones):
             with open(f'{self.path}/{topic}_bone_{i + 1}.obj', 'w') as f:
                 if radius:
-                    f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
-                            f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
+                    f.write(f'v {bone.line_raw_left[0]} {bone.line_raw_left[1]} {bone.line_raw_left[2]} \n'
+                            f'v {bone.line_raw_right[0]} {bone.line_raw_right[1]} {bone.line_raw_right[2]} \n'
                             f'l 1 2 \n'
                             f'# radius: {bone.radius} \n')
                 else:
-                    f.write(f'v {bone.left[0]} {bone.left[1]} {bone.left[2]} \n'
-                            f'v {bone.right[0]} {bone.right[1]} {bone.right[2]} \n'
+                    f.write(f'v {bone.line_raw_left[0]} {bone.line_raw_left[1]} {bone.line_raw_left[2]} \n'
+                            f'v {bone.line_raw_right[0]} {bone.line_raw_right[1]} {bone.line_raw_right[2]} \n'
                             f'l 1 2 \n')
 
     def find_joints(self):
@@ -83,16 +83,16 @@ class Skeleton:
         for joint in agenda:
             passing = joint[0]
             joining = joint[1]
-            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[4], joint[5], joint[6]]))
-            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[4], joint[5], joint[6]]))
+            dist_left = np.linalg.norm(self.bones[int(joining)].line_raw_left - np.array([joint[4], joint[5], joint[6]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].line_raw_right - np.array([joint[4], joint[5], joint[6]]))
             if dist_left < dist_right:
                 if self.bones[int(joining)].left_edit:
                     continue
                 else:
-                    self.bones[int(joining)].left = np.array([joint[4], joint[5], joint[6]])
+                    self.bones[int(joining)].line_raw_left = np.array([joint[4], joint[5], joint[6]])
                     bone=self.bones[int(joining)]
-                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
-                    bone.center=(bone.right+bone.left)/2
+                    bone.pca= (bone.line_raw_right - bone.line_raw_left) / np.linalg.norm(bone.line_raw_right - bone.line_raw_left)
+                    bone.points_center= (bone.line_raw_right + bone.line_raw_left) / 2
                     self.bones[int(joining)].left_edit = True
                     print('did sth')
                     log += 1
@@ -100,10 +100,10 @@ class Skeleton:
                 if self.bones[int(joining)].right_edit:
                     continue
                 else:
-                    self.bones[int(joining)].right = np.array([joint[4], joint[5], joint[6]])
+                    self.bones[int(joining)].line_raw_right = np.array([joint[4], joint[5], joint[6]])
                     bone=self.bones[int(joining)]
-                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
-                    bone.center=(bone.right+bone.left)/2
+                    bone.pca= (bone.line_raw_right - bone.line_raw_left) / np.linalg.norm(bone.line_raw_right - bone.line_raw_left)
+                    bone.points_center= (bone.line_raw_right + bone.line_raw_left) / 2
                     self.bones[int(joining)].right_edit = True
                     print('did sth')
                     log += 1
@@ -121,19 +121,19 @@ class Skeleton:
         for joint in agenda:
             passing = joint[1]
             joining = joint[0]
-            dist_left = np.linalg.norm(self.bones[int(joining)].left - np.array([joint[7], joint[8], joint[9]]))
-            dist_right = np.linalg.norm(self.bones[int(joining)].right - np.array([joint[7], joint[8], joint[9]]))
+            dist_left = np.linalg.norm(self.bones[int(joining)].line_raw_left - np.array([joint[7], joint[8], joint[9]]))
+            dist_right = np.linalg.norm(self.bones[int(joining)].line_raw_right - np.array([joint[7], joint[8], joint[9]]))
             if dist_left < dist_right:
                 if self.bones[int(joining)].left_edit:
                     continue
                 else:
-                    self.bones[int(joining)].left = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].line_raw_left = np.array([joint[7], joint[8], joint[9]])
                     self.bones[int(joining)].left_edit = True
             else:
                 if self.bones[int(joining)].right_edit:
                     continue
                 else:
-                    self.bones[int(joining)].right = np.array([joint[7], joint[8], joint[9]])
+                    self.bones[int(joining)].line_raw_right = np.array([joint[7], joint[8], joint[9]])
                     self.bones[int(joining)].right_edit = True
             self.bones[int(passing)].intermediate_points.append(joint[2])
 
@@ -150,13 +150,13 @@ class Skeleton:
         for joint in agenda:
             # trim both
             protrusions_1 = np.array([
-                np.linalg.norm(self.bones[int(joint[0])].left - np.array([joint[4], joint[5], joint[6]])),
-                np.linalg.norm(self.bones[int(joint[0])].right - np.array([joint[4], joint[5], joint[6]]))
+                np.linalg.norm(self.bones[int(joint[0])].line_raw_left - np.array([joint[4], joint[5], joint[6]])),
+                np.linalg.norm(self.bones[int(joint[0])].line_raw_right - np.array([joint[4], joint[5], joint[6]]))
             ])
             case_1 = np.argmin(protrusions_1)
             protrusions_2 = np.array([
-                np.linalg.norm(self.bones[int(joint[1])].left - np.array([joint[4], joint[5], joint[6]])),
-                np.linalg.norm(self.bones[int(joint[1])].right - np.array([joint[4], joint[5], joint[6]]))
+                np.linalg.norm(self.bones[int(joint[1])].line_raw_left - np.array([joint[4], joint[5], joint[6]])),
+                np.linalg.norm(self.bones[int(joint[1])].line_raw_right - np.array([joint[4], joint[5], joint[6]]))
             ])
             case_2 = np.argmin(protrusions_2)
             if protrusions_1[case_1] < self.threshold_distance_trim and protrusions_2[
@@ -166,22 +166,22 @@ class Skeleton:
                 ) / 2
 
                 if case_1 == 0:
-                    self.bones[int(joint[0])].left = midpoint
+                    self.bones[int(joint[0])].line_raw_left = midpoint
                     self.bones[int(joint[0])].left_edit = True
                     print('did sth')
                     log += 1
                 else:
-                    self.bones[int(joint[0])].right = midpoint
+                    self.bones[int(joint[0])].line_raw_right = midpoint
                     self.bones[int(joint[0])].right_edit = True
                     print('did sth')
                     log += 1
                 if case_2 == 0:
-                    self.bones[int(joint[1])].left = midpoint
+                    self.bones[int(joint[1])].line_raw_left = midpoint
                     self.bones[int(joint[1])].left_edit = True
                     print('did sth')
                     log += 1
                 else:
-                    self.bones[int(joint[1])].right = midpoint
+                    self.bones[int(joint[1])].line_raw_right = midpoint
                     self.bones[int(joint[1])].right_edit = True
                     print('did sth')
                     log += 1
@@ -192,14 +192,14 @@ class Skeleton:
                 # trim one
                 for i in [0, 1]:
                     bone = self.bones[i]
-                    protrusion_left = np.linalg.norm(bone.left - np.array([joint[4], joint[5], joint[6]]))
-                    protrusion_right = np.linalg.norm(bone.right - np.array([joint[4], joint[5], joint[6]]))
+                    protrusion_left = np.linalg.norm(bone.line_raw_left - np.array([joint[4], joint[5], joint[6]]))
+                    protrusion_right = np.linalg.norm(bone.line_raw_right - np.array([joint[4], joint[5], joint[6]]))
 
                     if protrusion_left < protrusion_right and protrusion_left < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.left_edit:
                         if i == 0:
-                            bone.left = np.array([joint[7], joint[8], joint[9]])
+                            bone.line_raw_left = np.array([joint[7], joint[8], joint[9]])
                         elif i == 1:
-                            bone.left = np.array([joint[4], joint[5], joint[6]])
+                            bone.line_raw_left = np.array([joint[4], joint[5], joint[6]])
                         else:
                             raise Exception('bone index out of range')
                         bone.left_edit = True
@@ -208,9 +208,9 @@ class Skeleton:
 
                     if protrusion_right < protrusion_left and protrusion_right < self.threshold_distance_trim and joint[3] < self.threshold_distance_join and not bone.right_edit:
                         if i == 0:
-                            bone.right = np.array([joint[7], joint[8], joint[9]])
+                            bone.line_raw_right = np.array([joint[7], joint[8], joint[9]])
                         elif i == 1:
-                            bone.right = np.array([joint[4], joint[5], joint[6]])
+                            bone.line_raw_right = np.array([joint[4], joint[5], joint[6]])
                         else:
                             raise Exception('bone index out of range')
                         bone.right_edit = True
@@ -243,13 +243,13 @@ class Skeleton:
                            / 2
 
                 dists_1 = np.array([
-                    np.linalg.norm(self.bones[int(joint[0])].left - midpoint),
-                    np.linalg.norm(self.bones[int(joint[0])].right - midpoint)
+                    np.linalg.norm(self.bones[int(joint[0])].line_raw_left - midpoint),
+                    np.linalg.norm(self.bones[int(joint[0])].line_raw_right - midpoint)
                 ])
                 case_1 = np.argmin(dists_1)  # 0 = left, 1 = right
                 dists_2 = np.array([
-                    np.linalg.norm(self.bones[int(joint[1])].left - midpoint),
-                    np.linalg.norm(self.bones[int(joint[1])].right - midpoint)
+                    np.linalg.norm(self.bones[int(joint[1])].line_raw_left - midpoint),
+                    np.linalg.norm(self.bones[int(joint[1])].line_raw_right - midpoint)
                 ])
                 case_2 = np.argmin(dists_2)  # 0 = left, 1 = right
 
@@ -257,25 +257,25 @@ class Skeleton:
                     if case_1 == 0:
                         if self.bones[int(joint[0])].left_edit:
                             continue
-                        self.bones[int(joint[0])].left = midpoint
+                        self.bones[int(joint[0])].line_raw_left = midpoint
                         self.bones[int(joint[0])].left_edit = True
                         print('did sth')
                     else:
                         if self.bones[int(joint[0])].right_edit:
                             continue
-                        self.bones[int(joint[0])].right = midpoint
+                        self.bones[int(joint[0])].line_raw_right = midpoint
                         self.bones[int(joint[0])].right_edit = True
                         print('did sth')
                     if case_2 == 0:
                         if self.bones[int(joint[1])].left_edit:
                             continue
-                        self.bones[int(joint[1])].left = midpoint
+                        self.bones[int(joint[1])].line_raw_left = midpoint
                         self.bones[int(joint[1])].left_edit = True
                         print('did sth')
                     else:
                         if self.bones[int(joint[1])].right_edit:
                             continue
-                        self.bones[int(joint[1])].right = midpoint
+                        self.bones[int(joint[1])].line_raw_right = midpoint
                         self.bones[int(joint[1])].right_edit = True
                         print('did sth')
                     log += 1
@@ -318,9 +318,9 @@ class Skeleton:
                     # find right/left for both bones to calc midpoint
 
                     if iter == 0:
-                        dist_left = np.linalg.norm(self.bones[int(joints[iter])].left - np.array(
+                        dist_left = np.linalg.norm(self.bones[int(joints[iter])].line_raw_left - np.array(
                             [agenda[i + iter][4], agenda[i + iter][5], agenda[i + iter][6]]))
-                        dist_right = np.linalg.norm(self.bones[int(joints[iter])].right - np.array(
+                        dist_right = np.linalg.norm(self.bones[int(joints[iter])].line_raw_right - np.array(
                             [agenda[i + iter][4], agenda[i + iter][5], agenda[i + iter][6]]))
                         if dist_left < dist_right:
                             if self.bones[int(joints[iter])].left_edit:
@@ -338,13 +338,13 @@ class Skeleton:
                                 log += 1
 
                     # check if ther is a Z connection so every entry needs to be on the same side
-                    dist0_left = np.linalg.norm(self.bones[int(joints[0])].left - np.array(
+                    dist0_left = np.linalg.norm(self.bones[int(joints[0])].line_raw_left - np.array(
                         [agenda[i + iter][4], agenda[i + iter][5], agenda[i + iter][6]]))
-                    dist0_right = np.linalg.norm(self.bones[int(joints[0])].right - np.array(
+                    dist0_right = np.linalg.norm(self.bones[int(joints[0])].line_raw_right - np.array(
                         [agenda[i + iter][4], agenda[i + iter][5], agenda[i + iter][6]]))
 
-                    dist_left = np.linalg.norm(self.bones[int(joints[iter+1])].left - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
-                    dist_right = np.linalg.norm(self.bones[int(joints[iter+1])].right - np.array([agenda[i+iter][7], agenda[i+iter][8], agenda[i+iter][9]]))
+                    dist_left = np.linalg.norm(self.bones[int(joints[iter+1])].line_raw_left - np.array([agenda[i + iter][7], agenda[i + iter][8], agenda[i + iter][9]]))
+                    dist_right = np.linalg.norm(self.bones[int(joints[iter+1])].line_raw_right - np.array([agenda[i + iter][7], agenda[i + iter][8], agenda[i + iter][9]]))
 
                     # adding directions
                     if dist0_left < dist0_right:
@@ -415,13 +415,13 @@ class Skeleton:
                 for iter in range(len(joints)):
                     bone=self.bones[int(joints[iter])]
                     if listdirection[iter]=="left":
-                        bone.left=midpoint
+                        bone.line_raw_left=midpoint
                     else:
-                        bone.right=midpoint
+                        bone.line_raw_right=midpoint
 
                     # need to update the bones properties
-                    bone.pca=(bone.right-bone.left)/np.linalg.norm(bone.right-bone.left)
-                    bone.center=(bone.right+bone.left)/2
+                    bone.pca= (bone.line_raw_right - bone.line_raw_left) / np.linalg.norm(bone.line_raw_right - bone.line_raw_left)
+                    bone.points_center= (bone.line_raw_right + bone.line_raw_left) / 2
 
                 # set connection point as middel
                 # join the most prominent

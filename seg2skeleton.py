@@ -108,9 +108,9 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
                 pipe_ind = int(line[0])
                 seg = Segment(name=str(pipe_ind))
 
-                seg.left = np.array([float(line[1]), float(line[2]), float(line[3])])
-                seg.right = np.array([float(line[4]), float(line[5]), float(line[6])])
-                seg.center = (seg.left + seg.right) / 2
+                seg.line_raw_left = np.array([float(line[1]), float(line[2]), float(line[3])])
+                seg.line_raw_right = np.array([float(line[4]), float(line[5]), float(line[6])])
+                seg.points_center = (seg.line_raw_left + seg.line_raw_right) / 2
                 seg.radius = float(line[7])
 
                 skeleton_actual.add_bone(seg)
