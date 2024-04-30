@@ -7,6 +7,7 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
@@ -86,6 +87,56 @@ class Segment(object):
         test_line = np.array([[origin[0] - direction[0], origin[0] + direction[0]],
                               [origin[1] - direction[1], origin[1] + direction[1]],
                               [origin[2] - direction[2], origin[2] + direction[2]]])
+
+        # plot in interactive go figure
+        fig = go.Figure()
+        fig.add_trace(go.Scatter3d(
+            x=points[:, 0],
+            y=points[:, 1],
+            z=points[:, 2],
+            mode='markers',
+            marker=dict(
+                size=1,
+                color='black',
+                opacity=0.6
+            )
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=points_on_line[:, 0],
+            y=points_on_line[:, 1],
+            z=points_on_line[:, 2],
+            mode='markers',
+            marker=dict(
+                size=1,
+                color='red',
+                opacity=0.6
+            )
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[origin[0]],
+            y=[origin[1]],
+            z=[origin[2]],
+            mode='markers',
+            marker=dict(
+                size=5,
+                color='blue',
+                opacity=1
+            )
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=test_line[0],
+            y=test_line[1],
+            z=test_line[2],
+            mode='lines',
+            line=dict(
+                color='green',
+                width=5
+            )
+        ))
+        # equal axes
+        fig.update_layout(scene_aspectmode='cube')
+        fig.show()
+
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
