@@ -75,10 +75,27 @@ def intersection_point_of_line_and_plane_rev(line_point, direction, plane):
 def intersecting_line(plane1, plane2):
     normal1, d1 = np.array(plane1[:3], dtype=np.float64), plane1[3]
     normal2, d2 = np.array(plane2[:3], dtype=np.float64), plane2[3]
+
+    # Normalize the normals to ensure calculations are based on unit vectors
+    normal1 = normal1 / np.linalg.norm(normal1)
+    normal2 = normal2 / np.linalg.norm(normal2)
+
+    # Calculate the direction of the line of intersection
     direction = np.cross(normal1, normal2)
-    # point_on_line = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction) ** 2
-    # return point_on_line, direction
-    return direction
+
+    # Check if the planes are parallel or coincident (cross product is zero)
+    if np.linalg.norm(direction) < 1e-10:  # Use a small threshold to handle floating-point precision issues
+        print("The planes are parallel or coincident. No unique line of intersection.")
+        return None, None
+
+    # Calculate an origin point on the line of intersection
+    try:
+        origin = np.cross((normal1 * d2 - normal2 * d1), direction) / np.linalg.norm(direction) ** 2
+    except FloatingPointError:
+        print("Numerical stability issue encountered while calculating the origin.")
+        return None, None
+
+    return direction, origin
 
 def line_of_intersection(plane1, plane2):
     normal1 = plane1[:3]

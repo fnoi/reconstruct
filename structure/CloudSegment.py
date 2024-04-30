@@ -7,6 +7,7 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
@@ -86,18 +87,6 @@ class Segment(object):
         test_line = np.array([[origin[0] - direction[0], origin[0] + direction[0]],
                               [origin[1] - direction[1], origin[1] + direction[1]],
                               [origin[2] - direction[2], origin[2] + direction[2]]])
-
-        # plot points and both planes
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.01)
-        for plane in planes:
-            x = np.linspace(-.8, -.6, 2)
-            y = np.linspace(17.9, 18.5, 2)
-            x, y = np.meshgrid(x, y)
-            z = (-plane[0] * x - plane[1] * y - plane[3]) / plane[2]
-            ax.plot_surface(x, y, z, alpha=0.3)
-        plt.show()
 
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
