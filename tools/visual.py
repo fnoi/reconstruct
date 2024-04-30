@@ -68,7 +68,7 @@ def segment_projection_3D(points, lines):
     fig.show()
 
 
-def segment_projection_2D(points, lines):
+def segment_projection_2D(points, lines, extra_point=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.scatter(points[:, 0], points[:, 1], s=0.05)
@@ -80,6 +80,8 @@ def segment_projection_2D(points, lines):
     #     [lines[2, 0], lines[3, 0]],
     #     [lines[2, 1], lines[3, 1]],
     #     color='purple')
+    if extra_point is not None:
+        ax.scatter(extra_point[0], extra_point[1], color='red', s=10)
     ax.set_aspect('equal')
     fig.show()
 
