@@ -79,7 +79,7 @@ class Segment(object):
         normals = self.points_data[['nx', 'ny', 'nz']].values
         # find the two best planes and their
         planes, direction, origin, inliers_0, inliers_1 = orientation_estimation(
-            np.concatenate((normals, points), axis=1),
+            np.concatenate((points, normals), axis=1),
             config=self.config,
             step="skeleton"
         )
@@ -88,63 +88,13 @@ class Segment(object):
                               [origin[1] - direction[1], origin[1] + direction[1]],
                               [origin[2] - direction[2], origin[2] + direction[2]]])
 
-        # plot in interactive go figure
-        fig = go.Figure()
-        fig.add_trace(go.Scatter3d(
-            x=points[:, 0],
-            y=points[:, 1],
-            z=points[:, 2],
-            mode='markers',
-            marker=dict(
-                size=1,
-                color='black',
-                opacity=0.6
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=points_on_line[:, 0],
-            y=points_on_line[:, 1],
-            z=points_on_line[:, 2],
-            mode='markers',
-            marker=dict(
-                size=1,
-                color='red',
-                opacity=0.6
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=[origin[0]],
-            y=[origin[1]],
-            z=[origin[2]],
-            mode='markers',
-            marker=dict(
-                size=5,
-                color='blue',
-                opacity=1
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=test_line[0],
-            y=test_line[1],
-            z=test_line[2],
-            mode='lines',
-            line=dict(
-                color='green',
-                width=5
-            )
-        ))
-        # equal axes
-        fig.update_layout(scene_aspectmode='cube')
-        fig.show()
-
-
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
         # ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.01)
         ax.scatter(points_on_line[:, 0], points_on_line[:, 1], points_on_line[:, 2], s=0.05, color='red')
         ax.scatter(points[:, 0], points[:, 1], points[:, 2], s=0.01, color='green')
         ax.scatter(origin[0], origin[1], origin[2], marker='o', s=10, color='blue')
-        ax.plot(test_line[0], test_line[1], test_line[2])
+        # ax.plot(test_line[0], test_line[1], test_line[2])
         ax.view_init(elev=45, azim=45)
         ax.set_aspect('equal')
         plt.tight_layout()
@@ -194,8 +144,10 @@ class Segment(object):
         proj_points_flat, mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir)
         proj_lines_flat = rotate_points_to_xy_plane(proj_lines, self.line_raw_dir)
 
+        origin_flat = rotate_points_to_xy_plane(np.array([origin]), self.line_raw_dir)[0]
+
         vis.segment_projection_3D(proj_points_plane, proj_lines)
-        vis.segment_projection_2D(proj_points_flat, proj_lines_flat)
+        vis.segment_projection_2D(proj_points_flat, proj_lines_flat, extra_point=origin_flat[0])
 
         proj_pts_2 = points_to_actual_plane(self.points, self.line_raw_dir, self.line_raw_left)
 
