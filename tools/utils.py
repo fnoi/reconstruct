@@ -231,3 +231,40 @@ def load_angles(yaml_path):
         gt_orientation = calculate_view_direction(rpy[0], rpy[1], rpy[2])
         vecs[int(key)] = gt_orientation
     return vecs
+
+
+def cost_function_beam(solution, model):
+    points = model['points']
+    num_points = points.shape[0]
+
+    x0, yo, tf, tw, lf, lw = solution
+
+    v1 = np.array([x0, y0])
+    v2 = np.array([v1[0] + lf, v1[1]])
+    v3 = np.array([v2[0], v2[1] + tf])
+    v4 = np.array([v3[0] - (lf - tw) / 2, v3[1]])
+    v5 = np.array([v4[0], v4[1] + lw])
+    v6 = np.array([v5[0] + (lf - tw) / 2, v5[1]])
+    v7 = np.array([v6[0], v6[1] + tf])
+    v8 = np.array([v7[0] - lf, v7[1]])
+    v9 = np.array([v8[0], v8[1] - tf])
+    v10 = np.array([v9[0] + (lf - tw) / 2, v9[1]])
+    v11 = np.array([v10[0], v10[1] - lw])
+    v12 = np.array([v11[0] - (lf - tw) / 2, v11[1]])
+
+    vertices = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12])
+
+    RMSE = np.sqrt(np.mean(np.min(np.linalg.norm(points[:, None, :] - vertices[None, :, :], axis=2), axis=1) ** 2))
+
+    return RMSE
+
+def bounding_box_pso(points):
+    min_vals = np.min(points, axis=0)
+    max_vals = np.max(points, axis=0)
+    return np.vstack([min_vals, max_vals])
+
+def calc_structure_pso(solution):
+    # calculate vertices based on solution
+    return np.array([compute])
+
+
