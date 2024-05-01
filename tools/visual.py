@@ -68,20 +68,50 @@ def segment_projection_3D(points, lines):
     fig.show()
 
 
-def segment_projection_2D(points, lines, extra_point=None):
+def segment_projection_2D(points, lines, extra_point=None, ransac_highlight=False, ransac_data=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.scatter(points[:, 0], points[:, 1], s=0.05)
-    # ax.plot(
-    #     [lines[0, 0], lines[1, 0]],
-    #     [lines[0, 1], lines[1, 1]],
-    #     color='red')
-    # ax.plot(
-    #     [lines[2, 0], lines[3, 0]],
-    #     [lines[2, 1], lines[3, 1]],
-    #     color='purple')
+    mask_scatter = np.ones(points.shape[0], dtype=bool)
+    if ransac_highlight:
+        mask_scatter[ransac_data[0]] = False
+        mask_scatter[ransac_data[1]] = False
+    ax.scatter(points[mask_scatter, 0], points[mask_scatter, 1], s=0.05, color='grey', zorder=7)
+    if ransac_highlight:
+        ax.scatter(points[ransac_data[0], 0], points[ransac_data[0], 1], s=0.05, color='red', zorder=9)
+        ax.scatter(points[ransac_data[1], 0], points[ransac_data[1], 1], s=0.05, color='purple', zorder=8)
     if extra_point is not None:
-        ax.scatter(extra_point[0], extra_point[1], color='red', s=10)
-    ax.set_aspect('equal')
+        ax.scatter(extra_point[0], extra_point[1], color='orange', s=10, zorder=10)
+    line_0 = np.array([extra_point - lines[0] * 1e3, extra_point + lines[0] * 1e3])
+    line_1 = np.array([extra_point - lines[1] * 1e3, extra_point + lines[1] * 1e3])
+    # plot lines
+    ax.plot(
+        line_0[:, 0], line_0[:, 1],
+        color='red',
+        alpha=0.5,
+        zorder=5
+    )
+    ax.plot(
+        line_1[:, 0], line_1[:, 1],
+        color='purple',
+        alpha=0.5,
+        zorder=6
+    )
+    # limit axis to points + 10%
+    rel_ext = 0.05
+    x_ext = np.abs(np.max(points[:, 0]) - np.min(points[:, 0]))
+    y_ext = np.abs(np.max(points[:, 1]) - np.min(points[:, 1]))
+    if x_ext > y_ext:
+        xmid = np.mean(points[:, 0])
+        xlim = xmid - x_ext/2 - rel_ext * x_ext, xmid + x_ext/2 + rel_ext * x_ext
+        ymid = np.mean(points[:, 1])
+        ylim = ymid - x_ext/2 - rel_ext * x_ext, ymid + x_ext/2 + rel_ext * x_ext
+    else:
+        ymid = np.mean(points[:, 1])
+        ylim = ymid - y_ext/2 - rel_ext * y_ext, ymid + y_ext/2 + rel_ext * y_ext
+        xmid = np.mean(points[:, 0])
+        xlim = xmid - y_ext/2 - rel_ext * y_ext, xmid + y_ext/2 + rel_ext * y_ext
+    ax.set_xlim(xmin=xlim[0], xmax=xlim[1])
+    ax.set_ylim(ymin=ylim[0], ymax=ylim[1])
+
     fig.show()
 

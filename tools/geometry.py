@@ -5,11 +5,14 @@ from typing import Tuple, Any
 import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
+from matplotlib import pyplot as plt
 from numpy import ndarray, dtype, object_
 # from structure.CloudSegment import CloudSegment
 
 from scipy.spatial import distance
 from math import degrees, acos
+
+from sklearn import linear_model
 
 
 def angle_between_planes(plane1, plane2):
@@ -240,7 +243,7 @@ def warped_vectors_intersection(seg1, seg2):
 # def passing_check:
 
 
-def rotate_points(points, angle, axis):
+def rotate_points_3D(points, angle, axis):
     axis_normalized = axis / np.linalg.norm(axis)
     a = np.cos(angle / 2)
     b, c, d = -axis_normalized * np.sin(angle / 2)
@@ -249,6 +252,12 @@ def rotate_points(points, angle, axis):
     rotation_matrix = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
                                 [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                                 [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    return np.dot(points, rotation_matrix)
+
+
+def rotate_points_2D(points, angle):
+    rotation_matrix = np.array([[np.cos(angle), -np.sin(angle)],
+                                [np.sin(angle), np.cos(angle)]])
     return np.dot(points, rotation_matrix)
 
 
@@ -493,3 +502,35 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
         return (f_0, f_1), orientation, point_on_line, inliers_0, inliers_1
     else:
         return orientation
+
+def orientation_2D(cloud):
+    coords = copy.deepcopy(cloud.points_flat_raw)
+    active_mask = np.ones(len(coords), dtype=bool)
+    lines = []
+    # perform ransac in 2D to find all lines using scipy
+    while True:
+        # ransac for line with pyrsc
+        line = pyrsc.Line()
+        ransac_result = line.fit(pts=coords[active_mask],
+                                 thresh=0.01,
+                                 maxIteration=100000)
+        lines.append(ransac_result[0])
+        # remove inliers from point cloud
+        inliers = ransac_result[1]
+        active_mask[inliers] = False
+
+        fig, ax = plt.subplots()
+        ax.scatter(coords[:, 0], coords[:, 1], s=1)
+        for line in lines:
+            x = np.linspace(np.min(coords[:, 0]), np.max(coords[:, 0]), 3)
+            y = (-line[0] * x - line[2]) / line[1]
+            ax.plot(x, y, color='red')
+        plt.show()
+
+        a = 0
+
+        if len(coords[active_mask]) < 0.1 * len(coords):
+            break
+
+
+    a = 0
