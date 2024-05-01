@@ -452,6 +452,11 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
                     )
                 )
                 if 45 < angle % 180 < 135:
+                    inlier_coords = np.asarray(point_cloud.points)[inliers_1]
+                    # find the corresponding id in cluster_ptx_array for every row
+                    inliers_1_fix = np.where(np.isin(cluster_ptx_array[:, :3], inlier_coords).all(axis=1))[0]
+                    inliers_1 = inliers_1_fix.tolist()
+
                     break
                 else:
                     print('planes found are not "perpendicular" enough, retrying...')
