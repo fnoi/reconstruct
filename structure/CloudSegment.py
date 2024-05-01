@@ -83,7 +83,8 @@ class Segment(object):
             config=self.config,
             step="skeleton"
         )
-        points_on_line = project_points_to_line(points, origin, direction)
+        points_on_line, closest_ind = project_points_to_line(points, origin, direction)
+
 
         ref_x = -100000
         ref_t = (ref_x - origin[0]) / direction[0]
@@ -124,11 +125,17 @@ class Segment(object):
         proj_lines = [proj_dir_0, proj_dir_1]
 
         proj_points_plane = points_to_actual_plane(points, self.line_raw_dir, self.line_raw_left)
+        proj_origin_plane = points_to_actual_plane(np.array([self.point]), self.line_raw_dir, self.line_raw_left)
+
         proj_points_flat, self.mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir)
+        proj_origin_flat, _ = rotate_points_to_xy_plane(proj_origin_plane, self.line_raw_dir)
+
         # move points to z=0, include this in rotation matrix
         self.z_delta = proj_points_flat[0, 2]
         proj_points_flat[:, 2] = proj_points_flat[:, 2] - self.z_delta
         self.points_2D = proj_points_flat[:, :2]
+
+        proj_origin_flat = proj_origin_flat[0, :2]
 
         proj_lines_flat = []
         for line in proj_lines:
@@ -151,15 +158,9 @@ class Segment(object):
         line_plane_2D_rot_0 = rotate_points_2D(line_plane_2D_0, angle)
         line_plane_2D_rot_1 = rotate_points_2D(line_plane_2d_1, angle)
         lines_plane_fix = [line_plane_2D_rot_0, line_plane_2D_rot_1]
-        # proj_lines_flat_aligned = rotate_points_2D(proj_lines_flat, angle)
-
-        plane_point = intersection_point_of_line_and_plane(origin, self.line_raw_dir, proj_plane)
-        origin_flat, _ = rotate_points_to_xy_plane(np.array([origin]), self.line_raw_dir)
-        origin_flat_2, _ = rotate_points_to_xy_plane(np.array([self.line_raw_left]), self.line_raw_dir)
-        origin_flat_2 = origin_flat_2.flatten()[0:2]
 
         ransac_data = (inliers_0, inliers_1)
-        vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=origin_flat_2,
+        vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=self.points_2D[closest_ind],
                                   ransac_highlight=True, ransac_data=ransac_data)
 
         # find main orientation in 2D

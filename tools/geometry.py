@@ -374,8 +374,12 @@ def project_points_to_line(points, point_on_line, direction):
     # scalar_proj = np.dot(vec_to_points, direction_normalized)
     # vec_proj = np.outer(scalar_proj, direction_normalized)
     # projected_points = point_on_line + vec_proj
+    # calculate distance of points to line
+    dists = np.linalg.norm(vec_to_points - scalar_proj, axis=1)
+    closest_ind = np.argmin(dists)
+
     projected_points = scalar_proj + point_on_line
-    return projected_points
+    return projected_points, closest_ind
 
 
 def rotation_matrix_from_vectors(vec1, vec2):

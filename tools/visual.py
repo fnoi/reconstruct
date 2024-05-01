@@ -87,29 +87,29 @@ def segment_projection_2D(points, lines, extra_point=None, ransac_highlight=Fals
     ax.plot(
         line_0[:, 0], line_0[:, 1],
         color='red',
-        alpha=0.5,
-        zorder=5
+        alpha=0.25,
+        zorder=5,
+        linewidth=4
     )
     ax.plot(
         line_1[:, 0], line_1[:, 1],
         color='purple',
-        alpha=0.5,
-        zorder=6
+        alpha=0.25,
+        zorder=6,
+        linewidth=4
     )
     # limit axis to points + 10%
-    rel_ext = 0.05
+    rel_ext = 0.1
     x_ext = np.abs(np.max(points[:, 0]) - np.min(points[:, 0]))
     y_ext = np.abs(np.max(points[:, 1]) - np.min(points[:, 1]))
+    xmid = np.min(points[:, 0]) + (x_ext / 2)
+    ymid = np.min(points[:, 1]) + (y_ext / 2)
     if x_ext > y_ext:
-        xmid = np.mean(points[:, 0])
-        xlim = xmid - x_ext/2 - rel_ext * x_ext, xmid + x_ext/2 + rel_ext * x_ext
-        ymid = np.mean(points[:, 1])
-        ylim = ymid - x_ext/2 - rel_ext * x_ext, ymid + x_ext/2 + rel_ext * x_ext
+        xlim = xmid - (x_ext/2) - (rel_ext * x_ext), xmid + (x_ext/2) + (rel_ext * x_ext)
+        ylim = ymid - (x_ext/2) - (rel_ext * x_ext), ymid + (x_ext/2) + (rel_ext * x_ext)
     else:
-        ymid = np.mean(points[:, 1])
-        ylim = ymid - y_ext/2 - rel_ext * y_ext, ymid + y_ext/2 + rel_ext * y_ext
-        xmid = np.mean(points[:, 0])
-        xlim = xmid - y_ext/2 - rel_ext * y_ext, xmid + y_ext/2 + rel_ext * y_ext
+        ylim = ymid - (y_ext/2) - (rel_ext * y_ext), ymid + (y_ext/2) + (rel_ext * y_ext)
+        xlim = xmid - (y_ext/2) - (rel_ext * y_ext), xmid + (y_ext/2) + (rel_ext * y_ext)
     ax.set_xlim(xmin=xlim[0], xmax=xlim[1])
     ax.set_ylim(ymin=ylim[0], ymax=ylim[1])
 
