@@ -22,7 +22,7 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
 
     ##########
-    cache_flag = 4
+    cache_flag = 4.1
     ##########
 
     if cache_flag <= 1:
@@ -91,6 +91,19 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True)
+
+    if cache_flag <= 4.5:
+        with open(f'{config.project.parking_path}/cache.pickle', 'rb') as f:
+            data = pd.read_pickle(f)
+        for beam in data:
+            segment = beam[1]
+            name = beam[0]
+            segment.fit_cs_rev()
+
+
+
+        a = 0
+
 
     if cache_flag <= 5:
         print('\n- define initial skeleton and refine by semantics')  # baseline exists but omg

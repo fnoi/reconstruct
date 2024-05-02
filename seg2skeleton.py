@@ -1,5 +1,6 @@
 import itertools
 import os
+import pickle
 from math import ceil, sqrt
 import matplotlib.pyplot as plt
 
@@ -41,10 +42,16 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
                 cache_mask[cache.index(cache_entry)] = False
                 continue
             cloud.calc_axes()
-            cloud.fit_cs()
-            cloud.lookup_cs()
+
+            # cloud.fit_cs()
+            # cloud.lookup_cs()
 
         cache = list(itertools.compress(cache, cache_mask))
+        # serialize cache using pickel
+        with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
+            pickle.dump(cache, f)
+
+        a = 0
 
         skeleton.potential = np.array([0, 0, 0])
         # counter = 0

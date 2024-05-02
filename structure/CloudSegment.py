@@ -18,7 +18,7 @@ from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, l
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
     rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
-from tools import visual as vis
+from tools import visual as vis, fitting_pso_rev
 from tools.utils import bounding_box_pso
 
 
@@ -89,7 +89,6 @@ class Segment(object):
             step="skeleton"
         )
         points_on_line, closest_ind = project_points_to_line(points, origin, direction)
-
 
         ref_x = -100000
         ref_t = (ref_x - origin[0]) / direction[0]
@@ -297,6 +296,9 @@ class Segment(object):
                         f'l 1 4')
         return
 
+    def fit_cs_rev(self):
+        self.h_beam_params = fitting_pso_rev.fct(self.points_2D)
+
     def fit_cs(self):
         """
         fit a H beam cross section to the segment using PSO
@@ -360,9 +362,5 @@ class Segment(object):
             res.append(diag)
 
         final_diag = np.mean(res, axis=0)
-
-
-
-
 
         a = 0
