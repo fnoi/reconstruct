@@ -8,23 +8,25 @@ from pyswarm import pso
 
 def point_to_line_distance(point, v1, v2):
     """Calculate the minimum distance from a point to a line segment defined by vertices v1 and v2."""
-    line_vec = v2 - v1
-    point_vec = point - v1
+    line_vec = np.array(v2) - np.array(v1)
+    point_vec = np.array(point) - np.array(v1)
     line_len = np.linalg.norm(line_vec)
     line_unitvec = line_vec / line_len
     point_vec_scaled = point_vec / line_len
     t = np.dot(line_unitvec, point_vec_scaled)
     t = np.clip(t, 0, 1)
-    nearest = v1 + t * line_vec
-    dist = np.linalg.norm(nearest - point)
+    nearest = np.array(v1) + t * line_vec
+    dist = np.linalg.norm(nearest - np.array(point))
     return dist
 
 
-def min_distance_to_polygon(points, vertices):
-    """Calculate the minimum distance from each point in 'points' to a polygon defined by 'vertices'."""
+def min_distance_to_polygon(points, vertices, active_edges=False):
+    """Calculate the minimum distance from each point in 'points' to a polygon defined by 'vertices'.
+       Optionally return the number of polygon edges that are not the closest to any point."""
     num_vertices = len(vertices)
     num_points = len(points)
     min_distances = np.inf * np.ones(num_points)
+    edge_closest_count = np.zeros(num_vertices, dtype=int)  # Array to count closest occurrences for each edge
 
     for i in range(num_vertices):
         v1 = vertices[i]
@@ -34,16 +36,38 @@ def min_distance_to_polygon(points, vertices):
             dist = point_to_line_distance(point, v1, v2)
             if dist < min_distances[j]:
                 min_distances[j] = dist
+                if active_edges:
+                    edge_closest_count[i] += 1  # Mark this edge as closest for this point
 
-    return min_distances
+    if active_edges:
+        # Count how many edges were never the closest
+        inactive_edges_count = np.sum(edge_closest_count == 0)
+        return min_distances, inactive_edges_count
+    else:
+        return min_distances
 
-def cost_fct(solution, data):
+
+def cs_plot(vertices=None, points=None):
+    # plot lines in 2D iterate 0 - 11 and 0
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    if vertices is not None:
+        for i in range(11):
+            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]])
+        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
+    if points is not None:
+        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+    ax.set_aspect('equal')
+    plt.show()
+
+
+def param2vertices(solution):
     x0, y0, tf, tw, bf, d = solution
 
     v0 = np.array([x0, y0])
     v1 = v0 + np.array([0, tf])
-    v2 = v1 + np.array([(bf/2 - tw/2), 0])
-    v3 = v2 + np.array([0, (d - 2*tf)])
+    v2 = v1 + np.array([(bf / 2 - tw / 2), 0])
+    v3 = v2 + np.array([0, (d - 2 * tf)])
     v5 = v0 + np.array([0, d])
     v4 = v5 - np.array([0, tf])
     v6 = v5 + np.array([bf, 0])
@@ -55,18 +79,22 @@ def cost_fct(solution, data):
 
     vertices = np.array([v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11])
 
-    # # plot lines in 2D iterate 0 - 11 and 0
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # for i in range(11):
-    #     ax.plot([vertices[i][0], vertices[i+1][0]], [vertices[i][1], vertices[i+1][1]])
-    # ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
-    # ax.set_aspect('equal')
-    # plt.show()
+    return vertices
 
+
+def cost_fct_activate(solution, data):
+    vertices = param2vertices(solution)
+    active_edges, dists = min_distance_to_polygon(data, vertices, active_edges=True)
+
+
+def cost_fct(solution, data):
+    vertices = param2vertices(solution)
     # start = time.time()
-    dists = min_distance_to_polygon(data, vertices)
-    rmse = np.sqrt(np.mean(dists**2))
+    dists, e_active = min_distance_to_polygon(data, vertices, active_edges=True)
+    mae = np.mean(dists) + 0.1 * (12 - e_active)
+    print(mae)
+    # rmse = np.sqrt(np.mean(dists**2))
+    # print(rmse)
     # print(f'Elapsed time: {time.time() - start}')
 
     # # plot the lines again and add the points, color code distance to polygon
@@ -79,7 +107,8 @@ def cost_fct(solution, data):
     # ax.set_aspect('equal')
     # plt.show()
 
-    return rmse
+    return mae
+
 
 def fct(points_array_2D):
     # plot points in 2D
@@ -87,7 +116,6 @@ def fct(points_array_2D):
     ax = fig.add_subplot(111)
     ax.scatter(points_array_2D[:, 0], points_array_2D[:, 1], s=0.05, color='grey', zorder=7)
     ax.set_aspect('equal')
-
 
     boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
     bounding_ext_x = abs(boundings[1][0] - boundings[0][0])
@@ -127,19 +155,19 @@ def fct(points_array_2D):
     lower_bound = [lim[0] for lim in lims]
     upper_bound = [lim[1] for lim in lims]
 
-    xopt, fopt = pso(cost_fct, lower_bound, upper_bound, args=(points_array_2D,), swarmsize=10, maxiter=10)
+    swarm_size = 100
+    max_iter = 10
 
-    optimal_vertices = xopt.reshape((num_vertices, 2))
-    optimal_vertices = np.vstack([optimal_vertices, optimal_vertices[0]])
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    ax.plot(optimal_vertices[:, 0], optimal_vertices[:, 1])
-    ax.scatter(points_array_2D[:, 0], points_array_2D[:, 1], s=0.05, color='grey', zorder=7)
-    ax.set_aspect('equal')
-    plt.show()
+    # randomly take only 0.3 of the points
+    # idx = np.random.choice(points_array_2D.shape[0], int(points_array_2D.shape[0] * 0.3), replace=False)
+    # points_array_2D = points_array_2D[idx, :]
 
+    xopt, fopt = pso(cost_fct, lower_bound, upper_bound, args=(points_array_2D,),
+                     swarmsize=swarm_size, maxiter=max_iter)
 
+    optimal_vertices = param2vertices(xopt)
+    cs_plot(optimal_vertices, points_array_2D)
 
-
+    raise NotImplementedError
 
     a = 0

@@ -95,9 +95,13 @@ if __name__ == '__main__':
     if cache_flag <= 4.5:
         with open(f'{config.project.parking_path}/cache.pickle', 'rb') as f:
             data = pd.read_pickle(f)
+        a = 0
+
         for beam in data:
             segment = beam[1]
             name = beam[0]
+            # write 2d points to txt
+            # np.savetxt(f'/Users/fnoic/Downloads/beam_export_projection_{name}.txt', segment.points_2D, delimiter=' ', fmt='%f')
             segment.fit_cs_rev()
 
 
