@@ -1,5 +1,6 @@
 import itertools
 import os
+import pickle
 from math import ceil, sqrt
 import matplotlib.pyplot as plt
 
@@ -33,21 +34,22 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
             else:
                 cloud.load_from_txt(segment)
             cache.append((segment, cloud))
-
+        cache_mask = np.ones(len(cache), dtype=bool)
         for cache_entry in tqdm(cache, desc='instance orientation and point projection (axes)', total=len(cache)):
             segment = cache_entry[0]
             cloud = cache_entry[1]
+            if len(cloud.points) < config.skeleton.min_points:
+                cache_mask[cache.index(cache_entry)] = False
+                continue
             cloud.calc_axes()
 
+            # cloud.fit_cs()
+            # cloud.lookup_cs()
 
-            # cloud.calc_pca_o3d()
-
-            # cloud.plot_flats()
-            #
-            # cloud.transform_clean()
-            # cloud.pc2obj(pc_type='initial')
-            # skeleton.add_cloud(cloud)
-            a = 0
+        cache = list(itertools.compress(cache, cache_mask))
+        # serialize cache using pickel
+        with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
+            pickle.dump(cache, f)
 
         a = 0
 
