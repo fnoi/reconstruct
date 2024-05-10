@@ -86,13 +86,14 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
 
     if cache_flag <= 4:
-        print('\n- project instance points to plane, fit cs, lookup params')  # 1. ok, 2. help 3. easy
+        print('\n- project instance points to plane')  # 1. ok, 2. help 3. easy
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True)
 
     if cache_flag <= 4.5:
+        print('\n- fit cs')
         with open(f'{config.project.parking_path}/cache.pickle', 'rb') as f:
             data = pd.read_pickle(f)
         a = 0
