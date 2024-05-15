@@ -84,6 +84,9 @@ if __name__ == '__main__':
         miou_weighted, miou_unweighted = calculate_metrics(cloud, config)
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
+        # store cloud to  .txt
+        cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev.txt', sep=' ', index=False)
+        raise ValueError('stop here')
 
     if cache_flag <= 4:
         print('\n- project instance points to plane')  # 1. ok, 2. help 3. easy
