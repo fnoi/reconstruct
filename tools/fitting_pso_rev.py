@@ -93,24 +93,11 @@ def cost_fct(solution, data):
     dists, e_active = min_distance_to_polygon(data, vertices, active_edges=True)
     mae = np.mean(dists) + 0.1 * (12 - e_active)
     print(mae)
-    # rmse = np.sqrt(np.mean(dists**2))
-    # print(rmse)
-    # print(f'Elapsed time: {time.time() - start}')
-
-    # # plot the lines again and add the points, color code distance to polygon
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # for i in range(11):
-    #     ax.plot([vertices[i][0], vertices[i+1][0]], [vertices[i][1], vertices[i+1][1]])
-    # ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
-    # ax.scatter(data[:, 0], data[:, 1], c=dists, cmap='viridis')
-    # ax.set_aspect('equal')
-    # plt.show()
 
     return mae
 
 
-def fct(points_array_2D):
+def fitting_fct(points_array_2D):
     # plot points in 2D
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -132,12 +119,13 @@ def fct(points_array_2D):
     plt.show()
 
     # initiate params and define bounds
-    x0_lims = [boundings[0][0], boundings[0][0] + 0.2 * bounding_ext_x]
-    y0_lims = [boundings[0][1], boundings[0][1] + 0.2 * bounding_ext_y]
+    rel_ext = 0.1
+    x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
+    y0_lims = [boundings[0][1] - rel_ext * bounding_ext_y, boundings[0][1] + rel_ext * bounding_ext_y]
     tf_lims = [0.005, 0.05]
     tw_lims = [0.005, 0.05]
-    bf_lims = [0.05, bounding_ext_x]
-    d_lims = [0.05, bounding_ext_y]
+    bf_lims = [0.1, bounding_ext_x]
+    d_lims = [0.1, bounding_ext_y]
     lims = [x0_lims, y0_lims, tf_lims, tw_lims, bf_lims, d_lims]
 
     # # sample random float numbers within the defined bounds
@@ -155,7 +143,7 @@ def fct(points_array_2D):
     lower_bound = [lim[0] for lim in lims]
     upper_bound = [lim[1] for lim in lims]
 
-    swarm_size = 100
+    swarm_size = 10
     max_iter = 10
 
     # randomly take only 0.3 of the points
@@ -167,6 +155,8 @@ def fct(points_array_2D):
 
     optimal_vertices = param2vertices(xopt)
     cs_plot(optimal_vertices, points_array_2D)
+
+    print(xopt, fopt)
 
     raise NotImplementedError
 

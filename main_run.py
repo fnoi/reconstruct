@@ -102,6 +102,7 @@ if __name__ == '__main__':
         a = 0
 
         for beam in data:
+            print(f'fitting {beam[0]}')
             segment = beam[1]
             name = beam[0]
             # write 2d points to txt

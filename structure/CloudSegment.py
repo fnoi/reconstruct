@@ -297,7 +297,12 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        self.h_beam_params = fitting_pso_rev.fct(self.points_2D)
+        # downsample points to absolute required number (if above)
+        points_after_sampling = 250
+        if len(self.points_2D) > points_after_sampling:
+            print(f'sampling {len(self.points_2D)} points to {points_after_sampling} points')
+            self.points_2D = self.points_2D[np.random.choice(len(self.points_2D), points_after_sampling, replace=False)]
+        self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D)
 
     def fit_cs(self):
         """
