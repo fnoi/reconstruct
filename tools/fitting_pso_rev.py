@@ -4,7 +4,6 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from pyswarm import pso
-from tqdm import tqdm
 
 from tools.fitting import innerdist2edge3
 
@@ -97,7 +96,7 @@ def cost_fct(solution, data):
     #
     # mae = np.mean(dists) + 0.1 * (12 - e_active)
     # print(mae)
-    print(calcd_error)
+    # print(calcd_error)
 
     return calcd_error
 
@@ -138,12 +137,9 @@ def fitting_fct(points_array_2D):
     upper_bound = [lim[1] for lim in lims]
 
     swarm_size = 1000
-    max_iter = 10
+    max_iter = 2
 
-    pbar = tqdm(total=max_iter, desc='fitting cs')
-    for iter in range(max_iter):
-
-
+    timee = time.time()
     xopt, fopt = pso(cost_fct, lower_bound, upper_bound, args=(points_array_2D,),
                      swarmsize=swarm_size, maxiter=max_iter)
     print(time.time() - timee)
@@ -153,46 +149,6 @@ def fitting_fct(points_array_2D):
 
     print(xopt, fopt)
 
-    raise NotImplementedError
-
-    a = 0
-
-
-def pso_with_progress(cost_func, lb, ub, args=(), swarmsize=100, maxiter=100, **kwargs):
-    S = swarmsize
-    D = len(lb)
-
-    x = np.random.rand(S, D)
-    x = lb + x * (ub - lb)
-    v = np.zeros_like(x)
-
-    p = np.zeros_like(x)
-    p[:] = x
-    fp = np.zeros(S)
-    fp[:] = np.inf
-
-    g = np.zeros(D)
-    fg = np.inf
-
-    pbar = tqdm(total=maxiter, desc="Optimization Progress")
-
-    for i in range(maxiter):
-        # Evaluate the cost function
-        for j in range(S):
-            f = cost_func(x[j], *args)
-            if f < fp[j]:
-                p[j] = x[j]
-                fp[j] = f
-            if f < fg:
-                g = x[j]
-                fg = f
-
-        # Update the velocities and positions
-        v = np.random.rand(S, D) * v + np.random.rand(S, D) * (p - x) + np.random.rand(S, D) * (g - x)
-        x += v
-
-        # Update the progress bar
-        pbar.update(1)
-
-    pbar.close()
-    return g, fg
+    # raise NotImplementedError
+    #
+    # a = 0

@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 
 from pyswarm import pso
+from sklearn.cluster import DBSCAN
 
 from tools.IO import points2txt, lines2obj, cache_meta
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
@@ -21,6 +22,8 @@ from tools import visual as vis, fitting_pso_rev
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.h_beam_params = None
+        self.points_2D = None
         self.points_data = None
         self.line_raw_center = None
         self.line_raw_dir = None
@@ -294,10 +297,50 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        # downsample points to absolute required number (if above)
-        points_after_sampling = 250
-        if len(self.points_2D) > points_after_sampling:
-            print(f'sampling {len(self.points_2D)} points to {points_after_sampling} points')
-            self.points_2D = self.points_2D[np.random.choice(len(self.points_2D), points_after_sampling, replace=False)]
+        points_after_sampling = 100
+        grid_resolution = 0.005
+        self.downsample_dbscan_grid(grid_resolution)
+        # self.downsample_points_2D_dbscan_rand(points_after_sampling)
         self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D)
+
+    def downsample_points_2D_dbscan_rand(self, points_after_sampling):
+        init_count = self.points_2D.shape[0]
+        points = self.points_2D
+        if points.shape[0] > points_after_sampling:
+            points = points[np.random.choice(points.shape[0], points_after_sampling, replace=False)]
+
+        eps = 0.02
+        min_samples = int(0.05 * points_after_sampling)
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+        labels = db.labels_
+
+        core_samples_mask = np.zeros_like(labels, dtype=bool)
+        core_samples_mask[db.core_sample_indices_] = True
+        unique_labels = set(labels)
+
+        filtered_points = points[core_samples_mask]
+        self.points_2D = filtered_points
+
+        print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')
+
+    def downsample_dbscan_grid(self, resolution):
+        x = np.arange(self.points_2D[:, 0].min(), self.points_2D[:, 0].max(), resolution)
+        y = np.arange(self.points_2D[:, 1].min(), self.points_2D[:, 1].max(), resolution)
+        xx, yy = np.meshgrid(x, y)
+        grid = np.array([xx.flatten(), yy.flatten()]).T
+
+        # count points in grid cells
+        grid_count = np.zeros(len(grid))
+        for i, point in enumerate(grid):
+            grid_count[i] = np.sum(np.all(np.isclose(self.points_2D, point, atol=resolution), axis=1))
+
+        # for each grid cell with points calculate the mean
+        grid_mean = []
+        for i, point in enumerate(grid):
+            if grid_count[i] > 0:
+                grid_mean.append(np.mean(self.points_2D[np.all(np.isclose(self.points_2D, point, atol=resolution), axis=1)], axis=0))
+        self.points_2D = np.array(grid_mean)
+
+
+
 

@@ -1,124 +1,5 @@
-# Function Definitions
 import numpy as np
 from matplotlib import pyplot as plt
-
-
-def BoundingBox(points):
-    """ Calculate the bounding box of the point set. """
-    minp = np.min(points, axis=0)
-    maxp = np.max(points, axis=0)
-
-    bb = np.array([minp, maxp])
-    return bb
-
-
-def plotDataPoints(dataPoints):
-    numDim = dataPoints.shape[1]
-    if numDim == 2:
-        plt.figure(figsize=(3.5, 3.2))  # Approximate conversion from MATLAB's position
-        plt.scatter(dataPoints[:, 0], dataPoints[:, 1], c='k', s=1)
-        plt.xlabel('X')
-        plt.ylabel('Y')
-        plt.grid(True)
-        plt.box(True)
-    else:
-        fig = plt.figure(figsize=(3.5, 3.2))
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(dataPoints[:, 0], dataPoints[:, 1], dataPoints[:, 2], c='k', s=1)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        plt.grid(True)
-        plt.box(True)
-
-    plt.show()
-
-
-# Placeholder functions for custom MATLAB functions - To be defined based on MATLAB code
-import numpy as np
-
-def createGrid(points, step):
-    def bounding_box(points):
-        return np.min(points, axis=0), np.max(points, axis=0)
-
-    ll, ur = bounding_box(points)
-    lenx = ur[0] - ll[0]
-    widy = ur[1] - ll[1]
-
-    nX = int(np.ceil(lenx / step))
-    nY = int(np.ceil(widy / step))
-
-    cells = [{'center': [], 'lowerLeft': [], 'upperRight': [], 'pointsId': [], 'numPoints': 0} for _ in range(nX * nY)]
-    cell_size = {'X': step, 'Y': step}
-
-    k = 0
-    for ny in range(nY):
-        dmy = ll[1] + cell_size['Y'] * ny
-        dMy = dmy + cell_size['Y'] if ny < nY - 1 else ur[1]
-        for nx in range(nX):
-            dmx = ll[0] + cell_size['X'] * nx
-            dMx = dmx + cell_size['X'] if nx < nX - 1 else ur[0]
-            cells[k]['lowerLeft'] = [dmx, dmy]
-            cells[k]['upperRight'] = [dMx, dMy]
-            cells[k]['center'] = [dmx + (dMx - dmx) / 2, dmy + (dMy - dmy) / 2]
-            k += 1
-
-    # Distribute points to cells
-    cell_indices = [[] for _ in range(nX * nY)]
-
-    for p, point in enumerate(points):
-        cell_idx = int((point[0] - ll[0]) / cell_size['X'])
-        cell_idy = int((point[1] - ll[1]) / cell_size['Y'])
-        index = cell_idy * nX + cell_idx
-        cell_indices[index].append(p)
-
-    for i in range(len(cell_indices)):
-        cells[i]['pointsId'] = cell_indices[i]
-        cells[i]['numPoints'] = len(cell_indices[i])
-
-    return cells, nX, nY
-
-
-
-def cells2fullcells(cells):
-    fullcells = []
-    for cell in cells:
-        if len(cell['pointsId']) > 1:
-            fullcells.append(cell)
-    return fullcells
-
-
-
-def costFunctionGirder(sol, model):
-    points = model['points']
-    numPoints = model['numPoints']
-
-    x0, y0, tf, tw, lf, lw = sol
-
-    # Define vertices based on the parameters
-    v1 = np.array([x0, y0])
-    v2 = v1 + np.array([lf, 0])
-    v3 = v2 + np.array([0, tf])
-    v4 = v3 + np.array([-(lf-tw)/2, 0])
-    v5 = v4 + np.array([0, lw])
-    v6 = v5 + np.array([(lf-tw)/2, 0])
-    v7 = v6 + np.array([0, tf])
-    v8 = v7 + np.array([-lf, 0])
-    v9 = v8 + np.array([0, -tf])
-    v10 = v9 + np.array([(lf-tw)/2, 0])
-    v11 = v10 + np.array([0, -lw])
-    v12 = v11 + np.array([-(lf-tw)/2, 0])
-    vertices = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12])
-
-    hor_ver_const = [True] * 12  # Assuming this might indicate a constraint that is always True
-
-    # Placeholder for the actual distance computation to edges function
-    RMSE = innerdist2edge3(vertices, points, hor_ver_const)
-    return RMSE
-
-
-import numpy as np
-
 
 def innerdist2edge3(vertices, points):
     num_edges = vertices.shape[0]
@@ -129,7 +10,7 @@ def innerdist2edge3(vertices, points):
     edge_dist = np.zeros(num_edges)
 
     for i, point in enumerate(points):
-        best_dist = float('inf')
+        best_dist = np.inf
         edge_flag = False
         best_index = -1
 
