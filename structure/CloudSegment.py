@@ -12,14 +12,11 @@ import plotly.graph_objects as go
 from pyswarm import pso
 
 from tools.IO import points2txt, lines2obj, cache_meta
-from tools.fitting import createGrid, BoundingBox, cells2fullcells, plotDataPoints, fittingUsingPSOGA, \
-    costFunctionGirder, plotResultsGirder
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
     rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
 from tools import visual as vis, fitting_pso_rev
-from tools.utils import bounding_box_pso
 
 
 class Segment(object):
@@ -304,68 +301,3 @@ class Segment(object):
             self.points_2D = self.points_2D[np.random.choice(len(self.points_2D), points_after_sampling, replace=False)]
         self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D)
 
-    def fit_cs(self):
-        """
-        fit a H beam cross section to the segment using PSO
-        """
-        # Data Loading
-        data_points = self.points_2D
-
-        # Define the problem
-        model = {
-            'BoundingBox': BoundingBox(data_points),
-            'numInPoints': data_points.shape[0],
-            'numDim': data_points.shape[1],
-            'numParam': 6,
-            'points': None,
-            'numPoints': 0
-        }
-
-        # # Metaheuristic Parameters
-        # params = {
-        #     'MaxIt': 100,
-        #     'nPop': 75,
-        #     'pc': 0.9,
-        #     'pm': 0.1,
-        #     'range': 1.2,
-        #     'nOnlooker': 75,
-        #     'a': 0.8,
-        #     'pAccept': 0.35,
-        #     'alpha': 0.99,  # Last defined alpha takes precedence
-        #     'beta': 0.5,
-        #     'MaxSubIt': 5,
-        #     'T0': 0.1,
-        #     'nMove': 4,
-        #     'mu': 0.5,
-        #     'lowerBound': model['BoundingBox'][0] + [0.001, 0.001, 0.05, 0.05],
-        #     'upperBound': model['BoundingBox'][1] + [0.05, 0.05, 1, 1]
-        # }
-
-        # Sub-sampling Process
-        step = 0.005
-        cells = createGrid(data_points, step)
-        fullcells = cells2fullcells(cells)
-        sub_sampled_points = np.full((len(fullcells), 2), np.nan)
-
-        for i, cell in enumerate(fullcells):
-            points_id = cell['pointsId']
-            cell_points = data_points[points_id, :]
-            sub_sampled_points[i, :] = np.mean(cell_points, axis=0)
-
-        model['points'] = sub_sampled_points
-        model['numPoints'] = sub_sampled_points.shape[0]
-
-        # Plot Initial Data Points
-        plotDataPoints(data_points)
-
-        # Run Metaheuristic Algorithm
-        res = []
-        num_test = 10
-        for i in range(num_test):
-            best_sol, diag = fittingUsingPSOGA(params, model, costFunctionGirder)
-            plotResultsGirder(best_sol, model)
-            res.append(diag)
-
-        final_diag = np.mean(res, axis=0)
-
-        a = 0

@@ -4,6 +4,9 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from pyswarm import pso
+from tqdm import tqdm
+
+from tools.fitting import innerdist2edge3
 
 
 def point_to_line_distance(point, v1, v2):
@@ -82,19 +85,21 @@ def param2vertices(solution):
     return vertices
 
 
-def cost_fct_activate(solution, data):
-    vertices = param2vertices(solution)
-    active_edges, dists = min_distance_to_polygon(data, vertices, active_edges=True)
-
-
 def cost_fct(solution, data):
     vertices = param2vertices(solution)
-    # start = time.time()
-    dists, e_active = min_distance_to_polygon(data, vertices, active_edges=True)
-    mae = np.mean(dists) + 0.1 * (12 - e_active)
-    print(mae)
 
-    return mae
+    # cs_plot(vertices, data)
+    calcd_error = innerdist2edge3(vertices, data)
+
+
+
+    # dists, e_active = min_distance_to_polygon(data, vertices, active_edges=True)
+    #
+    # mae = np.mean(dists) + 0.1 * (12 - e_active)
+    # print(mae)
+    print(calcd_error)
+
+    return calcd_error
 
 
 def fitting_fct(points_array_2D):
@@ -122,36 +127,26 @@ def fitting_fct(points_array_2D):
     rel_ext = 0.1
     x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
     y0_lims = [boundings[0][1] - rel_ext * bounding_ext_y, boundings[0][1] + rel_ext * bounding_ext_y]
-    tf_lims = [0.005, 0.05]
-    tw_lims = [0.005, 0.05]
+    tf_lims = [0.005, 0.02]
+    tw_lims = [0.005, 0.02]
     bf_lims = [0.1, bounding_ext_x]
     d_lims = [0.1, bounding_ext_y]
     lims = [x0_lims, y0_lims, tf_lims, tw_lims, bf_lims, d_lims]
-
-    # # sample random float numbers within the defined bounds
-    # x0_init = np.random.uniform(x0_lims[0], x0_lims[1])
-    # y0_init = np.random.uniform(y0_lims[0], y0_lims[1])
-    # tf_init = np.random.uniform(tf_lims[0], tf_lims[1])
-    # tw_init = np.random.uniform(tw_lims[0], tw_lims[1])
-    # bf_init = np.random.uniform(bf_lims[0], bf_lims[1])
-    # d_init = np.random.uniform(d_lims[0], d_lims[1])
-    #
-    # solution_init = [x0_init, y0_init, tf_init, tw_init, bf_init, d_init]
-    # cost_init = cost_fct(solution_init, points_array_2D)
 
     num_vertices = 6
     lower_bound = [lim[0] for lim in lims]
     upper_bound = [lim[1] for lim in lims]
 
-    swarm_size = 10
+    swarm_size = 1000
     max_iter = 10
 
-    # randomly take only 0.3 of the points
-    # idx = np.random.choice(points_array_2D.shape[0], int(points_array_2D.shape[0] * 0.3), replace=False)
-    # points_array_2D = points_array_2D[idx, :]
+    pbar = tqdm(total=max_iter, desc='fitting cs')
+    for iter in range(max_iter):
+
 
     xopt, fopt = pso(cost_fct, lower_bound, upper_bound, args=(points_array_2D,),
                      swarmsize=swarm_size, maxiter=max_iter)
+    print(time.time() - timee)
 
     optimal_vertices = param2vertices(xopt)
     cs_plot(optimal_vertices, points_array_2D)
@@ -161,3 +156,43 @@ def fitting_fct(points_array_2D):
     raise NotImplementedError
 
     a = 0
+
+
+def pso_with_progress(cost_func, lb, ub, args=(), swarmsize=100, maxiter=100, **kwargs):
+    S = swarmsize
+    D = len(lb)
+
+    x = np.random.rand(S, D)
+    x = lb + x * (ub - lb)
+    v = np.zeros_like(x)
+
+    p = np.zeros_like(x)
+    p[:] = x
+    fp = np.zeros(S)
+    fp[:] = np.inf
+
+    g = np.zeros(D)
+    fg = np.inf
+
+    pbar = tqdm(total=maxiter, desc="Optimization Progress")
+
+    for i in range(maxiter):
+        # Evaluate the cost function
+        for j in range(S):
+            f = cost_func(x[j], *args)
+            if f < fp[j]:
+                p[j] = x[j]
+                fp[j] = f
+            if f < fg:
+                g = x[j]
+                fg = f
+
+        # Update the velocities and positions
+        v = np.random.rand(S, D) * v + np.random.rand(S, D) * (p - x) + np.random.rand(S, D) * (g - x)
+        x += v
+
+        # Update the progress bar
+        pbar.update(1)
+
+    pbar.close()
+    return g, fg

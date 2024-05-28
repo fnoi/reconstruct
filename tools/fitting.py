@@ -120,9 +120,9 @@ def costFunctionGirder(sol, model):
 import numpy as np
 
 
-def innerdist2edge3(vertices, points, hor_ver_const):
-    num_edges = len(vertices)
-    num_points = len(points)
+def innerdist2edge3(vertices, points):
+    num_edges = vertices.shape[0]
+    num_points = points.shape[0]
     edge_pts = [[] for _ in range(num_edges)]
     penalty = 100
     activity_dist = np.zeros(num_edges)
