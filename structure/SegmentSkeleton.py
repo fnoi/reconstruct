@@ -1,6 +1,7 @@
 import itertools
 import copy
 import os
+import pickle
 
 import numpy as np
 
@@ -34,6 +35,10 @@ class Skeleton:
         self.joints_array = None
 
         self.config = config  # logic from dataframe revision
+
+    def cache(self, path):
+        with open(f'{path}/skeleton_cache.pickle', 'wb') as f:
+            pickle.dump(self, f)
 
     def add_cloud(self, cloud):
         self.bones.append(cloud)

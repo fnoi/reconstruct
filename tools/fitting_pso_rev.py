@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 from pyswarm import pso
 
-from tools.fitting import innerdist2edge3
+from tools.fitting import cost_fct_0
 
 
 def point_to_line_distance(point, v1, v2):
@@ -84,25 +84,7 @@ def param2vertices(solution):
     return vertices
 
 
-def cost_fct(solution, data):
-    vertices = param2vertices(solution)
-
-    # cs_plot(vertices, data)
-    calcd_error = innerdist2edge3(vertices, data)
-
-
-
-    # dists, e_active = min_distance_to_polygon(data, vertices, active_edges=True)
-    #
-    # mae = np.mean(dists) + 0.1 * (12 - e_active)
-    # print(mae)
-    # print(calcd_error)
-
-    return calcd_error
-
-
-def fitting_fct(points_array_2D):
-    # plot points in 2D
+def plot_2D_points_bbox(points_array_2D):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.scatter(points_array_2D[:, 0], points_array_2D[:, 1], s=0.05, color='grey', zorder=7)
@@ -122,6 +104,11 @@ def fitting_fct(points_array_2D):
     )
     plt.show()
 
+def fitting_fct(points_array_2D):
+    boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
+    bounding_ext_x = abs(boundings[1][0] - boundings[0][0])
+    bounding_ext_y = abs(boundings[1][1] - boundings[0][1])
+
     # initiate params and define bounds #TODO: consider to initiate from table values from the standard
     rel_ext = 0.1
     x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
@@ -140,15 +127,13 @@ def fitting_fct(points_array_2D):
     max_iter = 2
 
     timee = time.time()
-    xopt, fopt = pso(cost_fct, lower_bound, upper_bound, args=(points_array_2D,),
+    xopt, fopt = pso(cost_fct_0, lower_bound, upper_bound, args=(points_array_2D,),
                      swarmsize=swarm_size, maxiter=max_iter)
     print(time.time() - timee)
 
     optimal_vertices = param2vertices(xopt)
     cs_plot(optimal_vertices, points_array_2D)
 
-    print(xopt, fopt)
+    print(fopt)
 
-    # raise NotImplementedError
-    #
-    # a = 0
+    return xopt, optimal_vertices, fopt

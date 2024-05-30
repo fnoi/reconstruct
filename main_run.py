@@ -22,7 +22,7 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
 
     ##########
-    cache_flag = 4
+    cache_flag = 4.1
     ##########
 
     if cache_flag <= 1:
@@ -89,7 +89,7 @@ if __name__ == '__main__':
         raise ValueError('stop here')
 
     if cache_flag <= 4:
-        print('\n- project instance points to plane')  # 1. ok, 2. help 3. easy
+        print('\n- project instance points to plane, initiate skeleton')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
@@ -99,23 +99,20 @@ if __name__ == '__main__':
         print('\n- fit cs')
         with open(f'{config.project.parking_path}/cache.pickle', 'rb') as f:
             data = pd.read_pickle(f)
-        a = 0
+        with open(f'{config.project.parking_path}/skeleton_cache.pickle', 'rb') as f:
+            skeleton = pd.read_pickle(f)
 
         for beam in data:
             print(f'fitting {beam[0]}')
             segment = beam[1]
             name = beam[0]
-            # write 2d points to txt
-            # np.savetxt(f'/Users/fnoic/Downloads/beam_export_projection_{name}.txt', segment.points_2D, delimiter=' ', fmt='%f')
             segment.fit_cs_rev()
-
-
-
-        a = 0
+        skeleton.cache(config.project.parking_path)
+        raise ValueError('stop here')
 
 
     if cache_flag <= 5:
-        print('\n- define initial skeleton and refine aggregation')  # baseline exists but omg
+        print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
 
     if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)

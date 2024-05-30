@@ -1,55 +1,11 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
+from tools.fitting_pso_rev import param2vertices
+
+
 def innerdist2edge3(vertices, points):
-    num_edges = vertices.shape[0]
-    num_points = points.shape[0]
-    edge_pts = [[] for _ in range(num_edges)]
-    penalty = 100
-    activity_dist = np.zeros(num_edges)
-    edge_dist = np.zeros(num_edges)
 
-    for i, point in enumerate(points):
-        best_dist = np.inf
-        edge_flag = False
-        best_index = -1
-
-        for j in range(num_edges):
-            verts_id = edge2vert(j, num_edges)
-            v1_id, v2_id = verts_id[0], verts_id[1]
-            v1, v2 = vertices[v1_id], vertices[v2_id]
-            dist, index = my_dist2edge(v1, v2, point)
-
-            if dist < best_dist:
-                best_dist = dist
-                if index == 0:
-                    best_index = v1_id
-                elif index == 1:
-                    best_index = v2_id
-                else:
-                    best_index = j
-                    edge_flag = True
-
-        if edge_flag:
-            edge_dist[best_index] += best_dist
-            edge_pts[best_index].append(i)
-        else:
-            edges = vert2edge(best_index, num_edges)
-            edge_dist[edges[0]] += 0.7071 * best_dist
-            edge_dist[edges[1]] += 0.7071 * best_dist
-
-    # Activity and edge distance calculations
-    edge_points = np.zeros(num_edges)
-    for j in range(num_edges):
-        num_edge_points = edge_pts[j].count(j)
-        edge_points[j] = num_edge_points
-
-    # Weights and final calculation
-    weights = edge_points / num_points
-    edge_weights = 1 / (weights + 0.02)
-    final_edge_dist = edge_dist + activity_dist
-
-    z = np.mean(edge_weights * final_edge_dist)
     return z
 
 
@@ -246,3 +202,55 @@ def costFunctionGirder(sol, model):
     return RMSE
 
 
+def cost_fct_0(solution, data):
+    vertices = param2vertices(solution)
+    num_edges = vertices.shape[0]
+    num_points = data.shape[0]
+    edge_pts = [[] for _ in range(num_edges)]
+    penalty = 100
+    activity_dist = np.zeros(num_edges)
+    edge_dist = np.zeros(num_edges)
+
+    for i, point in enumerate(data):
+        best_dist = np.inf
+        edge_flag = False
+        best_index = -1
+
+        for j in range(num_edges):
+            verts_id = edge2vert(j, num_edges)
+            v1_id, v2_id = verts_id[0], verts_id[1]
+            v1, v2 = vertices[v1_id], vertices[v2_id]
+            dist, index = my_dist2edge(v1, v2, point)
+
+            if dist < best_dist:
+                best_dist = dist
+                if index == 0:
+                    best_index = v1_id
+                elif index == 1:
+                    best_index = v2_id
+                else:
+                    best_index = j
+                    edge_flag = True
+
+        if edge_flag:
+            edge_dist[best_index] += best_dist
+            edge_pts[best_index].append(i)
+        else:
+            edges = vert2edge(best_index, num_edges)
+            edge_dist[edges[0]] += 0.7071 * best_dist
+            edge_dist[edges[1]] += 0.7071 * best_dist
+
+    # Activity and edge distance calculations
+    edge_points = np.zeros(num_edges)
+    for j in range(num_edges):
+        num_edge_points = edge_pts[j].count(j)
+        edge_points[j] = num_edge_points
+
+    # Weights and final calculation
+    weights = edge_points / num_points
+    edge_weights = 1 / (weights + 0.02)
+    final_edge_dist = edge_dist + activity_dist
+
+    z = np.mean(edge_weights * final_edge_dist)
+
+    return z

@@ -52,8 +52,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
         # serialize cache using pickle
         with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
             pickle.dump(cache, f)
-
-        a = 0
+        skeleton.cache(config.project.parking_path)
 
         skeleton.potential = np.array([0, 0, 0])
         # counter = 0
