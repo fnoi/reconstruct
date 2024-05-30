@@ -221,10 +221,6 @@ def cost_fct_0(solution, data):
     return z
 
 
-def cost_fct_1(solution_params, data):
-    solution_verts = param2vertices(solution_params)
-
-
 def param2vertices(solution):
     x0, y0, tf, tw, bf, d = solution
 

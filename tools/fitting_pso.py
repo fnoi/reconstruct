@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from pyswarm import pso
 
 from tools.fitting_0 import cost_fct_0, param2vertices
+from tools.fitting_1 import cost_fct_1
 
 
 def point_to_line_distance(point, v1, v2):
@@ -106,7 +107,7 @@ def fitting_fct(points_array_2D):
     max_iter = 2
 
     timee = time.time()
-    xopt, fopt = pso(cost_fct_0, lower_bound, upper_bound, args=(points_array_2D,),
+    xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
                      swarmsize=swarm_size, maxiter=max_iter)
     print(time.time() - timee)
 
