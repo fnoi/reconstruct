@@ -297,28 +297,31 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 100
+        points_after_sampling = 200
         grid_resolution = 0.005
-        self.downsample_dbscan_grid(grid_resolution)
-        # self.downsample_points_2D_dbscan_rand(points_after_sampling)
+        # self.downsample_dbscan_grid(grid_resolution)
+        self.downsample_points_2D_dbscan_rand(points_after_sampling)
         self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D)
 
     def downsample_points_2D_dbscan_rand(self, points_after_sampling):
         init_count = self.points_2D.shape[0]
         points = self.points_2D
-        if points.shape[0] > points_after_sampling:
+        if points.shape[0] > points_after_sampling * 1.5:
             points = points[np.random.choice(points.shape[0], points_after_sampling, replace=False)]
 
-        eps = 0.02
+        eps = 0.05
         min_samples = int(0.05 * points_after_sampling)
         db = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
         labels = db.labels_
 
         core_samples_mask = np.zeros_like(labels, dtype=bool)
         core_samples_mask[db.core_sample_indices_] = True
-        unique_labels = set(labels)
 
         filtered_points = points[core_samples_mask]
+
+        if filtered_points.shape[0] < points_after_sampling:
+            filtered_points = filtered_points[np.random.choice(filtered_points.shape[0], points_after_sampling, replace=True)]
+
         self.points_2D = filtered_points
 
         print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')

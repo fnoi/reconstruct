@@ -122,7 +122,7 @@ def fitting_fct(points_array_2D):
     )
     plt.show()
 
-    # initiate params and define bounds
+    # initiate params and define bounds #TODO: consider to initiate from table values from the standard
     rel_ext = 0.1
     x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
     y0_lims = [boundings[0][1] - rel_ext * bounding_ext_y, boundings[0][1] + rel_ext * bounding_ext_y]
