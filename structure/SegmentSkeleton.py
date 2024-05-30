@@ -38,8 +38,8 @@ class Skeleton:
     def add_cloud(self, cloud):
         self.bones.append(cloud)
         with open(f'{self.path}/fresh_bone_{self.bone_count}.obj', 'w') as f:
-            f.write(f'v {cloud.line_raw_left[0]} {cloud.line_raw_left[1]} {cloud.line_raw_left[2]} \n'
-                    f'v {cloud.line_raw_right[0]} {cloud.line_raw_right[1]} {cloud.line_raw_right[2]} \n'
+            f.write(f'v {cloud.line_cog_left[0]} {cloud.line_cog_left[1]} {cloud.line_cog_left[2]} \n'
+                    f'v {cloud.line_cog_right[0]} {cloud.line_cog_right[1]} {cloud.line_cog_right[2]} \n'
                     f'l 1 2 \n')
         self.bone_count += 1
 

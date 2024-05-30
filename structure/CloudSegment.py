@@ -22,6 +22,10 @@ from tools import visual as vis, fitting_pso_rev
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.line_cog_center = None
+        self.line_cog_right = None
+        self.line_cog_left = None
+        self.cog_2D = None
         self.h_beam_params = None
         self.points_2D = None
         self.points_data = None
@@ -88,6 +92,7 @@ class Segment(object):
             config=self.config,
             step="skeleton"
         )
+
         points_on_line, closest_ind = project_points_to_line(points, origin, direction)
 
         ref_x = -100000
@@ -170,8 +175,32 @@ class Segment(object):
         vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=true_origin_2D,
                                   ransac_highlight=True, ransac_data=ransac_data)
 
-        # vis.segment_projection_3D(points, proj_lines)
-        # vis.segment_projection_3D(proj_points_plane, proj_lines)
+        vis.segment_projection_3D(points, proj_lines)
+        vis.segment_projection_3D(proj_points_plane, proj_lines)
+
+        dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
+        closest_ind = np.argmin(dists)
+        self.cog_2D = self.points_2D[closest_ind]
+        self.cog_3D = points[closest_ind]
+
+        origin = self.cog_3D
+        points_on_line, closest_ind = project_points_to_line(points, origin, direction)
+
+        ref_x = -100000
+        ref_t = (ref_x - origin[0]) / direction[0]
+        ref_pt = origin + ref_t * direction
+        vecs = points_on_line - ref_pt
+        dists = np.linalg.norm(vecs, axis=1)
+        l_ind = np.argmin(dists)
+        r_ind = np.argmax(dists)
+
+        # raw line data from points projected to segment direction vector
+        self.line_cog_left = points_on_line[l_ind]
+        self.line_cog_right = points_on_line[r_ind]
+        self.line_raw_dir = direction
+        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+
+
 
     def find_cylinder(self):
         cyl = pyrsc.Cylinder()
@@ -278,12 +307,6 @@ class Segment(object):
 
         return
 
-    def plot_flats(self):
-        """
-        plot the points in the xy plane in a scatter plot for each segment in subplot
-        """
-        a = 0
-
     def pc2obj(self, pc_type):
         if pc_type == 'initial':
             with open(f'{self.parent_path}/{self.name}_pca_{pc_type}.obj', 'w') as f:
@@ -299,11 +322,11 @@ class Segment(object):
     def fit_cs_rev(self):
         points_after_sampling = 200
         grid_resolution = 0.005
-        # self.downsample_dbscan_grid(grid_resolution)
-        self.downsample_points_2D_dbscan_rand(points_after_sampling)
-        self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D)
+        self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
+        # self.downsample_points_2D_dbscan_rand(points_after_sampling)
+        self.h_beam_params = fitting_pso_rev.fitting_fct(self.points_2D_fitting)
 
-    def downsample_points_2D_dbscan_rand(self, points_after_sampling):
+    def downsample_dbscan_rand(self, points_after_sampling):
         init_count = self.points_2D.shape[0]
         points = self.points_2D
         if points.shape[0] > points_after_sampling * 1.5:
@@ -319,16 +342,31 @@ class Segment(object):
 
         filtered_points = points[core_samples_mask]
 
-        if filtered_points.shape[0] < points_after_sampling:
+        if filtered_points.shape[0] > points_after_sampling:
             filtered_points = filtered_points[np.random.choice(filtered_points.shape[0], points_after_sampling, replace=True)]
 
-        self.points_2D = filtered_points
+        self.points_2D_fitting = filtered_points
 
         print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')
 
-    def downsample_dbscan_grid(self, resolution):
-        x = np.arange(self.points_2D[:, 0].min(), self.points_2D[:, 0].max(), resolution)
-        y = np.arange(self.points_2D[:, 1].min(), self.points_2D[:, 1].max(), resolution)
+    def downsample_dbscan_grid(self, resolution, points_after_sampling):
+        init_count = self.points_2D.shape[0]
+        points = self.points_2D
+        if points.shape[0] > points_after_sampling * 1.5:
+            points = points[np.random.choice(points.shape[0], points_after_sampling, replace=False)]
+
+        eps = 0.05
+        min_samples = int(0.05 * points_after_sampling)
+        db = DBSCAN(eps=eps, min_samples=min_samples).fit(points)
+        labels = db.labels_
+
+        core_samples_mask = np.zeros_like(labels, dtype=bool)
+        core_samples_mask[db.core_sample_indices_] = True
+
+        filtered_points = points[core_samples_mask]
+
+        x = np.arange(filtered_points[:, 0].min(), filtered_points[:, 0].max(), resolution)
+        y = np.arange(filtered_points[:, 1].min(), filtered_points[:, 1].max(), resolution)
         xx, yy = np.meshgrid(x, y)
         grid = np.array([xx.flatten(), yy.flatten()]).T
 
@@ -342,7 +380,14 @@ class Segment(object):
         for i, point in enumerate(grid):
             if grid_count[i] > 0:
                 grid_mean.append(np.mean(self.points_2D[np.all(np.isclose(self.points_2D, point, atol=resolution), axis=1)], axis=0))
-        self.points_2D = np.array(grid_mean)
+        filtered_points = np.array(grid_mean)
+
+        if filtered_points.shape[0] > points_after_sampling:
+            filtered_points = filtered_points[np.random.choice(filtered_points.shape[0], points_after_sampling, replace=True)]
+
+        self.points_2D_fitting = filtered_points
+
+        print(f'downsampling from {init_count} to {self.points_2D.shape[0]} points')
 
 
 

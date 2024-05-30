@@ -22,7 +22,7 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
 
     ##########
-    cache_flag = 4.1
+    cache_flag = 4
     ##########
 
     if cache_flag <= 1:
@@ -115,7 +115,7 @@ if __name__ == '__main__':
 
 
     if cache_flag <= 5:
-        print('\n- define initial skeleton and refine by semantics')  # baseline exists but omg
+        print('\n- define initial skeleton and refine aggregation')  # baseline exists but omg
 
     if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)

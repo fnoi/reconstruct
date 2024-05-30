@@ -38,16 +38,18 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
         for cache_entry in tqdm(cache, desc='instance orientation and point projection (axes)', total=len(cache)):
             segment = cache_entry[0]
             cloud = cache_entry[1]
-            if len(cloud.points) < config.skeleton.min_points:
+            if len(cloud.points) > config.skeleton.min_points:
+                cloud.calc_axes()
+                skeleton.add_cloud(cloud)
+                a = 0
+                # skeleton.add_cloud(cloud)
+                # skeleton.add_bone()
+            else:
                 cache_mask[cache.index(cache_entry)] = False
-                continue
-            cloud.calc_axes()
 
-            # cloud.fit_cs()
-            # cloud.lookup_cs()
 
         cache = list(itertools.compress(cache, cache_mask))
-        # serialize cache using pickel
+        # serialize cache using pickle
         with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
             pickle.dump(cache, f)
 
@@ -87,6 +89,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
             cache_meta(data={'rot_mat_pca': bone.rot_mat_pca, 'rot_mat_pcb': bone.rot_mat_pcb},
                        path=bone.outpath, topic='rotations')
 
+        return skeleton
 
     a = 0
 
@@ -153,7 +156,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
                 a = 0
 
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['beams'])  # beams
+                        types=['beams'])  # beams #TODO: what is this
 
 
 
