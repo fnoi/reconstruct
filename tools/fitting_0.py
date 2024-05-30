@@ -1,13 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
 
-from tools.fitting_pso_rev import param2vertices
-
-
-def innerdist2edge3(vertices, points):
-
-    return z
-
 
 # Placeholder definitions for required utility functions
 def edge2vert(edge, num_edges):
@@ -173,34 +166,6 @@ params = {
     'upperBound': [10, 10, 10]
 }
 
-# Define a dummy CostFunction
-def costFunctionGirder(sol, model):
-    points = model['points']
-    numPoints = model['numPoints']
-
-    # Extract solution parameters
-    x0, y0, tf, tw, lf, lw = sol
-
-    # Calculate vertices based on the solution
-    v1 = np.array([x0, y0])
-    v2 = np.array([x0 + lf, y0])
-    v3 = np.array([x0 + lf, y0 + tf])
-    v4 = np.array([x0 + lf - (lf-tw)/2, y0 + tf])
-    v5 = np.array([x0 + lf - (lf-tw)/2, y0 + tf + lw])
-    v6 = np.array([x0 + (lf-tw)/2, y0 + tf + lw])
-    v7 = np.array([x0 + (lf-tw)/2, y0 + 2*tf + lw])
-    v8 = np.array([x0, y0 + 2*tf + lw])
-    v9 = np.array([x0, y0 + tf + lw])
-    v10 = np.array([x0 + (lf-tw)/2, y0 + tf + lw])
-    v11 = np.array([x0 + (lf-tw)/2, y0 + tf])
-    v12 = np.array([x0, y0 + tf])
-
-    vertices = np.array([v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11, v12])
-
-    # Call a function to calculate the RMSE between the girder vertices and points
-    RMSE = innerdist2edge3(vertices, points)
-    return RMSE
-
 
 def cost_fct_0(solution, data):
     vertices = param2vertices(solution)
@@ -254,3 +219,28 @@ def cost_fct_0(solution, data):
     z = np.mean(edge_weights * final_edge_dist)
 
     return z
+
+
+def cost_fct_1(solution_params, data):
+    solution_verts = param2vertices(solution_params)
+
+
+def param2vertices(solution):
+    x0, y0, tf, tw, bf, d = solution
+
+    v0 = np.array([x0, y0])
+    v1 = v0 + np.array([0, tf])
+    v2 = v1 + np.array([(bf / 2 - tw / 2), 0])
+    v3 = v2 + np.array([0, (d - 2 * tf)])
+    v5 = v0 + np.array([0, d])
+    v4 = v5 - np.array([0, tf])
+    v6 = v5 + np.array([bf, 0])
+    v7 = v4 + np.array([bf, 0])
+    v8 = v3 + np.array([tw, 0])
+    v9 = v2 + np.array([tw, 0])
+    v11 = v0 + np.array([bf, 0])
+    v10 = v11 + np.array([0, tf])
+
+    vertices = np.array([v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11])
+
+    return vertices

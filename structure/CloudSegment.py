@@ -13,12 +13,12 @@ from pyswarm import pso
 from sklearn.cluster import DBSCAN
 
 from tools.IO import points2txt, lines2obj, cache_meta
-from tools.fitting_pso_rev import plot_2D_points_bbox
+from tools.fitting_pso import plot_2D_points_bbox
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
     rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
-from tools import visual as vis, fitting_pso_rev
+from tools import visual as vis, fitting_pso
 
 
 class Segment(object):
@@ -322,18 +322,18 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 500
+        points_after_sampling = 200
         grid_resolution = 0.005
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
         self.downsample_dbscan_rand(points_after_sampling)
         plot_2D_points_bbox(self.points_2D_fitting)
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso_rev.fitting_fct(self.points_2D_fitting)
+        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
 
     def downsample_dbscan_rand(self, points_after_sampling):
         init_count = self.points_2D.shape[0]
         points = self.points_2D
-        if points.shape[0] > points_after_sampling * 1.5:
+        if points.shape[0] > points_after_sampling * 3:
             points = points[np.random.choice(points.shape[0], points_after_sampling, replace=False)]
 
         eps = 0.05

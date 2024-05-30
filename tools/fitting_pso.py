@@ -1,56 +1,118 @@
+import time
+
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from matplotlib import pyplot as plt
+
 from pyswarm import pso
 
-def costFunctionGirder(sol, points):
-    # Assume simplified calculation just for demonstration
-    x0, y0, tf, tw, lf, lw = sol
-    vertices = np.array([
-        [x0, y0],
-        [x0 + lf, y0],
-        [x0 + lf, y0 + tf],
-        [x0, y0 + tf],
-        [x0, y0]  # Closing the loop for visualization
-    ])
-    RMSE = np.sqrt(np.mean((np.mean(vertices, axis=0) - points)**2))
-    return RMSE
+from tools.fitting_0 import cost_fct_0, param2vertices
 
-# Parameters and PSO setup
-lower_bounds = [1, 1, 0.1, 0.1, 1, 1]
-upper_bounds = [5, 5, 1, 1, 3, 3]
-points = np.array([[2, 2], [3, 3], [4, 4]])
 
-positions = []
-def objective_with_logging(x, *args):
-    positions.append(x.copy())
-    return costFunctionGirder(x, *args)
+def point_to_line_distance(point, v1, v2):
+    """Calculate the minimum distance from a point to a line segment defined by vertices v1 and v2."""
+    line_vec = np.array(v2) - np.array(v1)
+    point_vec = np.array(point) - np.array(v1)
+    line_len = np.linalg.norm(line_vec)
+    line_unitvec = line_vec / line_len
+    point_vec_scaled = point_vec / line_len
+    t = np.dot(line_unitvec, point_vec_scaled)
+    t = np.clip(t, 0, 1)
+    nearest = np.array(v1) + t * line_vec
+    dist = np.linalg.norm(nearest - np.array(point))
+    return dist
 
-xopt, fopt = pso(objective_with_logging, lower_bounds, upper_bounds, args=(points,), swarmsize=30, maxiter=50)
 
-# Animation setup
-fig, ax = plt.subplots()
-ax.set_xlim(0, 10)
-ax.set_ylim(0, 10)
-line, = ax.plot([], [], 'r-o')  # Ensure markers show
-scat = ax.scatter(points[:, 0], points[:, 1], color='blue')
+def min_distance_to_polygon(points, vertices, active_edges=False):
+    """Calculate the minimum distance from each point in 'points' to a polygon defined by 'vertices'.
+       Optionally return the number of polygon edges that are not the closest to any point."""
+    num_vertices = len(vertices)
+    num_points = len(points)
+    min_distances = np.inf * np.ones(num_points)
+    edge_closest_count = np.zeros(num_vertices, dtype=int)  # Array to count closest occurrences for each edge
 
-def init():
-    line.set_data([], [])
-    return line, scat,
+    for i in range(num_vertices):
+        v1 = vertices[i]
+        v2 = vertices[(i + 1) % num_vertices]  # Wrap around to connect the last vertex to the first
+        for j in range(num_points):
+            point = points[j, :2]  # Assuming points are in nx3, ignore the third dimension if present
+            dist = point_to_line_distance(point, v1, v2)
+            if dist < min_distances[j]:
+                min_distances[j] = dist
+                if active_edges:
+                    edge_closest_count[i] += 1  # Mark this edge as closest for this point
 
-def update(frame):
-    sol = positions[frame]
-    x0, y0, tf, tw, lf, lw = sol
-    vertices = np.array([
-        [x0, y0],
-        [x0 + lf, y0],
-        [x0 + lf, y0 + tf],
-        [x0, y0 + tf],
-        [x0, y0]  # Closing the loop for visualization
-    ])
-    line.set_data(vertices[:, 0], vertices[:, 1])
-    return line, scat,
+    if active_edges:
+        # Count how many edges were never the closest
+        inactive_edges_count = np.sum(edge_closest_count == 0)
+        return min_distances, inactive_edges_count
+    else:
+        return min_distances
 
-ani = FuncAnimation(fig, update, frames=len(positions), init_func=init, blit=True, repeat=False)
-ani.save('girder_animation.gif', writer='imagemagick', fps=5)
+
+def cs_plot(vertices=None, points=None):
+    # plot lines in 2D iterate 0 - 11 and 0
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    if vertices is not None:
+        for i in range(11):
+            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]])
+        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
+    if points is not None:
+        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+    ax.set_aspect('equal')
+    plt.show()
+
+
+def plot_2D_points_bbox(points_array_2D):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(points_array_2D[:, 0], points_array_2D[:, 1], s=0.05, color='grey', zorder=7)
+    ax.set_aspect('equal')
+
+    boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
+    bounding_ext_x = abs(boundings[1][0] - boundings[0][0])
+    bounding_ext_y = abs(boundings[1][1] - boundings[0][1])
+    # plot bounding box
+    ax.plot(
+        [boundings[0][0], boundings[1][0], boundings[1][0], boundings[0][0], boundings[0][0]],
+        [boundings[0][1], boundings[0][1], boundings[1][1], boundings[1][1], boundings[0][1]],
+        color='red',
+        alpha=0.25,
+        zorder=5,
+        linewidth=4
+    )
+    plt.show()
+
+def fitting_fct(points_array_2D):
+    boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
+    bounding_ext_x = abs(boundings[1][0] - boundings[0][0])
+    bounding_ext_y = abs(boundings[1][1] - boundings[0][1])
+
+    # initiate params and define bounds #TODO: consider to initiate from table values from the standard
+    rel_ext = 0.1
+    x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
+    y0_lims = [boundings[0][1] - rel_ext * bounding_ext_y, boundings[0][1] + rel_ext * bounding_ext_y]
+    tf_lims = [0.005, 0.02]
+    tw_lims = [0.005, 0.02]
+    bf_lims = [0.1, bounding_ext_x]
+    d_lims = [0.1, bounding_ext_y]
+    lims = [x0_lims, y0_lims, tf_lims, tw_lims, bf_lims, d_lims]
+
+    num_vertices = 6
+    lower_bound = [lim[0] for lim in lims]
+    upper_bound = [lim[1] for lim in lims]
+
+    swarm_size = 1000
+    max_iter = 2
+
+    timee = time.time()
+    xopt, fopt = pso(cost_fct_0, lower_bound, upper_bound, args=(points_array_2D,),
+                     swarmsize=swarm_size, maxiter=max_iter)
+    print(time.time() - timee)
+
+    optimal_vertices = param2vertices(xopt)
+    cs_plot(optimal_vertices, points_array_2D)
+
+    print(fopt)
+
+    return xopt, optimal_vertices, fopt
