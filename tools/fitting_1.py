@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 
-from tools.fitting_0 import param2vertices, my_dist2edge
+from tools.fitting_0 import params2verts, my_dist2edge
 
 
 def verts2edges(vertices):
@@ -15,12 +15,14 @@ def verts2edges(vertices):
 
 def dist_verts_edges(vertices, edges, data_points):
     # for each point calc all vert distances and all edge distances, pick the smallest, store the type
-    dist2verts = np.zeros((data_points.shape[0], vertices.shape[0]))
-    #TODO: pick up here
+    dist_verts = np.zeros((data_points.shape[0], vertices.shape[0]))
+    dist_edges = np.zeros((data_points.shape[0], edges.shape[0]))
+    type = np.zeros((data_points.shape[0], 2))  # 0 empty, non determined 1 v1 2 v2 3 edge
+
 
 
 def cost_fct_1(solution_params, data_points):
-    solution_verts = param2vertices(solution_params)
+    solution_verts = params2verts(solution_params)
     solution_edges = verts2edges(solution_verts)
 
     timer = time.time()

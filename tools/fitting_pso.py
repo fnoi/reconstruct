@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 from pyswarm import pso
 
-from tools.fitting_0 import cost_fct_0, param2vertices
+from tools.fitting_0 import cost_fct_0, params2verts
 from tools.fitting_1 import cost_fct_1
 
 
@@ -111,7 +111,7 @@ def fitting_fct(points_array_2D):
                      swarmsize=swarm_size, maxiter=max_iter)
     print(time.time() - timee)
 
-    optimal_vertices = param2vertices(xopt)
+    optimal_vertices = params2verts(xopt)
     cs_plot(optimal_vertices, points_array_2D)
 
     print(fopt)

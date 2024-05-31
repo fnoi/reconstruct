@@ -43,132 +43,8 @@ def my_dist2edge(v1, v2, point):
 
     return dist, index
 
-
-def plotResultsGirder(BestSol, model):
-    fontSize = 12
-
-    # Plot the points
-    plt.scatter(model['points'][:, 0], model['points'][:, 1], c='r',
-                s=100)  # marker size set to 20 (s=100 for size equivalency)
-    plt.axis('equal')
-    plt.grid(True)
-    plt.xlabel('X', fontsize=fontSize)
-    plt.ylabel('Y', fontsize=fontSize)
-    plt.gca().set_aspect('equal', adjustable='box')
-
-    # Extract the solution values
-    x0 = BestSol['Position'][0]
-    y0 = BestSol['Position'][1]
-    tf = BestSol['Position'][2]
-    tw = BestSol['Position'][3]
-    lf = BestSol['Position'][4]
-    lw = BestSol['Position'][5]
-
-    # Calculate vertices
-    vertices = np.array([
-        [x0, y0],
-        [x0 + lf, y0],
-        [x0 + lf, y0 + tf],
-        [x0 + lf - (lf - tw) / 2, y0 + tf],
-        [x0 + lf - (lf - tw) / 2, y0 + tf + lw],
-        [x0 + (lf - tw) / 2, y0 + tf + lw],
-        [x0 + (lf - tw) / 2, y0 + 2 * tf + lw],
-        [x0, y0 + 2 * tf + lw],
-        [x0, y0 + tf + lw],
-        [x0 + (lf - tw) / 2, y0 + tf + lw],
-        [x0 + (lf - tw) / 2, y0 + tf],
-        [x0, y0 + tf],
-        [x0, y0]
-    ])
-
-    # Plot the vertices representing the girder structure
-    plt.plot(vertices[:, 0], vertices[:, 1], 'k-o', markerfacecolor='b', linewidth=1.5)
-    plt.show()
-
-    # Capturing the plot as an image frame is not directly needed in matplotlib
-    # If you need to save or process the figure, you can do so by saving to a file or similar methods
-    # plt.savefig("output.png")  # Example: saving to a file
-
-
-import numpy as np
-
-# Placeholder for auxiliary functions (to be defined)
-def Crossover2(p1, p2, VarRange):
-    # Implement crossover logic here
-    return p1, p2
-
-def Mutate3(p, VarRange):
-    # Implement mutation logic here
-    return p
-
-def SortPopulation(pop):
-    # Sort pop based on the Cost
-    return sorted(pop, key=lambda x: x['Cost'])
-
-def fittingUsingPSOGA(params, points, CostFunction):
-    VarSize = [1, len(params['lowerBound'])]
-    VarMin = np.array(params['lowerBound'])
-    VarMax = np.array(params['upperBound'])
-    VelMax = (VarMax - VarMin) / 10
-    VelMin = -VelMax
-
-    # PSO-GA Parameters
-    MaxIt = params['MaxIt']
-    nPop = params['nPop']
-
-    # Constriction Coefficients
-    phi1, phi2 = 2.05, 2.05
-    phi = phi1 + phi2
-    chi = 2 / (phi - 2 + np.sqrt(phi**2 - 4 * phi))
-    w, c1, c2 = chi, phi1 * chi, phi2 * chi
-
-    # Crossover and Mutation
-    pCrossover = 0.9
-    nCrossover = int(round(pCrossover * nPop / 2) * 2)
-    pMutation = 0.3
-    nMutation = int(round(pMutation * nPop))
-
-    # Initialize Population
-    pop = [{'Position': np.random.uniform(VarMin, VarMax, VarSize),
-            'Velocity': np.zeros(VarSize),
-            'Cost': None,
-            'Best': {'Position': None, 'Cost': np.inf}} for _ in range(nPop)]
-
-    # Initialize Global Best
-    BestSol = {'Cost': np.inf}
-
-    # Evaluate Initial Population
-    for particle in pop:
-        particle['Cost'] = CostFunction(particle['Position'], points)
-        particle['Best']['Position'] = particle['Position']
-        particle['Best']['Cost'] = particle['Cost']
-        if particle['Best']['Cost'] < BestSol['Cost']:
-            BestSol = particle['Best']
-
-    # Main Loop
-    for it in range(MaxIt):
-        # GA and PSO operations would be performed here
-        # Placeholder for GA and PSO logic
-
-        # Store the best cost value
-        BestCost = [BestSol['Cost'] for _ in range(MaxIt)]
-
-        # Display iteration info
-        print(f"Iteration {it + 1}: Best Cost = {BestCost[it]}")
-
-    return BestSol, BestCost
-
-# Example usage of the function
-params = {
-    'MaxIt': 100,
-    'nPop': 50,
-    'lowerBound': [-10, -10, -10],
-    'upperBound': [10, 10, 10]
-}
-
-
 def cost_fct_0(solution, data):
-    vertices = param2vertices(solution)
+    vertices = params2verts(solution)
     num_edges = vertices.shape[0]
     num_points = data.shape[0]
     edge_pts = [[] for _ in range(num_edges)]
@@ -221,7 +97,7 @@ def cost_fct_0(solution, data):
     return z
 
 
-def param2vertices(solution):
+def params2verts(solution):
     x0, y0, tf, tw, bf, d = solution
 
     v0 = np.array([x0, y0])
