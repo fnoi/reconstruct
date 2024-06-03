@@ -5,8 +5,8 @@ from matplotlib import pyplot as plt
 
 from pyswarm import pso
 
-from tools.fitting_0 import cost_fct_0, params2verts
-from tools.fitting_1 import cost_fct_1
+from tools.fitting_0 import cost_fct_0
+from tools.fitting_1 import cost_fct_1, params2verts
 
 
 def point_to_line_distance(point, v1, v2):
@@ -103,8 +103,24 @@ def fitting_fct(points_array_2D):
     lower_bound = [lim[0] for lim in lims]
     upper_bound = [lim[1] for lim in lims]
 
-    swarm_size = 1000
-    max_iter = 2
+    swarm_size = 500
+    max_iter = 100
+
+    x0 = np.min(points_array_2D[:, 0])
+    y0 = np.min(points_array_2D[:, 1])
+    dummy_solution = np.array([x0, y0, 0.01, 0.01, 0.1, 0.1])
+    timer = time.time()
+    cost_0 = cost_fct_0(dummy_solution, points_array_2D)
+    elapsed_0 = time.time() - timer
+    print(f'elapsed time: {elapsed_0:.3f}')
+    timer = time.time()
+    cost_1 = cost_fct_1(dummy_solution, points_array_2D)
+    elapsed_1 = time.time() - timer
+    print(f'elapsed time: {elapsed_1:.3f}')
+    rel_improvement = 1 - elapsed_1 / elapsed_0
+    print(f'v1/v0: {elapsed_1/elapsed_0:.3f}; relative improvement: {rel_improvement:.3f}')
+
+
 
     timee = time.time()
     xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),

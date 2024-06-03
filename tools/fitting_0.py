@@ -1,5 +1,6 @@
 import numpy as np
-from matplotlib import pyplot as plt
+
+from tools.fitting_1 import params2verts
 
 
 # Placeholder definitions for required utility functions
@@ -97,22 +98,3 @@ def cost_fct_0(solution, data):
     return z
 
 
-def params2verts(solution):
-    x0, y0, tf, tw, bf, d = solution
-
-    v0 = np.array([x0, y0])
-    v1 = v0 + np.array([0, tf])
-    v2 = v1 + np.array([(bf / 2 - tw / 2), 0])
-    v3 = v2 + np.array([0, (d - 2 * tf)])
-    v5 = v0 + np.array([0, d])
-    v4 = v5 - np.array([0, tf])
-    v6 = v5 + np.array([bf, 0])
-    v7 = v4 + np.array([bf, 0])
-    v8 = v3 + np.array([tw, 0])
-    v9 = v2 + np.array([tw, 0])
-    v11 = v0 + np.array([bf, 0])
-    v10 = v11 + np.array([0, tf])
-
-    vertices = np.array([v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10, v11])
-
-    return vertices
