@@ -104,28 +104,28 @@ def fitting_fct(points_array_2D):
     upper_bound = [lim[1] for lim in lims]
 
     swarm_size = 500
-    max_iter = 100
+    max_iter = 10
 
-    x0 = np.min(points_array_2D[:, 0])
-    y0 = np.min(points_array_2D[:, 1])
-    dummy_solution = np.array([x0, y0, 0.01, 0.01, 0.1, 0.1])
-    timer = time.time()
-    cost_0 = cost_fct_0(dummy_solution, points_array_2D)
-    elapsed_0 = time.time() - timer
-    print(f'elapsed time: {elapsed_0:.3f}')
-    timer = time.time()
-    cost_1 = cost_fct_1(dummy_solution, points_array_2D)
-    elapsed_1 = time.time() - timer
-    print(f'elapsed time: {elapsed_1:.3f}')
-    rel_improvement = 1 - elapsed_1 / elapsed_0
-    print(f'v1/v0: {elapsed_1/elapsed_0:.3f}; relative improvement: {rel_improvement:.3f}')
+    # x0 = np.min(points_array_2D[:, 0])
+    # y0 = np.min(points_array_2D[:, 1])
+    # dummy_solution = np.array([x0, y0, 0.01, 0.01, 0.1, 0.1])
+    # timer = time.time()
+    # cost_0 = cost_fct_0(dummy_solution, points_array_2D)
+    # elapsed_0 = time.time() - timer
+    # print(f'elapsed time: {elapsed_0:.3f}')
+    # timer = time.time()
+    # cost_1 = cost_fct_1(dummy_solution, points_array_2D)
+    # elapsed_1 = time.time() - timer
+    # print(f'elapsed time: {elapsed_1:.3f}')
+    # rel_improvement = 1 - elapsed_1 / elapsed_0
+    # print(f'v1/v0: {elapsed_1/elapsed_0:.3f}; relative improvement: {rel_improvement:.3f}')
 
 
 
     timee = time.time()
     xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
                      swarmsize=swarm_size, maxiter=max_iter)
-    print(time.time() - timee)
+    print(f'pso time to complete {time.time() - timee:2f}')
 
     optimal_vertices = params2verts(xopt)
     cs_plot(optimal_vertices, points_array_2D)

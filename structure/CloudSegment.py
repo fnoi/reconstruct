@@ -322,7 +322,7 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 400  # big impact, consider to make it a parameter
+        points_after_sampling = 200  # big impact, consider to make it a parameter
         grid_resolution = 0.005
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
