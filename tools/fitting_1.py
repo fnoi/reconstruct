@@ -6,86 +6,83 @@ import numpy as np
 
 
 def cost_fct_1(solution_params, data_points):
+    # edge_penalty: penalty for inactive edges
     edge_penalty = 100
+    # solution_verts: vertices of the cs-polygon defined by the solution parameters
     solution_verts = params2verts(solution_params)
+    # solution_edges: edges of the cs-polygon defined by the solution parameters
     solution_edges = verts2edges(solution_verts)
 
-    dist_value = np.zeros((data_points.shape[0]))
-    # dist_type = np.zeros((data_points.shape[0]))
-
+    # edge_activation: number of points that are closest to each edge
     edge_activation = np.zeros((solution_edges.shape[0]))
-
-    edge_tracker = [[] for _ in range(solution_edges.shape[0])]
+    # edge_track_ids: list of point ids that are closest to each edge
+    edge_track_ids = [[] for _ in range(solution_edges.shape[0])]
+    # edge_track_dists: list of distances of points that are closest to each edge
+    edge_track_dists = [[] for _ in range(solution_edges.shape[0])]
+    # point_best: best distance to the polygon for each point   # remove to improve performance
+    point_best = np.zeros((data_points.shape[0]))
 
     for i, point in enumerate(data_points):
         dist_vert = np.linalg.norm(solution_verts - point, axis=1)
 
-        # v1v2: p2 - p1
+        # distance line to polygon: vertices, lines, ...
+        # https://stackoverflow.com/questions/10983872/distance-from-a-point-to-a-polygon
         v1v2 = solution_edges[:, 1] - solution_edges[:, 0]
         v1p = point - solution_edges[:, 0]
-
-        a = np.sum(v1v2 * v1p, axis=1)
-
-        b = np.linalg.norm(v1v2, axis=1) ** 2
-
-        t = a / b
-
+        t = np.sum(v1v2 * v1p, axis=1) / np.linalg.norm(v1v2, axis=1) ** 2
         t_valid = np.logical_and(0 <= t, t <= 1)
+
         dist_edge = np.linalg.norm(solution_edges[:, 0] + t[:, None] * v1v2 - point, axis=1)
         dist_edge_valid = copy.deepcopy(dist_edge)
         dist_edge_valid[~t_valid] = 1e5
-        # dist_edge[~t_valid] = 1e5
 
-        # find min dist in vert and edge
         min_dist_vert = np.min(dist_vert)
         min_dist_vert_id = np.argmin(dist_vert)
         min_dist_edge = np.min(dist_edge_valid)
         min_dist_edge_id = np.argmin(dist_edge_valid)
 
         if min_dist_edge < min_dist_vert:
-            dist_value[i] = min_dist_edge
-            # dist_type[i] = 3
             edge_activation[min_dist_edge_id] += 1
-            edge_tracker[min_dist_edge_id].append(i)
+            edge_track_ids[min_dist_edge_id].append(i)
+            edge_track_dists[min_dist_edge_id].append(min_dist_edge)
+            point_best[i] = min_dist_edge  # remove to improve performance
         else:
-            # dist_value[i] = min_dist_vert
-            # dist_type[i] = 1
-            # active_vert = np.argmin(dist_vert)
             active_edges = get_neighboring_edges_from_vert(min_dist_vert_id, solution_verts.shape[0])
-            # find the edge that is closer to the point
-
-
             edge_activation[np.asarray(active_edges)] += 1
-            edge_tracker[active_edges[0]].append(i)
-            edge_tracker[active_edges[1]].append(i)
+            # find edge distances for both edges, do not track ids!
+            edge_track_dists[active_edges[0]].append(dist_edge[active_edges[0]])
+            edge_track_dists[active_edges[1]].append(dist_edge[active_edges[1]])
+            point_best[i] = min_dist_vert  # remove to improve performance
 
-        plot_flag_single = False
-        if plot_flag_single:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            for edge in solution_edges:
-                ax.plot([edge[0][0], edge[1][0]], [edge[0][1], edge[1][1]])
-            ax.plot(point[0], point[1], 'ro')
-            plt.show()
-
-    plot_flag_all = False
+    plot_flag_all = True
     if plot_flag_all:
         fig = plt.figure()
         ax = fig.add_subplot(111)
         edge_colors = list(edge_activation / np.max(edge_activation))
-        # retrieve viridis color for each edge
-        edge_colors_viridis = plt.cm.spring(edge_colors)
+        edge_colors_viridis = plt.cm.viridis(edge_colors)
 
-        i = 0
-        for edge, edge_color in zip(solution_edges, edge_colors_viridis):
+        for i, (edge, edge_color) in enumerate(zip(solution_edges, edge_colors_viridis)):
             ax.plot([edge[0][0], edge[1][0]], [edge[0][1], edge[1][1]], c=edge_color)
-            # plot value as text next to line
             ax.text((edge[0][0] + edge[1][0]) / 2, (edge[0][1] + edge[1][1]) / 2, f'{int(edge_activation[i])}',
                     fontsize=10, color='black')
-            i += 1
-        ax.scatter(data_points[:, 0], data_points[:, 1], s=3, c=list(dist_value / np.max(dist_value)))
+        ax.scatter(data_points[:, 0], data_points[:, 1], s=3, c=list(point_best / np.max(point_best)))
         ax.set_aspect('equal')
         plt.show()
+
+    for i, edge in enumerate(solution_edges):
+        weight = 1 / (len(edge_track_ids[i]) / len(data_points) + 0.01)
+        if edge_activation[i] == 0:
+            neighbor_edges = (
+                (i - 1) % solution_edges.shape[0],
+                (i + 1) % solution_edges.shape[0]
+            )
+            neighbor_0 = edge_track_ids[neighbor_edges[0]]
+            neighbor_1 = edge_track_ids[neighbor_edges[1]]
+            neighbor_ids = np.unique(np.concatenate((neighbor_0, neighbor_1)))
+
+            # TODO: which point can be used to activate this edge: find point with minimum edge dist (modular edge dist calc function)
+
+
 
     for _i in range(3):
         for i, edge_count in enumerate(edge_activation):
