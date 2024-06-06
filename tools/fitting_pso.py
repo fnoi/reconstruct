@@ -130,6 +130,4 @@ def fitting_fct(points_array_2D):
     optimal_vertices = params2verts(xopt)
     cs_plot(optimal_vertices, points_array_2D)
 
-    print(fopt)
-
     return xopt, optimal_vertices, fopt

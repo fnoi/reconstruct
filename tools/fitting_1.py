@@ -71,6 +71,7 @@ def cost_fct_1(solution_params, data_points):
 
     cost = np.zeros_like(edge_activation)
     for i, edge in enumerate(solution_edges):
+        edge_length = np.linalg.norm(edge[0] - edge[1])
         if edge_activation[i] == 0:
             weight = 1
             neighbor_edges = (
@@ -80,7 +81,7 @@ def cost_fct_1(solution_params, data_points):
             neighbor_0 = edge_track_ids[neighbor_edges[0]]
             neighbor_1 = edge_track_ids[neighbor_edges[1]]
             if len(neighbor_0) == 0 and len(neighbor_1) == 0:  # cannot be activated by neighbors
-                cost[i] = edge_penalty
+                cost[i] = edge_penalty * edge_length
             else:  # activated by neighbor
                 neighbor_ids = np.unique(np.concatenate((neighbor_0, neighbor_1)))
 
@@ -90,10 +91,10 @@ def cost_fct_1(solution_params, data_points):
 
                 edge_to_points = np.linalg.norm(point_to_line - t[:, None] * line_dir, axis=1)
                 best_dist = np.min(edge_to_points)
-                cost[i] = weight * best_dist
+                cost[i] = weight * best_dist * edge_length
         else:
             weight = 1 / (len(edge_track_ids[i]) / len(data_points) + 0.01)
-            cost[i] = weight * np.mean(edge_track_dists[i])  # corresponds to MAE of edge
+            cost[i] = weight * np.sum(edge_track_dists[i]) * edge_length  # corresponds to MAE of edge
 
     return np.sum(cost)
 
