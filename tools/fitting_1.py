@@ -54,7 +54,7 @@ def cost_fct_1(solution_params, data_points):
             edge_track_dists[active_edges[1]].append(dist_edge[active_edges[1]])
             point_best[i] = min_dist_vert  # remove to improve performance
 
-    plot_flag_all = True
+    plot_flag_all = False
     if plot_flag_all:
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -69,68 +69,33 @@ def cost_fct_1(solution_params, data_points):
         ax.set_aspect('equal')
         plt.show()
 
+    cost = np.zeros_like(edge_activation)
     for i, edge in enumerate(solution_edges):
-        weight = 1 / (len(edge_track_ids[i]) / len(data_points) + 0.01)
         if edge_activation[i] == 0:
+            weight = 1
             neighbor_edges = (
                 (i - 1) % solution_edges.shape[0],
                 (i + 1) % solution_edges.shape[0]
             )
             neighbor_0 = edge_track_ids[neighbor_edges[0]]
             neighbor_1 = edge_track_ids[neighbor_edges[1]]
-            neighbor_ids = np.unique(np.concatenate((neighbor_0, neighbor_1)))
+            if len(neighbor_0) == 0 and len(neighbor_1) == 0:  # cannot be activated by neighbors
+                cost[i] = edge_penalty
+            else:  # activated by neighbor
+                neighbor_ids = np.unique(np.concatenate((neighbor_0, neighbor_1)))
 
-            # TODO: which point can be used to activate this edge: find point with minimum edge dist (modular edge dist calc function)
+                line_dir = edge[0] - edge[1]
+                point_to_line = data_points[neighbor_ids.astype(int), :] - edge[0]
+                t = np.dot(point_to_line, line_dir) / np.dot(line_dir, line_dir)
 
-
-
-    for _i in range(3):
-        for i, edge_count in enumerate(edge_activation):
-            if edge_count == 0:
-                neighboring_edges_ids = (
-                    (i - 1) % solution_edges.shape[0],
-                    (i + 1) % solution_edges.shape[0]
-                )
-                # neighbor_min_dist =
-                if edge_activation[neighboring_edges_ids[0]] > 0 or edge_activation[neighboring_edges_ids[1]] > 0:
-                    if edge_activation[neighboring_edges_ids[0]] > edge_activation[neighboring_edges_ids[1]]:
-                        # case 1: neighor edge 0 has more activation
-                        a = 1
-                    else:
-                        a = 0
-
-
-    for i, edge_count in enumerate(edge_activation):
-        if edge_count != 0:
-            weight = 1 / (edge_count / len(data_points) + 0.01)
-            a = 0
+                edge_to_points = np.linalg.norm(point_to_line - t[:, None] * line_dir, axis=1)
+                best_dist = np.min(edge_to_points)
+                cost[i] = weight * best_dist
         else:
-            weight = 1
-            neighboring_edge_ids = (
-                (i - 1) % solution_edges.shape[0],
-                (i + 1) % solution_edges.shape[0]
-            )
+            weight = 1 / (len(edge_track_ids[i]) / len(data_points) + 0.01)
+            cost[i] = weight * np.mean(edge_track_dists[i])  # corresponds to MAE of edge
 
-    for i, edge_count in enumerate(edge_activation):
-        if edge_count == 0:
-            weight = 1
-            neighboring_edge_ids = (
-                (i - 1) % solution_edges.shape[0],
-                (i + 1) % solution_edges.shape[0]
-            )
-
-            a = 0
-
-    a = 0
-
-    # normalize active edges
-    weights = active_edges / np.sum(active_edges)
-    # penalize inactive edges
-    penalty = np.sum(active_edges == 0) * edge_penalty
-
-    cost = np.sum(dists) + penalty
-
-    return cost
+    return np.sum(cost)
 
 
 def params2verts(solution):
