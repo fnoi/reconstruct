@@ -446,7 +446,7 @@ class Segment(object):
 
         return beams_frame
 
-    def replace(self, segment):
-        self.h_beam_params = segment.h_beam_params
-        self.h_beam_verts = segment.h_beam_verts
-        self.h_beam_fit_cost = segment.h_beam_fit_cost
+    # def replace(self, segment):
+    #     self.h_beam_params = segment.h_beam_params
+    #     self.h_beam_verts = segment.h_beam_verts
+    #     self.h_beam_fit_cost = segment.h_beam_fit_cost

@@ -119,7 +119,8 @@ if __name__ == '__main__':
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         for bone in skeleton.bones:
             bone = bone.cs_lookup()
-        a = 0
+        # fix oversegmentation (over-fix)
+
         print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
 
     if cache_flag <= 6:
