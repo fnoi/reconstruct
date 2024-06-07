@@ -22,7 +22,7 @@ if __name__ == '__main__':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
 
     ##########
-    cache_flag = 4.1
+    cache_flag = 5.0
     ##########
 
     if cache_flag <= 1:
@@ -102,16 +102,24 @@ if __name__ == '__main__':
         with open(f'{config.project.parking_path}/skeleton_cache.pickle', 'rb') as f:
             skeleton = pd.read_pickle(f)
 
+        segments = []
         for beam in data:
             print(f'fitting {beam[0]}')
             segment = beam[1]
             name = beam[0]
             segment.fit_cs_rev()
-        skeleton.cache(config.project.parking_path)
-        raise ValueError('stop here')
+            segments.append(segment)
+
+        for i, bone in enumerate(skeleton.bones):
+            bone.replace(segment)
+        skeleton.cache_pickle(config.project.parking_path)
 
 
     if cache_flag <= 5:
+        skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+        for bone in skeleton.bones:
+            bone = bone.cs_lookup()
+        a = 0
         print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
 
     if cache_flag <= 6:

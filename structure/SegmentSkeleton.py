@@ -4,6 +4,7 @@ import os
 import pickle
 
 import numpy as np
+import pandas as pd
 
 from tools.geometry import warped_vectors_intersection
 
@@ -36,7 +37,7 @@ class Skeleton:
 
         self.config = config  # logic from dataframe revision
 
-    def cache(self, path):
+    def cache_pickle(self, path):
         with open(f'{path}/skeleton_cache.pickle', 'wb') as f:
             pickle.dump(self, f)
 

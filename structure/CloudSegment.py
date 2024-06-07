@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 import open3d as o3d
+import pandas as pd
 import pyransac3d as pyrsc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -29,6 +30,7 @@ class Segment(object):
         self.line_cog_left = None
         self.cog_2D = None
         self.h_beam_params = None
+        self.h_beam_params_lookup = None
         self.points_2D = None
         self.points_data = None
         self.line_raw_center = None
@@ -322,8 +324,8 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 200  # big impact, consider to make it a parameter
-        grid_resolution = 0.005
+        points_after_sampling = 500  # big impact, consider to make it a parameter
+        grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
         self.downsample_dbscan_rand(points_after_sampling)
@@ -393,6 +395,58 @@ class Segment(object):
 
         print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')
 
+    def cs_lookup(self, path=None):
+        if path is None:
+            path = '/data/beams/aisc-shapes-database-v15.0.csv'
+            # combine current path with path
+            path = os.getcwd() + path
+        with open(path, 'r') as f:
+            beams = pd.read_csv(f, header=0, sep=';')
+            beams_frame = beams[['Type', 'AISC_Manual_Label', 'tw.1', 'tf.1', 'bf.1', 'd.1']]
+            # rename columns
+            beams_frame.columns = ['type', 'label', 'tw', 'tf', 'bf', 'd']
+            # replace all , with . for tw tf bf and d
+            beams_frame = beams_frame.replace(',', '.', regex=True)
+            # drop all rows with –
+            beams_frame = beams_frame.replace('–', np.nan, regex=True)
+            # convert to numeric in column tw
+            beams_frame[['tw', 'tf', 'bf', 'd']] = beams_frame[['tw', 'tf', 'bf', 'd']].apply(pd.to_numeric)
+            # beams_frame = beams_frame.apply(pd.to_numeric)
 
+        # find the closest beam
+        tw_fit = self.h_beam_params[2] * 1e3  # convert to mm
+        tf_fit = self.h_beam_params[3] * 1e3  # convert to mm
+        bf_fit = self.h_beam_params[4] * 1e3  # convert to mm
+        d_fit = self.h_beam_params[5] * 1e3  # convert to mm
 
+        # find best fit row in beams_frame with RMSE
+        beams_frame['RMSE'] = np.sqrt(
+            (beams_frame['tw'] - tw_fit) ** 2 +
+            (beams_frame['tf'] - tf_fit) ** 2 +
+            (beams_frame['bf'] - bf_fit) ** 2 +
+            (beams_frame['d'] - d_fit) ** 2)
+        beams_frame = beams_frame.sort_values(by='RMSE', ascending=True)
+        tw_lookup = beams_frame['tw'].iloc[0]
+        tf_lookup = beams_frame['tf'].iloc[0]
+        bf_lookup = beams_frame['bf'].iloc[0]
+        d_lookup = beams_frame['d'].iloc[0]
+        type_lookup = beams_frame['type'].iloc[0]
+        label_lookup = beams_frame['label'].iloc[0]
 
+        # wiggle x, y
+
+        self.h_beam_params_lookup = {
+            'type': type_lookup,
+            'label': label_lookup,
+            'tw': tw_lookup,
+            'tf': tf_lookup,
+            'bf': bf_lookup,
+            'd': d_lookup
+        }
+
+        return beams_frame
+
+    def replace(self, segment):
+        self.h_beam_params = segment.h_beam_params
+        self.h_beam_verts = segment.h_beam_verts
+        self.h_beam_fit_cost = segment.h_beam_fit_cost

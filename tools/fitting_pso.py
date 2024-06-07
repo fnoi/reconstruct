@@ -103,9 +103,6 @@ def fitting_fct(points_array_2D):
     lower_bound = [lim[0] for lim in lims]
     upper_bound = [lim[1] for lim in lims]
 
-    swarm_size = 500
-    max_iter = 10
-
     # x0 = np.min(points_array_2D[:, 0])
     # y0 = np.min(points_array_2D[:, 1])
     # dummy_solution = np.array([x0, y0, 0.01, 0.01, 0.1, 0.1])
@@ -120,11 +117,34 @@ def fitting_fct(points_array_2D):
     # rel_improvement = 1 - elapsed_1 / elapsed_0
     # print(f'v1/v0: {elapsed_1/elapsed_0:.3f}; relative improvement: {rel_improvement:.3f}')
 
+    swarm_size = 200
+    maxiter = 100
+
+    # omega =
+    phip = 2.05
+    phig = 2.05
+    # minstep =
+    # minfunc =
 
 
     timee = time.time()
-    xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
-                     swarmsize=swarm_size, maxiter=max_iter)
+
+    # ieqcons=[], f_ieqcons=None, args=(), kwargs={},
+    #         swarmsize=100, omega=0.5, phip=0.5, phig=0.5, maxiter=100,
+    #         minstep=1e-8, minfunc=1e-8, debug=False)
+
+    xopt, fopt = pso(func=cost_fct_1,
+                     lb=lower_bound,
+                     ub=upper_bound,
+                     args=(points_array_2D,),
+                     swarmsize=swarm_size,
+                     maxiter=maxiter,
+                     phip=phip,
+                     phig=phig,
+                     debug=True)
+
+    # xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
+    #                  swarmsize=swarm_size, maxiter=max_iter)
     print(f'pso time to complete {time.time() - timee:2f}')
 
     optimal_vertices = params2verts(xopt)
