@@ -15,7 +15,7 @@ from tools.utils import update_logbook_checklist
 from tools.test_plots import plot_test_in, plot_test_out
 
 
-def inst2skeleton(cloud_df, config, df_cloud_flag=False):
+def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
     # new approach has cloud with beams as dataframe. inject alternative from here
     skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out_rev/skeleton',
                         types=['beams'],
@@ -39,22 +39,25 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
             segment = cache_entry[0]
             cloud = cache_entry[1]
             if len(cloud.points) > config.skeleton.min_points:
-                cloud.calc_axes()
+                cloud.calc_axes(plot=plot)
                 skeleton.add_cloud(cloud)
-                a = 0
                 # skeleton.add_cloud(cloud)
                 # skeleton.add_bone()
             else:
                 cache_mask[cache.index(cache_entry)] = False
 
+        #TODO: reiterate cache necessity
+        #TODO: move skeleton processing part
+        # cache = list(itertools.compress(cache, cache_mask))
+        # # serialize cache using pickle
+        # with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
+        #     pickle.dump(cache, f)
+        # skeleton.cache(config.project.parking_path)
 
-        cache = list(itertools.compress(cache, cache_mask))
-        # serialize cache using pickle
-        with open(f'{config.project.parking_path}/cache.pickle', 'wb') as f:
-            pickle.dump(cache, f)
-        skeleton.cache(config.project.parking_path)
+        # skeleton.potential = np.array([0, 0, 0])
 
-        skeleton.potential = np.array([0, 0, 0])
+
+
         # counter = 0
         # while np.sum(skeleton.potential) < 3:  # testing is 1 !
         #     print(f'Iteration {counter + 1}')
@@ -67,9 +70,12 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
         #         break
 
         # skeleton.join_passing_new()
-        skeleton.join_passing()
-        skeleton.join_on_passing()
-        skeleton.trim_passing()
+
+
+        # TODO: move to skeleton class
+        # skeleton.join_passing()
+        # skeleton.join_on_passing()
+        # skeleton.trim_passing()
 
         # print('in 1')
         # skeleton.trim_passing()
@@ -78,15 +84,16 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
         # print('in 3')
         # skeleton.join_on_passing()
 
-        skeleton.to_obj(topic=f'store_beam')
-        for bone in skeleton.bones:
-            # bone.recompute_pca()
-            x_vec = np.array([1, 0, 0])
-
-            # here pcb_rot and pcc_rot needed?
-            bone.rot_mat_pca = rotation_matrix_from_vectors(bone.pca, x_vec)
-            cache_meta(data={'rot_mat_pca': bone.rot_mat_pca, 'rot_mat_pcb': bone.rot_mat_pcb},
-                       path=bone.outpath, topic='rotations')
+        #TODO: move to skeleton class
+        # skeleton.to_obj(topic=f'store_beam')
+        # for bone in skeleton.bones:
+        #     # bone.recompute_pca()
+        #     x_vec = np.array([1, 0, 0])
+        #
+        #     # here pcb_rot and pcc_rot needed?
+        #     bone.rot_mat_pca = rotation_matrix_from_vectors(bone.pca, x_vec)
+        #     cache_meta(data={'rot_mat_pca': bone.rot_mat_pca, 'rot_mat_pcb': bone.rot_mat_pcb},
+        #                path=bone.outpath, topic='rotations')
 
         return skeleton
 
@@ -154,8 +161,8 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False):
 
                 a = 0
 
-    skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
-                        types=['beams'])  # beams #TODO: what is this
+    # skeleton = Skeleton(path=f'{str(os.getcwd())}/data/out/0_skeleton',
+    #                     types=['beams'])  # beams #TODO: what is this
 
 
 

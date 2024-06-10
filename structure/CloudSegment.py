@@ -14,7 +14,8 @@ from pyswarm import pso
 from sklearn.cluster import DBSCAN
 
 from tools.IO import points2txt, lines2obj, cache_meta
-from tools.fitting_pso import plot_2D_points_bbox
+from tools.fitting_1 import params2verts
+from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
 from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
@@ -84,7 +85,7 @@ class Segment(object):
         self.points = data[:, :3]
         self.points_center = np.mean(self.points, axis=0)
 
-    def calc_axes(self):
+    def calc_axes(self, plot=True):
         """
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
@@ -176,11 +177,12 @@ class Segment(object):
         lines_plane_fix = [line_plane_2D_rot_0, line_plane_2D_rot_1]
 
         ransac_data = (inliers_0, inliers_1)
-        vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=true_origin_2D,
-                                  ransac_highlight=True, ransac_data=ransac_data)
+        if plot:
+            vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=true_origin_2D,
+                                      ransac_highlight=True, ransac_data=ransac_data)
 
-        vis.segment_projection_3D(points, proj_lines)
-        # vis.segment_projection_3D(proj_points_plane, proj_lines)
+            vis.segment_projection_3D(points, proj_lines)
+            # vis.segment_projection_3D(proj_points_plane, proj_lines)
 
         dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
         closest_ind = np.argmin(dists)
@@ -413,11 +415,14 @@ class Segment(object):
             beams_frame[['tw', 'tf', 'bf', 'd']] = beams_frame[['tw', 'tf', 'bf', 'd']].apply(pd.to_numeric)
             # beams_frame = beams_frame.apply(pd.to_numeric)
 
+        # divide the selected columns by 1000 to convert to mm
+        beams_frame[['tw', 'tf', 'bf', 'd']] = beams_frame[['tw', 'tf', 'bf', 'd']] / 1e3
+
         # find the closest beam
-        tw_fit = self.h_beam_params[2] * 1e3  # convert to mm
-        tf_fit = self.h_beam_params[3] * 1e3  # convert to mm
-        bf_fit = self.h_beam_params[4] * 1e3  # convert to mm
-        d_fit = self.h_beam_params[5] * 1e3  # convert to mm
+        tw_fit = self.h_beam_params[2]
+        tf_fit = self.h_beam_params[3]
+        bf_fit = self.h_beam_params[4]
+        d_fit = self.h_beam_params[5]
 
         # find best fit row in beams_frame with RMSE
         beams_frame['RMSE'] = np.sqrt(
@@ -433,9 +438,60 @@ class Segment(object):
         type_lookup = beams_frame['type'].iloc[0]
         label_lookup = beams_frame['label'].iloc[0]
 
-        # wiggle x, y
+        improve_xy = False
+        if improve_xy:
+            # optimize location / improve x0, y0 after param lookup
+            delta_xy = 0.01
+            range_x = np.linspace(self.h_beam_params[0] - delta_xy,
+                                  self.h_beam_params[0] + delta_xy,
+                                  10)
+            range_y = np.linspace(self.h_beam_params[1] - delta_xy,
+                                  self.h_beam_params[1] + delta_xy,
+                                  10)
+            range_x = np.append(range_x, self.h_beam_params[0])
+            range_y = np.append(range_y, self.h_beam_params[1])
+
+            # all combinations of x, y
+            xy_combinations = list(itertools.product(range_x, range_y))
+            err = np.zeros(len(xy_combinations))
+            for i, xy in enumerate(xy_combinations):
+                params = [xy[0], xy[1], tw_fit, tf_fit, bf_fit, d_fit]
+                err[i] = cost_fct_1(params, self.points_2D, debug_plot=False)
+
+            min_ind = np.argmin(err)
+            new_x = xy_combinations[min_ind][0]
+            new_y = xy_combinations[min_ind][1]
+
+            # x changed?
+            if new_x != self.h_beam_params[0]:
+                print(f'changed x from {self.h_beam_params[0]} to {new_x}')
+                self.h_beam_params[0] = new_x
+            else:
+                print(f'x unchanged at {self.h_beam_params[0]}')
+            # y changed?
+            if new_y != self.h_beam_params[1]:
+                print(f'changed y from {self.h_beam_params[1]} to {new_y}')
+                self.h_beam_params[1] = new_y
+            else:
+                print(f'y unchanged at {self.h_beam_params[1]}')
+
+            # plot cs with points
+            cs_plot(self.h_beam_verts, self.points_2D)
+            # plot new cs
+            self.h_beam_verts = params2verts(self.h_beam_params)
+            cs_plot(self.h_beam_verts, self.points_2D)
+
+        cog_2D_lookup = (
+            self.h_beam_params[0] + bf_lookup / 2,
+            self.h_beam_params[1] + d_lookup / 2
+        )
+
+        self.cog_2D = cog_2D_lookup
+        self.cog_3D = 0
 
         self.h_beam_params_lookup = {
+            'x0': self.h_beam_params[0],
+            'y0': self.h_beam_params[1],
             'type': type_lookup,
             'label': label_lookup,
             'tw': tw_lookup,
@@ -445,8 +501,3 @@ class Segment(object):
         }
 
         return beams_frame
-
-    # def replace(self, segment):
-    #     self.h_beam_params = segment.h_beam_params
-    #     self.h_beam_verts = segment.h_beam_verts
-    #     self.h_beam_fit_cost = segment.h_beam_fit_cost

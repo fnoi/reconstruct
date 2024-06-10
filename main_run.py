@@ -89,37 +89,25 @@ if __name__ == '__main__':
         raise ValueError('stop here')
 
     if cache_flag <= 4:
-        print('\n- project instance points to plane, initiate skeleton')
+        print('\n- project instance points to plane, initiate skeleton, fit cs')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
-        del f
-        skeleton = inst2skeleton(cloud, config, df_cloud_flag=True)
+        skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=True)
 
-    if cache_flag <= 4.5:
-        print('\n- fit cs')
-        with open(f'{config.project.parking_path}/cache.pickle', 'rb') as f:
-            data = pd.read_pickle(f)
-        with open(f'{config.project.parking_path}/skeleton_cache.pickle', 'rb') as f:
-            skeleton = pd.read_pickle(f)
-
-        segments = []
-        for beam in data:
-            print(f'fitting {beam[0]}')
-            segment = beam[1]
-            name = beam[0]
-            segment.fit_cs_rev()
-            segments.append(segment)
-
-        for i, bone in enumerate(skeleton.bones):
-            bone.replace(segment)
+        # process bones directly
+        for bone in skeleton.bones:
+            bone.fit_cs_rev()
+            print(bone.h_beam_params)
         skeleton.cache_pickle(config.project.parking_path)
-
 
     if cache_flag <= 5:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+
+        plot = plt.figure()
         for bone in skeleton.bones:
             bone = bone.cs_lookup()
-        # fix oversegmentation (over-fix)
+            plt.plot(bone)
+        # fix over-segmentation (over-fix)
 
         print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
 

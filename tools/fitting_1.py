@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def cost_fct_1(solution_params, data_points):
+def cost_fct_1(solution_params, data_points, debug_plot=False):
     # edge_penalty: penalty for inactive edges
     edge_penalty = 100
     # solution_verts: vertices of the cs-polygon defined by the solution parameters
@@ -54,7 +54,7 @@ def cost_fct_1(solution_params, data_points):
             edge_track_dists[active_edges[1]].append(dist_edge[active_edges[1]])
             point_best[i] = min_dist_vert  # remove to improve performance
 
-    plot_flag_all = False
+    plot_flag_all = debug_plot
     if plot_flag_all:
         fig = plt.figure()
         ax = fig.add_subplot(111)
