@@ -128,7 +128,7 @@ if __name__ == '__main__':
         #             else:
         #                 dict[inst_l0] = [lr]
 
-    path_hack = f'C:/Users/ga25mal/PyCharmProjects/reconstruct/data/out_pipe/sweep_pipe.txt'
+    path_hack = f'D:/Uni/hiwi/reconstruct/data/out_pipe/sweep_pipe.txt'
 
     piperuns = []
     with open(path_hack, 'r') as f:
@@ -225,5 +225,21 @@ if __name__ == '__main__':
         App.getDocument(filename).ActiveObject.Transition = u"Round corner"
 
 
+    olddoc=FreeCAD.ActiveDocument
+    App = FreeCAD
+    filename = 'ifc_pips'
+    App.newDocument(filename)
+    fcdoc = App.getDocument(filename)
+
+    for obj in olddoc.Objects:
+        if obj.TypeId=='Part::Sweep':
+            placement=obj.Placement
+            crosssection=fcdoc.copyObject(obj.Sections[0], True)
+            line=fcdoc.copyObject(obj.Spine[0],True)
+            pipe = Arch.makePipe(crosssection)
+            Draft.autogroup(pipe)
+            pipe = Arch.makePipe(line)
+            Draft.autogroup(pipe)
+            pipe.Diameter=radius*2
 
     print('PyCharm says hi and congrats for running the whole macro without errors!')

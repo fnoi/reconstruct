@@ -1,0 +1,364 @@
+import os
+import stat
+import pickle
+import json
+
+import numpy as np
+import math
+from sys import platform
+
+import Part
+import Mesh
+import Draft
+import Arch
+import BOPTools
+
+import importOBJ
+
+
+
+
+def quaternion_rotation(v, ax=np.array([1.0, 0.0, 0.0])):
+    v = v / norm(v)  # Normalize the vector
+
+    if v[0] == 1.0:  # Vector is already aligned with x-axis
+        q = np.array([1.0, 0.0, 0.0, 0.0])
+    else:
+        axis = np.cross(v, ax)  # Calculate rotation axis
+        angle = np.arccos(np.dot(v, ax))  # Calculate rotation angle
+        q = np.array([np.cos(angle/2), axis[0]*np.sin(angle/2), axis[1]*np.sin(angle/2), axis[2]*np.sin(angle/2)])  # Convert axis-angle representation to quaternion
+
+    return q
+
+
+
+if __name__ == '__main__':
+
+    App = FreeCAD
+    filename_export = 'ifc_beams'
+    App.newDocument(filename_export)
+    fcdocexport = App.getDocument(filename_export)
+    fcdocexport.addObject('PartDesign::Body', 'Body')
+    #read filepath for reconstrution
+    config=os.getenv('APPDATA')+f'/FreeCad/config.json'
+    with open(config, 'r') as f:
+        path = json.load(f)
+
+    path=path['File Path']
+    # read json -> get range of bones
+    #ToDo: Change path to path of input 
+    # 0 set up FreeCAD "file"
+    filename_beam = 'beam_skeleton'
+    App.newDocument(filename_beam)
+    fcdoc = App.getDocument(filename_beam)
+    body=fcdoc.addObject('PartDesign::Body', 'Body')
+
+    with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
+        raw_beam_data = json.load(f)['Beams']
+        for iter in raw_beam_data:
+
+           #1 getting cornerpoints
+           polygon_corners=iter['ListofConers']
+           
+           # 2 create placement
+           pl = FreeCAD.Placement()
+           # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
+           pl.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
+           fcdoc.recompute()
+
+           #   3 sketch bone line
+           vector=np.asarray([iter["End"][i]-iter["Start"][i] for i in range(3)])
+           length=np.linalg.norm(vector)
+           points = [FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2]),
+                     FreeCAD.Vector(iter["End"][0],iter["End"][1],iter["End"][2])]
+           line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+           Draft.autogroup(line)
+           fcdoc.recompute()
+
+           #  4 calc rotation matrix for inclined plane
+           a = np.array([0, 0, 1])
+           b = vector / np.linalg.norm(vector)
+           v = np.cross(a, b)
+           c = np.dot(a, b)
+           s = np.linalg.norm(v)
+           kmat = np.array([[0, -v[2], v[1]],
+                         [v[2], 0, -v[0]],
+                         [-v[1], v[0], 0]])
+           rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+           # rotmat from numpy to FreeCAD
+           rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
+                            rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
+                            rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
+                            0, 0, 0, 1)
+
+           pl.Rotation.Matrix = rotmat
+
+           
+           # 5 create an offset surface of yz with x coardinate of midpoint + Rotatet Plane
+ 
+           #create points for offset
+           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{iter['ID']}")
+           point.X=iter['Start'][0]
+           point.Y=iter['Start'][1]
+           point.Z=iter['Start'][2]
+
+           #create rotatet plane
+           datumplane=fcdoc.getObject('Body').newObject('PartDesign::Plane',f'DatumPlane{iter["ID"]}')
+           datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+           datumplane.MapReversed = False
+           datumplane.Support = [(point,f"Point{iter['ID']}")]
+           datumplane.MapPathParameter = 0.000000
+           datumplane.MapMode = 'Translate'
+           datumplane.Placement.Rotation.Matrix=rotmat
+           datumplane.recompute()
+           
+           # sketch crosssection
+           fcdoc.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{iter["ID"]}')
+           polygon = fcdoc.getObject(f'cross_section{iter["ID"]}')
+           polygon.Support = (fcdoc.getObject(f'DatumPlane{iter["ID"]}'), [''])
+           polygon.MapMode = 'FlatFace'
+           polygon_edges = []
+           for i in range(len(iter['ListofConers'])):
+               if i != len(iter['ListofConers'])-1:
+                   polygon_edges.append((i, i + 1))
+               else:
+                   polygon_edges.append((i, 0))
+
+           print(polygon_edges)
+           # probably here apply the rotation matrix
+           for edge in polygon_edges:
+               polygon.addGeometry(Part.LineSegment(
+               App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1],  iter['ListofConers'][edge[0]][2]),
+               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],iter['ListofConers'][edge[1]][2])),
+               False
+           )
+           polygon.Placement=pl
+           Draft.autogroup(polygon)
+           fcdoc.recompute()
+
+           #   6 sweep
+           fcdoc.addObject('Part::Sweep', f'beam{iter["ID"]}')
+           sweep = fcdoc.getObject(f'beam{iter["ID"]}')
+           sweep.Sections = polygon
+           sweep.Spine = line
+           sweep.Solid = True
+           sweep.Frenet = False
+           #sweep.Placement.Base = FreeCAD.Vector(iter["Start"][0],iter["Start"][1],iter["Start"][2])
+           fcdoc.recompute()
+           
+           
+            #	7 save beam into IFC Export list
+           # doesnt work
+           App.setActiveDocument(filename_export)
+           # create crosssection again 
+           point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{iter['ID']}")
+           point.X=iter['Start'][0]
+           point.Y=iter['Start'][1]
+           point.Z=iter['Start'][2]
+
+           #create rotatet plane
+           datumplane=FreeCAD.ActiveDocument.getObject('Body').newObject('PartDesign::Plane',f'DatumPlane{iter["ID"]}')
+           datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000),  App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+           datumplane.MapReversed = False
+           datumplane.Support = [(point,f"Point{iter['ID']}")]
+           datumplane.MapPathParameter = 0.000000
+           datumplane.MapMode = 'Translate'
+           datumplane.Placement.Rotation.Matrix=rotmat
+           datumplane.recompute()
+           
+           # sketch crosssection
+           FreeCAD.ActiveDocument.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{iter["ID"]}')
+           polygon = FreeCAD.ActiveDocument.getObject(f'cross_section{iter["ID"]}')
+           polygon.Support = (FreeCAD.ActiveDocument.getObject(f'DatumPlane{iter["ID"]}'), [''])
+           polygon.MapMode = 'FlatFace'
+           polygon_edges = []
+           for i in range(len(iter['ListofConers'])):
+               if i != len(iter['ListofConers'])-1:
+                   polygon_edges.append((i, i + 1))
+               else:
+                   polygon_edges.append((i, 0))
+
+           print(polygon_edges)
+           # probably here apply the rotation matrix
+           for edge in polygon_edges:
+               polygon.addGeometry(Part.LineSegment(
+               App.Vector(iter['ListofConers'][edge[0]][0], iter['ListofConers'][edge[0]][1],  iter['ListofConers'][edge[0]][2]),
+               App.Vector(iter['ListofConers'][edge[1]][0], iter['ListofConers'][edge[1]][1],iter['ListofConers'][edge[1]][2])),
+               False
+           )
+           polygon.Placement=pl
+           Draft.autogroup(polygon)
+           fcdoc.recompute()
+
+           beam = Arch.makeStructure(polygon,height=length)
+           beam.Profile="Crosssection"
+           # ifc strutre elements are extruded into the negative axis
+           # the beam is placed via the crosssection -> need to shift in the local placement -> the vector of the spine
+           beam.Placement.Base.x+=vector[0]
+           beam.Placement.Base.y+=vector[1]
+           beam.Placement.Base.z+=vector[2]
+
+           beam.IfcType='Beam'
+           Draft.autogroup(beam)
+           fcdocexport.recompute()
+           App.setActiveDocument(filename_beam)
+           fcdoc.recompute()
+           # i dont know why but this solves the problem that beams dont show up
+           fcdoc.removeObject(f'DatumPlane{iter["ID"]}')
+           fcdocexport.removeObject(f'DatumPlane{iter["ID"]}')
+           fcdoc.recompute()
+
+    # 8 Intersections 
+    # get the connections
+    with open(path+f'/data/Sample_Json/ConnectionsBeam_sample.json', 'r') as f:
+        raw_connection_data = json.load(f)['ConnectionBeam']
+        for iter in raw_connection_data:
+            for i in range(1,len(iter["Connections"])):
+                #go through each connection and modify the current one to all beams that are befor on the list
+                # here the same for the structure?
+                for m in range(i):
+                    #do the cutout and search the objects by Label because the inital name is fix and so i would yield the wrong object
+                    copy=fcdoc.copyObject(fcdoc.getObjectsByLabel(f"beam{iter['Connections'][m]}"))[0]
+                    cutout = BOPTools.JoinFeatures.makeCutout(name=f'cutout{iter["Connections"][i]}')
+                    oldbeam=fcdoc.getObjectsByLabel(f"beam{iter['Connections'][i]}")[0]
+                    cutout.Base = oldbeam
+                    cutout.Tool = copy
+                    cutout.Proxy.execute(cutout)
+                    cutout.purgeTouched()
+                    for obj in cutout.ViewObject.Proxy.claimChildren():
+                        obj.ViewObject.hide()
+                    # renaming the old beam and the cutout that the cutout is the new beam
+                    # FreeCad sets the name on creation and is not changeable -> need to tracke the change via Label 
+                    oldbeam.Label=oldbeam.Label+f"_v{m}"
+                    fcdoc.recompute()
+                    cutout.Label=f"beam{iter['Connections'][i]}"
+                    fcdoc.recompute()
+
+
+     # 9 export to obj
+    __objs__ = []
+    with open(path+f'/data/Sample_Json/beam_sample.json', 'r') as f:
+        raw_beam_data = json.load(f)['Beams']
+        for iter in raw_beam_data:
+            __objs__ = []
+            __objs__.append(fcdoc.getObjectsByLabel(f"beam{iter['ID']}")[0])
+            Mesh.export(__objs__, path+f'/data/out/0_skeleton/beam_bone_{iter["ID"]}.obj')
+            del __objs__
+    
+    # 9 clean up
+    App.closeDocument(filename_beam)
+
+
+
+    # Pipe stuff
+
+    # get range from json file lenght pipes
+    filename_export = 'ifc_pipe'
+    App.newDocument(filename_export)
+    fcdocexport = App.getDocument(filename_export)
+    # 3 set up FreeCAD "file"
+    filename_pipe = 'pipe_skeleton'
+    App.newDocument(filename_pipe)
+    fcdoc = App.getDocument(filename_pipe)
+    fcdoc.addObject('PartDesign::Body', 'Body')
+    fcdoc.recompute()
+    with open(path+f'/data/Sample_Json/pipe_sample.json', 'r') as f:
+        raw_pipe_data = json.load(f)['Pipe']
+        for iter in raw_pipe_data:
+            radius = iter["Radius"]
+            #foreach pipe go throught segements
+            # 4 draw wire in Draft
+            pl = FreeCAD.Placement()
+            # pl.Rotation.Q = (0.0, 0.0, 0.0, 1.0)
+            points=[]
+            for piperun in iter["Segments"]:
+                points.append(FreeCAD.Vector(piperun["Start"][0], piperun["Start"][1], piperun["Start"][2]))
+                points.append(FreeCAD.Vector(piperun["End"][0], piperun["End"][1], piperun["End"][2]))
+            pl.Base = FreeCAD.Vector(points[0][0], points[0][1], points[0][2])
+            line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+            Draft.autogroup(line)
+            fcdoc.recompute()
+
+            # calculate rotation matrix to rotate z axis with vector
+            vector = np.array(points[1] - points[0])
+
+            a = np.array([0, 0, 1])
+            b = vector / np.linalg.norm(vector)
+            v = np.cross(a, b)
+            c = np.dot(a, b)
+            s = np.linalg.norm(v)
+            kmat = np.array([[0, -v[2], v[1]],
+                             [v[2], 0, -v[0]],
+                             [-v[1], v[0], 0]])
+            rotmat = np.eye(3) + kmat + kmat.dot(kmat) * ((1 - c) / (s ** 2))
+            # rotmat from numpy to FreeCAD
+            rotmat = App.Matrix(rotmat[0][0], rotmat[0][1], rotmat[0][2], 0,
+                                rotmat[1][0], rotmat[1][1], rotmat[1][2], 0,
+                                rotmat[2][0], rotmat[2][1], rotmat[2][2], 0,
+                                0, 0, 0, 1)
+
+            pl.Rotation.Matrix = rotmat
+
+
+            circle = Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
+            Draft.autogroup(circle)
+            fcdoc.recompute()
+            #
+            # 5 make pipe
+            sweep=App.getDocument(filename_pipe).addObject('Part::Sweep', f'pipe{iter["ID"]}')
+            sweep.Sections = [circle, ]
+            sweep.Spine = line
+            sweep.Solid = True
+            sweep.Frenet = False
+            sweep.Transition = u"Round corner"
+            fcdoc.recompute()
+            
+            # Export for IFC
+            App.setActiveDocument(filename_export)
+            placement=sweep.Placement
+            crosssection= Draft.makeCircle(radius=radius, placement=pl, face=True, support=None)
+            line_copy = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
+            Draft.autogroup(line_copy)
+            fcdoc.recompute()
+            pipe = Arch.makePipe(line_copy)
+            Draft.autogroup(pipe)
+            pipe.Diameter=radius*2
+            pipe = Arch.makePipe(crosssection)
+            Draft.autogroup(pipe)
+
+            fcdocexport.recompute()
+            App.setActiveDocument(filename_pipe)
+            fcdoc.recompute()
+
+    # import intersection pipes
+    with open(path+f'/data/Sample_Json/ConnectionsPipe_sample.json', 'r') as f:
+        raw_connection_data_data = json.load(f)['ConnectionPipe']
+        for iter in raw_connection_data_data:
+            fusion=fcdoc.addObject("Part::MultiFuse","Fusion")
+            tofus=[]
+            for m in iter["Connections"]:
+                tofus.append(fcdoc.getObject(f"pipe{m}"))
+            fcdoc.Fusion.Shapes = tofus
+            for m in tofus:
+                m.Visibility=False
+            fcdoc.recompute()
+    # 9 export to obj
+    j=0
+    # pipes get not named by id because intersection pipes gets fused to one
+    for obj in fcdoc.Objects:
+        __objs__ = []
+        if obj.TypeId=='Part::Sweep' or obj.TypeId=="Part::MultiFuse":
+            if obj.Visibility==True:
+                __objs__.append(obj)
+                Mesh.export(__objs__, path+f'/data/out/0_skeleton/pipe_{j}.obj')
+                j+=1
+                
+    del __objs__
+        
+    # 9 clean up
+    App.closeDocument(filename_pipe)
+
+
+    print('PyCharm says hi and congrats for running the whole macro without errors!')
+
+
