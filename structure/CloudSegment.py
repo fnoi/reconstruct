@@ -25,6 +25,7 @@ from tools import visual as vis, fitting_pso
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.angle_2D = None
         self.points_2D_fitting = None
         self.line_cog_center = None
         self.line_cog_right = None
@@ -91,7 +92,7 @@ class Segment(object):
         """
         points = self.points
         normals = self.points_data[['nx', 'ny', 'nz']].values
-        # find the two best planes and their
+        # find the two best planes and their line of intersection
         planes, direction, origin, inliers_0, inliers_1 = orientation_estimation(
             np.concatenate((points, normals), axis=1),
             config=self.config,
@@ -121,21 +122,21 @@ class Segment(object):
         proj_dir_0, proj_origin_0 = intersecting_line(proj_plane, planes[0])
         proj_dir_1, proj_origin_1 = intersecting_line(proj_plane, planes[1])
 
-        len = self.config.skeleton_visualization.line_length_projection
+        len_proj = self.config.skeleton_visualization.line_length_projection
         proj_dir_0 = np.array(
-            [[self.point[0] - (proj_dir_0[0] * len),
-              self.point[1] - (proj_dir_0[1] * len),
-              self.point[2] - (proj_dir_0[2] * len)],
-             [self.point[0] + (proj_dir_0[0] * len),
-              self.point[1] + (proj_dir_0[1] * len),
-              self.point[2] + (proj_dir_0[2] * len)]])
+            [[self.point[0] - (proj_dir_0[0] * len_proj),
+              self.point[1] - (proj_dir_0[1] * len_proj),
+              self.point[2] - (proj_dir_0[2] * len_proj)],
+             [self.point[0] + (proj_dir_0[0] * len_proj),
+              self.point[1] + (proj_dir_0[1] * len_proj),
+              self.point[2] + (proj_dir_0[2] * len_proj)]])
         proj_dir_1 = np.array(
-            [[self.point[0] - (proj_dir_1[0] * len),
-              self.point[1] - (proj_dir_1[1] * len),
-              self.point[2] - (proj_dir_1[2] * len)],
-             [self.point[0] + (proj_dir_1[0] * len),
-              self.point[1] + (proj_dir_1[1] * len),
-              self.point[2] + (proj_dir_1[2] * len)]])
+            [[self.point[0] - (proj_dir_1[0] * len_proj),
+              self.point[1] - (proj_dir_1[1] * len_proj),
+              self.point[2] - (proj_dir_1[2] * len_proj)],
+             [self.point[0] + (proj_dir_1[0] * len_proj),
+              self.point[1] + (proj_dir_1[1] * len_proj),
+              self.point[2] + (proj_dir_1[2] * len_proj)]])
         proj_lines = [proj_dir_0, proj_dir_1]
 
         proj_points_plane = points_to_actual_plane(points, self.line_raw_dir, self.line_raw_left)
@@ -144,7 +145,7 @@ class Segment(object):
         proj_points_flat, self.mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir)
         proj_origin_flat, _ = rotate_points_to_xy_plane(proj_origin_plane, self.line_raw_dir)
 
-        # move points to z=0, include this in rotation matrix
+        # move points to z=0 / xy-plane
         self.z_delta = proj_points_flat[0, 2]
         proj_points_flat[:, 2] = proj_points_flat[:, 2] - self.z_delta
         self.points_2D = proj_points_flat[:, :2]
@@ -167,6 +168,7 @@ class Segment(object):
         line_plane_2D_0 = line_plane_2D_0[:2]
         x_axis = np.array([1, 0])
         angle = np.arccos(np.dot(line_plane_2D_0, x_axis) / (np.linalg.norm(line_plane_2D_0) * np.linalg.norm(x_axis)))
+        self.angle_2D = angle
         # rotate points to align line with x-axis
 
         # vis.segment_projection_2D(proj_points_flat, proj_lines_flat)
@@ -206,6 +208,31 @@ class Segment(object):
         self.line_raw_dir = direction
         self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
+    def update_axes(self):
+        """bring back center of gravity cog (from lookup) to its correct position in the original coordinate system"""
+        cog_flat = rotate_points_2D(self.cog_2D, - self.angle_2D)
+
+        cog_lifted = np.array([cog_flat[0], cog_flat[1], self.z_delta])
+
+        cog_left_maybe = np.dot(cog_lifted, self.mat_rotation_xy)
+
+        projected, _ = project_points_to_line(
+            points=self.points,
+            point_on_line=cog_left_maybe,
+            direction=self.line_raw_dir
+        )
+
+        ref_x = -100000
+        ref_t = (ref_x - cog_left_maybe[0]) / self.line_raw_dir[0]
+        ref_pt = cog_left_maybe + ref_t * self.line_raw_dir
+        vecs = projected - ref_pt
+        dists = np.linalg.norm(vecs, axis=1)
+        l_ind = np.argmin(dists)
+        r_ind = np.argmax(dists)
+
+        self.line_cog_left = projected[l_ind]
+        self.line_cog_right = projected[r_ind]
+        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
 
     def find_cylinder(self):
@@ -326,7 +353,7 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 500  # big impact, consider to make it a parameter
+        points_after_sampling = 100  # big impact, consider to make it a parameter
         grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
@@ -500,4 +527,5 @@ class Segment(object):
             'd': d_lookup
         }
 
-        return beams_frame
+        return
+        # return beams_frame

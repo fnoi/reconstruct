@@ -100,6 +100,7 @@ def intersecting_line(plane1, plane2):
 
     return direction, origin
 
+
 def line_of_intersection(plane1, plane2):
     normal1 = plane1[:3]
     normal2 = plane2[:3]
@@ -349,11 +350,15 @@ def project_points_onto_plane(points, normal):
 
 
 def points_to_actual_plane(points, normal, point_on_plane):
-    # Normalize the normal vector
+    # normalize normal vector
     normal = normal / np.linalg.norm(normal)
 
-    # Calculate the projections
+    # calculate the projections
     projections = points - np.dot(points - point_on_plane, normal)[:, np.newaxis] * normal
+
+    # aggregate rotation matrix
+    R = rotation_matrix_from_vectors(normal, np.array([0, 0, 1]))
+
     return projections
 
 
@@ -368,6 +373,19 @@ def project_points_to_plane(points, plane_normal, point_on_plane):
 
 
 def project_points_to_line(points, point_on_line, direction):
+    """
+    Project points to a line defined by a point on the line and the direction of the line
+    Parameters
+    ----------
+    points: ndarray of shape (n, 3)
+        Points to project to the line
+    point_on_line: ndarray of shape (3,)
+        A point on the line
+    direction: ndarray of shape (3,)
+        Direction of the line
+    -------
+    """
+
     direction_normalized = direction / np.linalg.norm(direction)
     vec_to_points = points - point_on_line
     scalar_proj = np.dot(vec_to_points, direction_normalized)[:, np.newaxis] * direction_normalized
@@ -402,11 +420,11 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 def rotate_points_to_xy_plane(points, normal):
-    # Find the rotation matrix
+    # find rotation matrix
     rot_matrix = rotation_matrix_from_vectors(normal, np.array([0, 0, 1]))
-
-    # Rotate the points
+    # rotate points
     rotated_points = np.dot(points, rot_matrix.T)
+
     return rotated_points, rot_matrix
 
 
@@ -512,6 +530,7 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
     else:
         return orientation
 
+
 def orientation_2D(cloud):
     coords = copy.deepcopy(cloud.points_flat_raw)
     active_mask = np.ones(len(coords), dtype=bool)
@@ -540,6 +559,5 @@ def orientation_2D(cloud):
 
         if len(coords[active_mask]) < 0.1 * len(coords):
             break
-
 
     a = 0

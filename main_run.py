@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import open3d as o3d
+import plotly.graph_objects as go
+
 from omegaconf import OmegaConf
 
 import tools.utils
@@ -103,13 +105,41 @@ if __name__ == '__main__':
     if cache_flag <= 5:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
-        plot = plt.figure()
+        # create plotly fig
+        fig = go.Figure()
         for bone in skeleton.bones:
-            bone = bone.cs_lookup()
-            plt.plot(bone)
-        # fix over-segmentation (over-fix)
+            bone.cs_lookup()
+            bone.update_axes()
+
+            # plot line_cog_left, line_cog_right as lines
+            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
+                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
+                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
+                                       mode='lines',
+                                       line=dict(color='blue', width=3)))
+            # add line_cog_left, line_cog_right as scatter points
+            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
+                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
+                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
+                                       mode='markers',
+                                       marker=dict(color='magenta', size=5)))
+            # point cloud scatter
+            fig.add_trace(go.Scatter3d(x=bone.points[:, 0],
+                                       y=bone.points[:, 1],
+                                       z=bone.points[:, 2],
+                                       mode='markers',
+                                       marker=dict(color='grey', size=1)))
+
+        # perspective should be ortho
+        fig.layout.scene.camera.projection.type = "orthographic"
+        # show go figure
+        fig.show()
 
         print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
+        # over-aggregate
+        # cut by hierarchy (cs dims)
+        # join on passing
+        # join open ends (stronger dim stays in place? dim and point support?)
 
     if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)
