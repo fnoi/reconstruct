@@ -43,7 +43,7 @@ def plot_debug_fct(cloud_frame, gt_id, pr_id, gt_orientation, pr_orientation):
 
 if __name__ == '__main__':
     # load orientation ground truth
-    orientation_gt = OmegaConf.load('instance_orientation.yaml')
+    orientation_gt = OmegaConf.load('data/in_test/instance_orientation.yaml')
     # load orientation prediction
     with open('./data/in_test/dirs.pkl', 'rb') as f:
         orientation_pr = pickle.load(f)

@@ -226,7 +226,8 @@ def calculate_metrics(df_cloud, config):
 
 
 def supernormal_evaluation(cloud, config):
-    orientation_gt = load_angles('instance_orientation.yaml')
+    orientation_gt = load_angles(config.project.orientation_gt_path)
+    # orientation_gt = load_angles('instance_orientation.yaml')
     # iterate over rows in cloud
     cloud['supernormal_dev_gt'] = None
     for idx, row in cloud.iterrows():
@@ -263,7 +264,7 @@ def supernormal_evaluation(cloud, config):
 
 
 def normal_evaluation(cloud, config):
-    orientation_gt = load_angles('instance_orientation.yaml')
+    orientation_gt = load_angles(config.project.orientation_gt_path)
     # iterate over rows in cloud
     cloud['normal_dev_gt'] = None
     for idx, row in cloud.iterrows():

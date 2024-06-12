@@ -17,14 +17,16 @@ from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood
 from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_rev.yaml')
+    config = OmegaConf.load('config_full.yaml')
     if os.name == 'nt':
         config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
+        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.orientation_path}')
     else:  # os.name == 'posix':
         config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
+        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 5.0
+    cache_flag = 0
     ##########
 
     if cache_flag <= 1:
@@ -32,9 +34,10 @@ if __name__ == '__main__':
         with open(config.project.path, 'r') as f:
             # TODO: add option to load rgb here, currently XYZ, label only
             cloud = pd.read_csv(f, sep=' ', header=None).values
-            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'old_label', 'instance_gt'])
+            # cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'old_label', 'instance_gt'])
+            # cloud.drop(['old_label'], axis=1, inplace=True)
+            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
-            cloud.drop(['old_label'], axis=1, inplace=True)
         del f
 
         cloud_o3d = o3d.geometry.PointCloud()
@@ -132,6 +135,11 @@ if __name__ == '__main__':
 
         # perspective should be ortho
         fig.layout.scene.camera.projection.type = "orthographic"
+        # no background grid
+        fig.layout.scene.xaxis.visible = False
+        fig.layout.scene.yaxis.visible = False
+        fig.layout.scene.zaxis.visible = False
+
         # show go figure
         fig.show()
 

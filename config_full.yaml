@@ -6,8 +6,8 @@ project:
   parking_path: data/parking/
 
 segmentation:
-  cloud_path: /data/in_test/test_junction_snip_rev.txt
-  orientation_path: /data/in_test/instance_orientation.yaml
+  cloud_path: /data/in_full/full_30.txt
+  orientation_path: /data/in_full/orientation_list.yaml
   # path to raw cloud
   #  cloud_path: /data/in_instances/beams.txt
 

@@ -25,6 +25,7 @@ from tools import visual as vis, fitting_pso
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.cog_3D = None
         self.angle_2D = None
         self.points_2D_fitting = None
         self.line_cog_center = None
@@ -234,7 +235,6 @@ class Segment(object):
         self.line_cog_right = projected[r_ind]
         self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
-
     def find_cylinder(self):
         cyl = pyrsc.Cylinder()
         res = cyl.fit(self.points, 0.04, 1000)
@@ -353,7 +353,7 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 100  # big impact, consider to make it a parameter
+        points_after_sampling = 500  # big impact, consider to make it a parameter
         grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
