@@ -182,7 +182,7 @@ def calculate_precision_recall_iou(pred, gt, id_map, thresholds=None):
         pr_thresh[threshold]['mean_iou'] = np.mean(iou)
         pr_thresh[threshold]['mean_iou_weighted'] = np.sum(gt_weighted_iou)
 
-        report_flag = False
+        report_flag = True
         if report_flag:
             print(f"mAP   unweighted  @{threshold}: {pr_thresh[threshold]['mean_precision']:.4f}")
             print(f"mAP   weighted    @{threshold}: {pr_thresh[threshold]['mean_precision_weighted']:.4f}")

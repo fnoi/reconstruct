@@ -353,7 +353,7 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 500  # big impact, consider to make it a parameter
+        points_after_sampling = 50  # big impact, consider to make it a parameter
         grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
@@ -429,11 +429,15 @@ class Segment(object):
             path = '/data/beams/aisc-shapes-database-v15.0.csv'
             # combine current path with path
             path = os.getcwd() + path
-        with open(path, 'r') as f:
+        with open(path, 'r', newline='\n') as f:
             beams = pd.read_csv(f, header=0, sep=';')
-            beams_frame = beams[['Type', 'AISC_Manual_Label', 'tw.1', 'tf.1', 'bf.1', 'd.1']]
+            # retrieve name of first column
+            uno = beams.columns[0]
+            beams_frame = beams[[uno, 'AISC_Manual_Label', 'tw.1', 'tf.1', 'bf.1', 'd.1']]
             # rename columns
             beams_frame.columns = ['type', 'label', 'tw', 'tf', 'bf', 'd']
+            # remove all "â€“", replace with nan
+            beams_frame = beams_frame.replace('â€“', np.nan, regex=True)
             # replace all , with . for tw tf bf and d
             beams_frame = beams_frame.replace(',', '.', regex=True)
             # drop all rows with –

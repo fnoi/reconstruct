@@ -70,7 +70,11 @@ def region_growing(cloud, config):
         source_point_ids = [_ for _ in source_point_ids if _ not in seed_patch_point_ids_set]
 
         active_patch_ids.append(cloud.loc[cloud['id'] == seed_point_id, 'ransac_patch'].values[0])
-        source_patch_ids.remove(seed_patch_id)
+        print(seed_patch_id)
+        if seed_patch_id in source_patch_ids:
+            source_patch_ids.remove(seed_patch_id)
+        else:
+            break
 
         # active_patch_ids.append(cloud.loc[seed_point_id, 'ransac_patch'])
         # source_patch_ids.remove(cloud.loc[seed_point_id, 'ransac_patch'])

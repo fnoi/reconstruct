@@ -9,6 +9,8 @@ import plotly.graph_objects as go
 
 from omegaconf import OmegaConf
 
+from scipy.spatial import KDTree
+
 import tools.utils
 from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
@@ -17,7 +19,7 @@ from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood
 from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_full.yaml')
+    config = OmegaConf.load('config_rev.yaml')
     if os.name == 'nt':
         config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.orientation_path}')
@@ -26,7 +28,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 3.0
+    cache_flag = 5
     ##########
 
     if cache_flag <= 1:
@@ -34,9 +36,9 @@ if __name__ == '__main__':
         with open(config.project.path, 'r') as f:
             # TODO: add option to load rgb here, currently XYZ, label only
             cloud = pd.read_csv(f, sep=' ', header=None).values
-            # cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'old_label', 'instance_gt'])
-            # cloud.drop(['old_label'], axis=1, inplace=True)
-            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
+            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'old_label', 'instance_gt'])
+            cloud.drop(['old_label'], axis=1, inplace=True)
+            # cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
 
@@ -71,7 +73,8 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
 
-        cloud = calculate_supernormals_rev(cloud, config)
+        cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+        cloud = calculate_supernormals_rev(cloud, cloud_tree, config)
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=2)
 
@@ -91,7 +94,7 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt
         cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev.txt', sep=' ', index=False)
-        raise ValueError('stop here')
+        # raise ValueError('stop here')
 
     if cache_flag <= 4:
         print('\n- project instance points to plane, initiate skeleton, fit cs')
@@ -148,6 +151,8 @@ if __name__ == '__main__':
         # cut by hierarchy (cs dims)
         # join on passing
         # join open ends (stronger dim stays in place? dim and point support?)
+        skeleton.join_on_passing()
+
 
     if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)

@@ -71,8 +71,9 @@ def angular_deviation(vector, reference):
     return angle * 180 / np.pi
 
 
-def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=None, plot_flag=False):
-    neighbor_ids = neighborhood_search(cloud, seed_id, config)
+def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=None, plot_ind=None, plot_flag=False):
+    neighbor_ids = neighborhood_search(cloud_tree=cloud_tree, seed_id=seed_id, config=config, cloud=cloud)
+    # neighbor_ids = neighborhood_search(cloud, seed_id, config)
 
     if plot_flag and seed_id == plot_ind:
         neighborhood_plot(cloud, seed_id, neighbor_ids, config)
@@ -101,7 +102,7 @@ def neighborhood_calculations(cloud=None, seed_id=None, config=None, plot_ind=No
     return cloud
 
 
-def calculate_supernormals_rev(cloud=None, config=None):
+def calculate_supernormals_rev(cloud=None, cloud_tree=None, config=None):
     cloud['snx'] = None
     cloud['sny'] = None
     cloud['snz'] = None
@@ -116,7 +117,7 @@ def calculate_supernormals_rev(cloud=None, config=None):
 
     if config.local_features.neighbor_shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
         for seed_id in tqdm(point_ids, desc="computing supernormals, one step", total=len(point_ids)):
-                cloud = neighborhood_calculations(cloud=cloud, seed_id=seed_id, config=config,
+                cloud = neighborhood_calculations(cloud=cloud, cloud_tree=cloud_tree, seed_id=seed_id, config=config,
                                                   plot_ind=plot_ind, plot_flag=plot_flag)
         # no second step of computation needed
 
