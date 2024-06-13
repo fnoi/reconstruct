@@ -1,16 +1,24 @@
+import copy
+import time
+
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.spatial import KDTree
+from tqdm import tqdm
 
 from tools.local import neighborhood_search, angular_deviation, supernormal_svd
 
 
 def region_growing(cloud, config):
     """region growing algorithm for instance segmentation"""
+    # add column to cloud that stores integer ID
+    cloud['id'] = [i for i in range(len(cloud))]
+
     # actual annotation
     label_instance = 1
     cloud['instance_pr'] = 0  # unlabeled
     # source: unsegmented
-    source_point_ids = cloud.index.tolist()
+    source_point_ids = cloud['id'].tolist()
     source_patch_ids = cloud['ransac_patch'].unique().tolist()
     # active: now growing, assigned to current segment
     active_point_ids = []
@@ -19,7 +27,11 @@ def region_growing(cloud, config):
     sink_point_ids = []
     sink_patch_ids = []
 
+    pointcount = 0
+    patchcount = 0
     while True:
+        pointcount += 1
+        print(f'Pointcount: {pointcount}')
         if len(source_point_ids) <= config.region_growing.leftover_thresh:
             break
         # find seed point
@@ -28,44 +40,52 @@ def region_growing(cloud, config):
         source_cloud.sort_values(by='confidence', ascending=False, inplace=True)
         # seed point
         for i, row in source_cloud.iterrows():
-            patch = row['ransac_patch']
-            if patch == 0:
+            if row['ransac_patch'] == 0:
                 continue
             else:
-                seed_point_id = i
+                seed_point_id = row['id']
                 break
 
-        if seed_point_id == 1546:
-            break
-        seed_point_id = cloud.index[
-            (cloud['x'] == source_cloud.loc[seed_point_id, 'x']) &
-            (cloud['y'] == source_cloud.loc[seed_point_id, 'y']) &
-            (cloud['z'] == source_cloud.loc[seed_point_id, 'z'])
-        ].tolist()[0]
+        # if seed_point_id == 1546:
+        #     break
+        # seed_point_id = cloud['id'].iloc[seed_point_id
+        # seed_point_id = cloud.index[
+        #     (cloud['x'] == source_cloud.loc[seed_point_id, 'x']) &
+        #     (cloud['y'] == source_cloud.loc[seed_point_id, 'y']) &
+        #     (cloud['z'] == source_cloud.loc[seed_point_id, 'z'])
+        # ].tolist()[0]
 
-        seed_sn = cloud.loc[seed_point_id, ['snx', 'sny', 'snz']].values
-        seed_rn = cloud.loc[seed_point_id, ['rnx', 'rny', 'rnz']].values
+        # retrieve 'sn' and 'rn' values from the row where 'id' == seed_point_id
+        seed_sn = cloud.loc[cloud['id'] == seed_point_id, ['snx', 'sny', 'snz']].values
+        seed_rn = cloud.loc[cloud['id'] == seed_point_id, ['rnx', 'rny', 'rnz']].values
 
         # seed patch
-        seed_patch_id = cloud.loc[seed_point_id, 'ransac_patch']
-        seed_patch_point_ids = cloud.index[cloud['ransac_patch'] == seed_patch_id].tolist()
+        seed_patch_id = cloud.loc[cloud['id'] == seed_point_id, 'ransac_patch'].values[0]
+        # find 'id's of points in the seed patch
+        seed_patch_point_ids = cloud.loc[cloud['ransac_patch'] == seed_patch_id, 'id'].tolist()
 
         # inventory
         active_point_ids.extend(seed_patch_point_ids)
-        source_point_ids = [_ for _ in source_point_ids if _ not in seed_patch_point_ids]
+        seed_patch_point_ids_set = set(seed_patch_point_ids)
+        source_point_ids = [_ for _ in source_point_ids if _ not in seed_patch_point_ids_set]
 
-        active_patch_ids.append(cloud.loc[seed_point_id, 'ransac_patch'])
-        source_patch_ids.remove(cloud.loc[seed_point_id, 'ransac_patch'])
+        active_patch_ids.append(cloud.loc[cloud['id'] == seed_point_id, 'ransac_patch'].values[0])
+        source_patch_ids.remove(seed_patch_id)
+
+        # active_patch_ids.append(cloud.loc[seed_point_id, 'ransac_patch'])
+        # source_patch_ids.remove(cloud.loc[seed_point_id, 'ransac_patch'])
 
         cluster_blacklist = []
         growth_iter = 0
         len_log = 0
 
         while True:
+            patchcount += 1
+            print(f'Patchcount: {patchcount}')
             growth_iter += 1
-            candidate_point_ids = [_ for _ in active_point_ids
-                                   if _ not in sink_point_ids
-                                   and _ not in cluster_blacklist]
+            # candidate_point_ids = [_ for _ in active_point_ids
+            #                        if _ not in sink_point_ids
+            #                        and _ not in cluster_blacklist]
             active_limits = [np.min(cloud.loc[active_point_ids, 'x']),
                              np.max(cloud.loc[active_point_ids, 'x']),
                              np.min(cloud.loc[active_point_ids, 'y']),
@@ -76,7 +96,14 @@ def region_growing(cloud, config):
                 cloud=cloud, seed_id=None, config=config,
                 step='bbox_mask', cluster_lims=active_limits
             )
-            potential_cloud = cloud.loc[potential_neighbors]
+            potential_cloud = cloud.loc[cloud['id'].isin(potential_neighbors)]
+            # potential_cloud = cloud.loc[potential_neighbors]
+            # create a dictionary to track ids between the cloud representations
+            # and then use it to map the ids back to the original cloud
+            # use twice: 1. for seed_id to local_seed_id 2. for retrieved neighbor_ids to global cloud ids
+
+            a = 0
+            # map_dict_full_vs_potential = dict(zip(potential_cloud, potential_cloud[]
 
             # # scatter plot potential cloud
             # fig = plt.figure()
@@ -91,7 +118,9 @@ def region_growing(cloud, config):
             if smart_choices and growth_iter > 1:
                 # calculate supernormal based on cluster points
                 cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
+                print('in')
                 cluster_sn = supernormal_svd(cluster_normals)
+                print('out')
                 cluster_sn /= np.linalg.norm(cluster_sn)
                 # find the most confident % of cluster points per config
                 # cluster_confidences = cloud.loc[active_point_ids, 'confidence']
@@ -118,10 +147,13 @@ def region_growing(cloud, config):
                 cluster_sn = seed_sn
                 cluster_rn = seed_rn
 
-            for active_point in active_point_ids:
+            potential_cloud_tree = KDTree(potential_cloud[['x', 'y', 'z']].values)
+            # TODO: mitigate the problems arising from changing the cloud in the loop
+            #  fix output for sphere, ensure valid output for non-spherical!
+            for active_point in tqdm(active_point_ids, desc="debug for-loop active_point_ids", total=len(active_point_ids)):
                 actual_neighbors.extend(neighborhood_search(
-                    cloud=cloud, seed_id=active_point, config=config,
-                    step='patch growing', patch_sn=cluster_sn
+                    cloud=potential_cloud, seed_id=active_point, config=config,
+                    step='patch growing', patch_sn=cluster_sn, cluster_lims=active_limits
                 ))
             actual_neighbors = list(set(actual_neighbors))
             actual_neighbors = [_ for _ in actual_neighbors if _ not in active_point_ids]
@@ -142,12 +174,14 @@ def region_growing(cloud, config):
             # for each of those neighbors, if they belong to a patch, check if patch can be added
             for neighbor in actual_neighbors:
                 if (neighbor in visited_neighbors
-                        or cloud.loc[neighbor, 'ransac_patch'] in active_patch_ids
+                        or cloud[cloud['id'] == neighbor]['ransac_patch'].values[0] in active_patch_ids
+                        # or cloud.loc[neighbor, 'ransac_patch'] in active_patch_ids
                         or neighbor in sink_point_ids
                 ):
                     continue
                 else:
-                    neighbor_patch = cloud.loc[neighbor, 'ransac_patch']
+                    neighbor_patch = cloud[cloud['id'] == neighbor]['ransac_patch'].values[0]
+                    # neighbor_patch = cloud.loc[neighbor, 'ransac_patch']
                     if neighbor_patch == 0:
                         # check if neighbor point can be added
                         neighbor_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
@@ -158,8 +192,10 @@ def region_growing(cloud, config):
                             source_point_ids.remove(neighbor)
                     else:
                         # check if patch can be added
-                        neighbor_patch_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
-                        neighbor_patch_rn = cloud.loc[neighbor, ['rnx', 'rny', 'rnz']].values
+                        neighbor_patch_sn = cloud[cloud['id'] == neighbor][['snx', 'sny', 'snz']].values
+                        neighbor_patch_rn = cloud[cloud['id'] == neighbor][['rnx', 'rny', 'rnz']].values
+                        # neighbor_patch_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
+                        # neighbor_patch_rn = cloud.loc[neighbor, ['rnx', 'rny', 'rnz']].values
 
                         deviation_sn = angular_deviation(cluster_sn, neighbor_patch_sn) % 180
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
@@ -239,17 +275,29 @@ def region_growing(cloud, config):
                         if deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
                                 deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation:
                             active_patch_ids.append(neighbor_patch)
-                            active_point_ids.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
-                            visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
+                            active_point_ids.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
+                            visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
+
+                            # active_point_ids.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
+                            # visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
                             if neighbor_patch not in source_patch_ids:
-                                a = 0
+                                a = 0  ## ?
                             source_patch_ids.remove(neighbor_patch)
-                            source_point_ids = [
-                                _ for _ in source_point_ids
-                                if _ not in cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist()
-                            ]
+                            src = copy.deepcopy(source_point_ids)
+
+                            # speed up the removal of visited neighbors
+                            source_point_ids_array = np.array(source_point_ids)
+                            cloud_ids_array = np.array(cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'id'])
+
+                            indices_to_keep = np.where(~np.isin(source_point_ids_array, cloud_ids_array))
+
+                            source_point_ids_filtered = source_point_ids_array[indices_to_keep]
+
+                            source_point_ids = source_point_ids_filtered.tolist()
+
                         else:
-                            visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
+                            visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
+                            # visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
 
             if len_log == len(active_point_ids):
 

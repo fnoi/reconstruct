@@ -26,7 +26,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 0
+    cache_flag = 3.0
     ##########
 
     if cache_flag <= 1:

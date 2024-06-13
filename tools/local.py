@@ -8,13 +8,15 @@ from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from tqdm import tqdm
 from scipy.spatial import KDTree
+from scipy.linalg import svd
 from sklearn.cluster import DBSCAN
 
 from tools.utils import plot_patch
 
 
 def supernormal_svd(normals):
-    U, S, Vt = np.linalg.svd(normals)
+    U, S, Vt = svd(normals, full_matrices=False)
+    # U, S, Vt = np.linalg.svd(normals)
     return Vt[-1, :]
 
 
@@ -56,6 +58,9 @@ def angular_deviation(vector, reference):
 
     vector_normalized = vector / norm_vector
     reference_normalized = reference / norm_reference
+
+    vector_normalized = vector_normalized.flatten()
+    reference_normalized = reference_normalized.flatten()
 
     # compute dot product and clamp it to the valid range for arccos
     dot_product = np.dot(vector_normalized, reference_normalized)
@@ -510,21 +515,20 @@ def plot_patch_v3(cloud, num_colors=None):
     plt.show()
 
 
-def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None, patch_sn=None):
+def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None, cluster_lims=None, patch_sn=None):
 
     if step == 'bbox_mask':
         shape = "cube"
     elif step == 'patch growing':
         shape = config.region_growing.neighbor_shape
-        seed_data = cloud.iloc[seed_id]
+        seed_data = cloud.loc[cloud['id'] == seed_id]
+        # seed_data = cloud.iloc[seed_id]
     else:
         shape = config.local_features.neighbor_shape
         seed_data = cloud.iloc[seed_id]
     match shape:
         case "sphere":
-            cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
-            neighbor_ids = cloud_tree.query_ball_point([seed_data['x'], seed_data['y'], seed_data['z']],
-                                                       r=config.local_features.supernormal_radius)
+            neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config)
         case "cylinder":
             neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
         case "oriented_cuboid":
@@ -534,7 +538,7 @@ def neighborhood_search(cloud, seed_id, config, step=None, cluster_lims=None, pa
         case "cube":
             neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims)
         case "oriented_ellipsoid":
-            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step, patch_sn)
+            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step, patch_sn, seed_data)
         case "oriented_octahedron":
             neighbor_ids = neighbors_oriented_octahedron(cloud, seed_id, config)  # TODO: add this fct
         case _:
@@ -732,14 +736,14 @@ def find_orthonormal_basis(direction):
     y_axis /= np.linalg.norm(y_axis)
     z_axis = np.cross(direction, y_axis)
 
-    return np.column_stack((direction, y_axis, z_axis))
+    # return np.column_stack((direction, y_axis, z_axis))
+    return np.vstack((direction, y_axis, z_axis))
 
 
-def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None, patch_sn=None):
+def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None, patch_sn=None, seed_data=None):
     """
     find neighbors of seed_id in ellipsoid shape
     """
-    seed_data = cloud.iloc[seed_id]
     seed_coords = seed_data[['x', 'y', 'z']].values
     cloud_coords = cloud[['x', 'y', 'z']].values
 
@@ -769,7 +773,9 @@ def neighbors_oriented_ellipsoid(cloud, seed_id, config, step=None, patch_sn=Non
 
     neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
 
-    return neighbor_ids
+    neighbor_ids = cloud.iloc[neighbor_ids].index
+
+    return neighbor_ids.tolist()
 
 
 def neighbors_ellipsoid(cloud, seed_id, config):
@@ -804,6 +810,14 @@ def neighbors_oriented_cylinder(cloud, seed_id, config):
     seed_data = cloud.iloc[seed_id]
 
     return idx
+
+
+def neighbors_sphere(cloud_tree, seed_data, config):
+    idx = cloud_tree.query_ball_point([seed_data['x'], seed_data['y'], seed_data['z']],
+                                      r=config.local_features.supernormal_radius)
+
+    return idx
+
 
 
 def neighbors_oriented_cuboid(cloud, seed_id, config):
@@ -853,4 +867,7 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
     # remove seed_id from neighbor_ids
     neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
 
-    return neighbor_ids
+    # retrieve 'id' values from the indices
+    neighbor_ids = cloud.iloc[neighbor_ids].index
+
+    return neighbor_ids.tolist()
