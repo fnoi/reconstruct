@@ -17,7 +17,7 @@ local_features:
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
   supernormal_input: ransac
-  supernormal_radius: 0.15
+  supernormal_radius: 0.20
   neighbor_shape: sphere
   supernormal_cube_dist: 0.15
   supernormal_ellipsoid_a: 0.1

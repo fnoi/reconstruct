@@ -44,7 +44,8 @@ if __name__ == '__main__':
 
         cloud_o3d = o3d.geometry.PointCloud()
         cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
-        cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+        cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+            radius=config.local_features.normals_radius, max_nn=config.local_features.max_nn))
         normals = np.asarray(cloud_o3d.normals)
         normals = normals / np.linalg.norm(normals, axis=1)[:, None]
         cloud['nx'] = normals[:, 0]
@@ -82,6 +83,18 @@ if __name__ == '__main__':
         control_supernormals = True
         if control_supernormals:
             supernormal_evaluation(cloud, config)
+        o3d_cloud_0 = o3d.geometry.PointCloud()
+        o3d_cloud_0.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+        o3d_cloud_0.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
+        o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_normals_trial.ply', o3d_cloud_0)
+        # create o3d cloud
+        cloud_o3d = o3d.geometry.PointCloud()
+        cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+        cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['snx', 'sny', 'snz']].values)
+        # save to trial.ply in parking
+        o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
+        print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
+        raise ValueError('stop here')
 
     if cache_flag <= 3:
         print('\n- compute instance predictions through region growing, report metrics')

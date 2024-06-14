@@ -152,11 +152,9 @@ def region_growing(cloud, config):
                 cluster_rn = seed_rn
 
             potential_cloud_tree = KDTree(potential_cloud[['x', 'y', 'z']].values)  # unused if not sphere...
-            # TODO: mitigate the problems arising from changing the cloud in the loop
-            #  fix output for sphere, ensure valid output for non-spherical!
             for active_point in tqdm(active_point_ids, desc="debug for-loop active_point_ids", total=len(active_point_ids)):
                 actual_neighbors.extend(neighborhood_search(
-                    cloud=potential_cloud, seed_id=active_point, config=config,
+                    cloud=potential_cloud, seed_id=active_point, config=config, cloud_tree=potential_cloud_tree,
                     step='patch growing', patch_sn=cluster_sn, cluster_lims=active_limits
                 ))
             actual_neighbors = list(set(actual_neighbors))
