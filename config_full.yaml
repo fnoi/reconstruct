@@ -6,7 +6,7 @@ project:
   parking_path: data/parking/
 
 segmentation:
-  cloud_path: /data/in_full/full_30.txt
+  cloud_path: /data/in_full/girder_0.txt
   orientation_path: /data/in_full/orientation_list.yaml
   # path to raw cloud
   #  cloud_path: /data/in_instances/beams.txt
