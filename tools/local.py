@@ -74,11 +74,14 @@ def angular_deviation(vector, reference):
 def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=None, plot_ind=None, plot_flag=False):
     neighbor_ids = neighborhood_search(cloud_tree=cloud_tree, seed_id=seed_id, config=config, cloud=cloud)
     # neighbor_ids = neighborhood_search(cloud, seed_id, config)
+    # 3d scatter all points, color seed red, neighbors blue
 
+    plot_ind = 40200
     if plot_flag and seed_id == plot_ind:
         neighborhood_plot(cloud, seed_id, neighbor_ids, config)
 
-    if cloud.loc[seed_id, 'confidence'] is not None:
+    sort_flag = False
+    if cloud.loc[seed_id, 'confidence'] is not None and sort_flag:
         # sort neighborhood_ids by confidence
         neighbor_confidences = cloud.loc[neighbor_ids, 'confidence']
         neighbor_ids = neighbor_ids[np.argsort(neighbor_confidences)]
@@ -220,7 +223,9 @@ def ransac_patches(cloud, config):
         ax1.set_xlim(ax_lims_x)
         ax1.set_ylim(ax_lims_y)
         ax1.set_zlim(ax_lims_z)
-
+        # equal aspect ratio
+        ax1.set_aspect('equal')
+        ax2.set_aspect('equal')
         # set tight
         plt.tight_layout()
         plt.show()

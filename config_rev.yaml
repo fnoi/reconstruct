@@ -12,6 +12,7 @@ segmentation:
   #  cloud_path: /data/in_instances/beams.txt
 
 local_features:
+  voxel_size: 0.01
   normals_radius: 0.05
   max_nn: 30
   max_dist_cross: 0.4

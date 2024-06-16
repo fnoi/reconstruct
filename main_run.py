@@ -10,6 +10,7 @@ import plotly.graph_objects as go
 from omegaconf import OmegaConf
 
 from scipy.spatial import KDTree
+from tqdm import tqdm
 
 import tools.utils
 from seg2skeleton import inst2skeleton
@@ -28,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 0
+    cache_flag = 2
     ##########
 
     if cache_flag <= 1:
@@ -42,8 +43,26 @@ if __name__ == '__main__':
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
 
-        cloud_o3d = o3d.geometry.PointCloud()
-        cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+        o3d_cloud = o3d.geometry.PointCloud()
+        o3d_cloud.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+        downsample = True
+        if downsample:
+            print(f'original cloud size: {len(cloud)}')
+            cloud_o3d = o3d_cloud.voxel_down_sample(voxel_size=config.local_features.voxel_size)
+            cloud_frame_new = pd.DataFrame(np.asarray(cloud_o3d.points), columns=['x', 'y', 'z'])
+            # add instance_gt column with nan
+            cloud_frame_new['instance_gt'] = np.nan
+            for row in tqdm(cloud_frame_new.iterrows(), total=len(cloud_frame_new),
+                            desc='Assigning instance_gt to downsampled cloud'):
+                point_coords = np.asarray(row[1])[0:3]
+                # calculate distance to all points in cloud
+                dists = np.linalg.norm(cloud[['x', 'y', 'z']].values - point_coords, axis=1)
+                # find the closest point
+                seed_id = np.argmin(dists)
+                # assign instance_gt to new cloud_frame
+                cloud_frame_new.loc[row[0], 'instance_gt'] = cloud.loc[seed_id, 'instance_gt']
+            cloud = cloud_frame_new
+            print(f'downsampled cloud size: {len(cloud)}')
         cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
             radius=config.local_features.normals_radius, max_nn=config.local_features.max_nn))
         normals = np.asarray(cloud_o3d.normals)
