@@ -9,10 +9,12 @@ from tqdm import tqdm
 from tools.local import neighborhood_search, angular_deviation, supernormal_svd
 
 
-def region_growing(cloud, config):
+def     region_growing(cloud, config):
     """region growing algorithm for instance segmentation"""
-    # add column to cloud that stores integer ID
-    cloud['id'] = [i for i in range(len(cloud))]
+    # check if cloud has 'id' column
+    if 'id' not in cloud.columns:
+        # add column to cloud that stores integer ID
+        cloud['id'] = [i for i in range(len(cloud))]
 
     # actual annotation
     label_instance = 1
@@ -305,11 +307,19 @@ def region_growing(cloud, config):
 
                 # scatter plot active cloud
                 fig = plt.figure()
+                active_points_set = set(active_point_ids)
+                inactive_point_ids = [_ for _ in cloud['id'].tolist() if _ not in active_points_set]
                 ax = fig.add_subplot(111, projection='3d')
                 # 1. full cloud
-                ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=.2, c='grey', alpha=0.4)
+                ax.scatter(cloud.loc[cloud['id'].isin(inactive_point_ids), 'x'],
+                           cloud.loc[cloud['id'].isin(inactive_point_ids), 'y'],
+                           cloud.loc[cloud['id'].isin(inactive_point_ids), 'z'],
+                           s=1, c='grey', alpha=0.4)
                 # 2. active cloud
-                ax.scatter(cloud.loc[active_point_ids, 'x'], cloud.loc[active_point_ids, 'y'], cloud.loc[active_point_ids, 'z'], s=1, c='violet')
+                ax.scatter(cloud.loc[cloud['id'].isin(active_point_ids), 'x'],
+                            cloud.loc[cloud['id'].isin(active_point_ids), 'y'],
+                            cloud.loc[cloud['id'].isin(active_point_ids), 'z'],
+                            s=4, c='violet')
                 ax.set_aspect('equal')
                 plt.show()
 

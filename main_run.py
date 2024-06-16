@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 2
+    cache_flag = 3
     ##########
 
     if cache_flag <= 1:
@@ -70,6 +70,13 @@ if __name__ == '__main__':
         cloud['nx'] = normals[:, 0]
         cloud['ny'] = normals[:, 1]
         cloud['nz'] = normals[:, 2]
+
+        # # re-order cloud by ascending z-values
+        # cloud = cloud.sort_values(by='z', ascending=True)
+
+        if 'id' not in cloud.columns:
+            # add column to cloud that stores integer ID
+            cloud['id'] = [i for i in range(len(cloud))]
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=0)
 
@@ -113,7 +120,7 @@ if __name__ == '__main__':
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
-        raise ValueError('stop here')
+        # raise ValueError('stop here')
 
     if cache_flag <= 3:
         print('\n- compute instance predictions through region growing, report metrics')

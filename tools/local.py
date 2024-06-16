@@ -76,9 +76,14 @@ def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=
     # neighbor_ids = neighborhood_search(cloud, seed_id, config)
     # 3d scatter all points, color seed red, neighbors blue
 
-    plot_ind = 40200
     if plot_flag and seed_id == plot_ind:
         neighborhood_plot(cloud, seed_id, neighbor_ids, config)
+
+    rnd_picks_abs = True
+    if rnd_picks_abs:
+        neighbor_cap = 100
+        if len(neighbor_ids) > 100:
+            neighbor_ids = random.sample(neighbor_ids, 100)
 
     sort_flag = False
     if cloud.loc[seed_id, 'confidence'] is not None and sort_flag:
@@ -91,16 +96,32 @@ def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=
         neighbor_ids = neighbor_ids[start_index:]
 
     if config.local_features.supernormal_input == 'ransac':
-        neighbor_normals = cloud.loc[neighbor_ids][['rnx', 'rny', 'rnz']].values
+        # neighbor_normals = cloud.loc[neighbor_ids][['rnx', 'rny', 'rnz']].values
+        # use 'id' column
+        neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['rnx', 'rny', 'rnz']].values
+        # remove zero vectors
+        neighbor_normals = neighbor_normals[np.linalg.norm(neighbor_normals, axis=1) > 0]
+        if len(neighbor_normals) < 10:
+            print('found less than 10 neighbors with ransac normals, using normals instead')
+            neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['nx', 'ny', 'nz']].values
+
     else:
-        neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
+        # neighbor_normals = cloud.iloc[neighbor_ids][['nx', 'ny', 'nz']].values
+        # use 'id' column
+        neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['nx', 'ny', 'nz']].values
+
+
     seed_supernormal = supernormal_svd(neighbor_normals)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
 
-    cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
-    cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
-    cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
-    cloud.loc[seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals)
+    cloud.loc[cloud['id'] == seed_id, 'snx'] = seed_supernormal[0]
+    cloud.loc[cloud['id'] == seed_id, 'sny'] = seed_supernormal[1]
+    cloud.loc[cloud['id'] == seed_id, 'snz'] = seed_supernormal[2]
+    cloud.loc[cloud['id'] == seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals)
+    # cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
+    # cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
+    # cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
+    # cloud.loc[seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals)
 
     return cloud
 
@@ -111,10 +132,10 @@ def calculate_supernormals_rev(cloud=None, cloud_tree=None, config=None):
     cloud['snz'] = None
     cloud['confidence'] = None
 
-    plot_ind = random.randint(0, len(cloud))
-    plot_ind = 762
-    print(f'plot ind is {plot_ind}')
     plot_flag = True
+    plot_ind = 42000
+    if plot_flag:
+        print(f'point {plot_ind} will be used for neighborhood plot')
 
     point_ids = np.arange(len(cloud))
 
@@ -531,7 +552,12 @@ def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None,
         # seed_data = cloud.iloc[seed_id]
     else:
         shape = config.local_features.neighbor_shape
-        seed_data = cloud.iloc[seed_id]
+        # if cloud has 'id' column:
+        if 'id' in cloud.columns:
+            seed_data = cloud.loc[cloud['id'] == seed_id]
+        else:
+            seed_data = cloud.iloc[seed_id]
+
     match shape:
         case "sphere":
             neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config)
