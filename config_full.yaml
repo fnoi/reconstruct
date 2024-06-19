@@ -18,7 +18,7 @@ local_features:
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
   supernormal_input: ransac
-  supernormal_radius: 0.20
+  supernormal_radius: 0.15
   neighbor_shape: sphere
   supernormal_cube_dist: 0.15
   supernormal_ellipsoid_a: 0.1
@@ -28,7 +28,7 @@ initial:
   rnd_pick_ratio: 0.05
 
 clustering:
-  max_dist_euc: 0.2  # re-think with cross and to-plane limits
+  max_dist_euc: 0.1  # re-think with cross and to-plane limits
   max_ransac_iterations: 1000
   dist_thresh_normal: 0.1
   angle_thresh_normal: 30
@@ -52,11 +52,11 @@ clustering:
 
 region_growing:
   neighbors_found_min: 10
-  supernormal_point_angle_deviation: 20
-  supernormal_patch_angle_deviation: 15
-  ransacnormal_patch_angle_deviation: 30
-  neighborhood_radius_a: 0.3
-  neighborhood_radius_bc: 0.1
+  supernormal_point_angle_deviation: 15
+  supernormal_patch_angle_deviation: 10
+  ransacnormal_patch_angle_deviation: 20
+  neighborhood_radius_a: 0.1
+  neighborhood_radius_bc: 0.05
   leftover_thresh: 0.02
   neighbor_shape: sphere
   supernormal_vote_of_confidence: 0.6

@@ -120,7 +120,7 @@ if __name__ == '__main__':
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
-        # raise ValueError('stop here')
+        raise ValueError('stop here')
 
     if cache_flag <= 3:
         print('\n- compute instance predictions through region growing, report metrics')
@@ -133,7 +133,7 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt
         cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev.txt', sep=' ', index=False)
-        # raise ValueError('stop here')
+        raise ValueError('stop here')
 
     if cache_flag <= 4:
         print('\n- project instance points to plane, initiate skeleton, fit cs')

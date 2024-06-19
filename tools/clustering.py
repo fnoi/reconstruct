@@ -9,7 +9,7 @@ from tqdm import tqdm
 from tools.local import neighborhood_search, angular_deviation, supernormal_svd
 
 
-def     region_growing(cloud, config):
+def region_growing(cloud, config):
     """region growing algorithm for instance segmentation"""
     # check if cloud has 'id' column
     if 'id' not in cloud.columns:
@@ -33,7 +33,7 @@ def     region_growing(cloud, config):
     patchcount = 0
     while True:
         pointcount += 1
-        print(f'Pointcount: {pointcount}')
+        print(f'segment counter: {pointcount}')
         if len(source_point_ids) <= config.region_growing.leftover_thresh:
             break
         # find seed point
@@ -47,15 +47,6 @@ def     region_growing(cloud, config):
             else:
                 seed_point_id = row['id']
                 break
-
-        # if seed_point_id == 1546:
-        #     break
-        # seed_point_id = cloud['id'].iloc[seed_point_id
-        # seed_point_id = cloud.index[
-        #     (cloud['x'] == source_cloud.loc[seed_point_id, 'x']) &
-        #     (cloud['y'] == source_cloud.loc[seed_point_id, 'y']) &
-        #     (cloud['z'] == source_cloud.loc[seed_point_id, 'z'])
-        # ].tolist()[0]
 
         # retrieve 'sn' and 'rn' values from the row where 'id' == seed_point_id
         seed_sn = cloud.loc[cloud['id'] == seed_point_id, ['snx', 'sny', 'snz']].values
@@ -87,7 +78,7 @@ def     region_growing(cloud, config):
 
         while True:
             patchcount += 1
-            print(f'Patchcount: {patchcount}')
+            print(f'iteration in segment: {patchcount}')
             growth_iter += 1
             # candidate_point_ids = [_ for _ in active_point_ids
             #                        if _ not in sink_point_ids
@@ -103,21 +94,6 @@ def     region_growing(cloud, config):
                 step='bbox_mask', cluster_lims=active_limits
             )
             potential_cloud = cloud.loc[cloud['id'].isin(potential_neighbors)]
-            # potential_cloud = cloud.loc[potential_neighbors]
-            # create a dictionary to track ids between the cloud representations
-            # and then use it to map the ids back to the original cloud
-            # use twice: 1. for seed_id to local_seed_id 2. for retrieved neighbor_ids to global cloud ids
-
-            a = 0
-            # map_dict_full_vs_potential = dict(zip(potential_cloud, potential_cloud[]
-
-            # # scatter plot potential cloud
-            # fig = plt.figure()
-            # ax = fig.add_subplot(111, projection='3d')
-            # ax.scatter(potential_cloud['x'], potential_cloud['y'], potential_cloud['z'], s=1, c='grey', alpha=0.4)
-            # ax.scatter(cloud.loc[active_point_ids, 'x'], cloud.loc[active_point_ids, 'y'], cloud.loc[active_point_ids, 'z'], s=4, c='violet')
-            # ax.set_aspect('equal')
-            # plt.show()
 
             actual_neighbors = []
             smart_choices = True
@@ -162,18 +138,6 @@ def     region_growing(cloud, config):
             actual_neighbors = list(set(actual_neighbors))
             actual_neighbors = [_ for _ in actual_neighbors if _ not in active_point_ids]
 
-            # # scatter plot actual neighbors
-            # fig = plt.figure()
-            # ax = fig.add_subplot(111, projection='3d')
-            # # 1. potential cloud
-            # ax.scatter(potential_cloud['x'], potential_cloud['y'], potential_cloud['z'], s=1, c='grey', alpha=0.4)
-            # # 2. active cloud
-            # ax.scatter(cloud.loc[active_point_ids, 'x'], cloud.loc[active_point_ids, 'y'], cloud.loc[active_point_ids, 'z'], s=4, c='violet')
-            # # 3. actual neighbors
-            # ax.scatter(cloud.loc[actual_neighbors, 'x'], cloud.loc[actual_neighbors, 'y'], cloud.loc[actual_neighbors, 'z'], s=4, c='green')
-            # ax.set_aspect('equal')
-            # plt.show()
-
             visited_neighbors = []
             # for each of those neighbors, if they belong to a patch, check if patch can be added
             for neighbor in actual_neighbors:
@@ -206,10 +170,10 @@ def     region_growing(cloud, config):
                         deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
                         deviation_rn = min(deviation_rn, 90 - deviation_rn)
 
-                        debug_plot = False
+                        debug_plot = True
                         if debug_plot:
                             deviation_check = deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
-                                    deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation
+                                              deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation
 
                             # plot current cluster, neighbor patch and sn and rn each
                             fig = plt.figure()
@@ -304,7 +268,6 @@ def     region_growing(cloud, config):
                             # visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
 
             if len_log == len(active_point_ids):
-
                 # scatter plot active cloud
                 fig = plt.figure()
                 active_points_set = set(active_point_ids)
@@ -317,12 +280,11 @@ def     region_growing(cloud, config):
                            s=1, c='grey', alpha=0.4)
                 # 2. active cloud
                 ax.scatter(cloud.loc[cloud['id'].isin(active_point_ids), 'x'],
-                            cloud.loc[cloud['id'].isin(active_point_ids), 'y'],
-                            cloud.loc[cloud['id'].isin(active_point_ids), 'z'],
-                            s=4, c='violet')
+                           cloud.loc[cloud['id'].isin(active_point_ids), 'y'],
+                           cloud.loc[cloud['id'].isin(active_point_ids), 'z'],
+                           s=4, c='violet')
                 ax.set_aspect('equal')
                 plt.show()
-
 
                 cloud.loc[active_point_ids, 'instance_pr'] = label_instance
                 label_instance += 1
@@ -338,8 +300,4 @@ def     region_growing(cloud, config):
 
     return cloud
 
-
-
-        # grow cluster
-
-
+    # grow cluster
