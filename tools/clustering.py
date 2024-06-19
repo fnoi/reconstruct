@@ -95,11 +95,34 @@ def region_growing(cloud, config):
             )
             potential_cloud = cloud.loc[cloud['id'].isin(potential_neighbors)]
 
+            # scatter plot potential cloud within limits
+            _plot_cluster = cloud.loc[cloud['id'].isin(active_point_ids)]
+            _plot_neighbors = cloud.loc[cloud['id'].isin(potential_neighbors)]
+            _plot_idle_cluster = cloud.loc[~cloud['id'].isin(active_point_ids)]
+            _plot_idle_neighbors = cloud.loc[~cloud['id'].isin(potential_neighbors)]
+
+            fig = plt.figure()
+            ax1 = fig.add_subplot(121, projection='3d')
+            ax2 = fig.add_subplot(122, projection='3d')
+            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.2, c='violet')
+            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.05, c='grey', alpha=0.4)
+            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.2, c='green')
+            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.05, c='grey', alpha=0.4)
+            ax1.set_aspect('equal')
+            ax2.set_aspect('equal')
+            ax1.axis('off')
+            ax2.axis('off')
+            plt.tight_layout()
+            plt.show()
+
+
+
             actual_neighbors = []
             smart_choices = True
             if smart_choices and growth_iter > 1:
                 # calculate supernormal based on cluster points
-                cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
+                cluster_normals = cloud.loc[cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
+                # cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
                 print('in')
                 cluster_sn = supernormal_svd(cluster_normals)
                 print('out')
@@ -116,7 +139,8 @@ def region_growing(cloud, config):
                 # # cluster_sn /= np.linalg.norm(cluster_sn)
 
                 # find the biggest patch in the cluster
-                ransac_patch_sizes = cloud.loc[active_point_ids, 'ransac_patch'].value_counts()
+                ransac_patch_sizes = cloud.loc[cloud['id'].isin(active_point_ids), 'ransac_patch'].value_counts()
+                # ransac_patch_sizes = cloud.loc[active_point_ids, 'ransac_patch'].value_counts()
                 biggest_patch_id = ransac_patch_sizes.idxmax()
 
                 if biggest_patch_id == 0:
@@ -152,7 +176,8 @@ def region_growing(cloud, config):
                     # neighbor_patch = cloud.loc[neighbor, 'ransac_patch']
                     if neighbor_patch == 0:
                         # check if neighbor point can be added
-                        neighbor_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
+                        neighbor_sn = cloud.loc[cloud['id'] == neighbor, ['snx', 'sny', 'snz']].values
+                        # neighbor_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
                         deviation_sn = angular_deviation(cluster_sn, neighbor_sn) % 180
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
                         if deviation_sn < config.region_growing.supernormal_point_angle_deviation:
@@ -170,8 +195,8 @@ def region_growing(cloud, config):
                         deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
                         deviation_rn = min(deviation_rn, 90 - deviation_rn)
 
-                        debug_plot = True
-                        if debug_plot:
+                        debug_plot = False
+                        if debug_plot:  #
                             deviation_check = deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
                                               deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation
 
