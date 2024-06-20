@@ -258,7 +258,8 @@ def region_growing(cloud, config):
                         else:
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
 
-            if len_log == len(active_point_ids):
+            plot_cluster = False
+            if len_log == len(active_point_ids) and plot_cluster:
                 # scatter plot active cloud
                 fig = plt.figure()
                 active_points_set = set(active_point_ids)
