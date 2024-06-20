@@ -849,6 +849,7 @@ def neighbors_sphere(cloud_tree, seed_data, config):
         x, y, z = seed_data['x'], seed_data['y'], seed_data['z']
     else:
         x, y, z = seed_data['x'].values[0], seed_data['y'].values[0], seed_data['z'].values[0]
+
     idx = cloud_tree.query_ball_point([x, y, z], r=config.local_features.supernormal_radius)
 
     return idx

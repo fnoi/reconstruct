@@ -104,24 +104,24 @@ def region_growing(cloud, config):
             fig = plt.figure()
             ax1 = fig.add_subplot(121, projection='3d')
             ax2 = fig.add_subplot(122, projection='3d')
-            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.2, c='violet')
-            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.05, c='grey', alpha=0.4)
-            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.2, c='green')
-            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.05, c='grey', alpha=0.4)
+            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
+            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
+            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
+            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')
             ax1.axis('off')
             ax2.axis('off')
             plt.tight_layout()
+            plt.title(f'potential neighbors: {len(potential_neighbors)}')
             plt.show()
-
-
 
             actual_neighbors = []
             smart_choices = True
             if smart_choices and growth_iter > 1:
                 # calculate supernormal based on cluster points
-                cluster_normals = cloud.loc[cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
+                # cluster_normals = cloud.loc[cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
+                cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['rnx', 'rny', 'rnz']].to_numpy()
                 # cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
                 print('in')
                 cluster_sn = supernormal_svd(cluster_normals)
@@ -154,13 +154,35 @@ def region_growing(cloud, config):
                 cluster_rn = seed_rn
 
             potential_cloud_tree = KDTree(potential_cloud[['x', 'y', 'z']].values)  # unused if not sphere...
-            for active_point in tqdm(active_point_ids, desc="debug for-loop active_point_ids", total=len(active_point_ids)):
+            for active_point in tqdm(active_point_ids, desc="checking potential neighbors", total=len(active_point_ids)):
                 actual_neighbors.extend(neighborhood_search(
                     cloud=potential_cloud, seed_id=active_point, config=config, cloud_tree=potential_cloud_tree,
                     step='patch growing', patch_sn=cluster_sn, cluster_lims=active_limits
                 ))
             actual_neighbors = list(set(actual_neighbors))
+            actual_neighbors = potential_cloud.iloc[actual_neighbors]['id'].tolist()
             actual_neighbors = [_ for _ in actual_neighbors if _ not in active_point_ids]
+
+            # scatter plot potential cloud within limits
+            _plot_cluster = cloud.loc[cloud['id'].isin(active_point_ids)]
+            _plot_neighbors = cloud.loc[cloud['id'].isin(actual_neighbors)]
+            _plot_idle_cluster = cloud.loc[~cloud['id'].isin(active_point_ids)]
+            _plot_idle_neighbors = cloud.loc[~cloud['id'].isin(actual_neighbors)]
+
+            fig = plt.figure()
+            ax1 = fig.add_subplot(121, projection='3d')
+            ax2 = fig.add_subplot(122, projection='3d')
+            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
+            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
+            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
+            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
+            ax1.set_aspect('equal')
+            ax2.set_aspect('equal')
+            ax1.axis('off')
+            ax2.axis('off')
+            plt.title(f'actual neighbors: {len(actual_neighbors)}')
+            plt.tight_layout()
+            plt.show()
 
             visited_neighbors = []
             # for each of those neighbors, if they belong to a patch, check if patch can be added
@@ -194,76 +216,6 @@ def region_growing(cloud, config):
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
                         deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
                         deviation_rn = min(deviation_rn, 90 - deviation_rn)
-
-                        debug_plot = False
-                        if debug_plot:  #
-                            deviation_check = deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
-                                              deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation
-
-                            # plot current cluster, neighbor patch and sn and rn each
-                            fig = plt.figure()
-                            ax = fig.add_subplot(111, projection='3d')
-                            # 0. potential cloud
-                            ax.scatter(potential_cloud['x'],
-                                       potential_cloud['y'],
-                                       potential_cloud['z'],
-                                       s=.2, c='grey', alpha=0.4)
-                            # 1. cluster points
-                            ax.scatter(cloud.loc[active_point_ids, 'x'],
-                                       cloud.loc[active_point_ids, 'y'],
-                                       cloud.loc[active_point_ids, 'z'],
-                                       s=1, c='green')
-                            # 2. neighbor patch points
-                            ax.scatter(cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'x'],
-                                       cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'y'],
-                                       cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'z'],
-                                       s=1, c='blue')
-                            x_move = 0.5
-                            # 3. cluster supernormal
-                            ax.quiver(cloud.loc[active_point_ids[0], 'x'] + x_move,
-                                      cloud.loc[active_point_ids[0], 'y'],
-                                      cloud.loc[active_point_ids[0], 'z'],
-                                      cluster_sn[0] * .3,
-                                      cluster_sn[1] * .3,
-                                      cluster_sn[2] * .3,
-                                      color='red')
-                            # 4. neighbor patch supernormal from first point of neighbor patch
-                            ax.quiver(cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'x'].iloc[0] + x_move,
-                                      cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'y'].iloc[0],
-                                      cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'z'].iloc[0],
-                                      neighbor_patch_sn[0] * .3,
-                                      neighbor_patch_sn[1] * .3,
-                                      neighbor_patch_sn[2] * .3,
-                                      color='orange')
-                            # 5. cluster ransac normal
-                            ax.quiver(cloud.loc[active_point_ids[0], 'x'] + x_move,
-                                      cloud.loc[active_point_ids[0], 'y'],
-                                      cloud.loc[active_point_ids[0], 'z'],
-                                      cluster_rn[0] * .3,
-                                      cluster_rn[1] * .3,
-                                      cluster_rn[2] * .3,
-                                      color='purple')
-                            # 6. neighbor patch ransac normal from first point of neighbor patch
-                            ax.quiver(cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'x'].iloc[0] + x_move,
-                                      cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'y'].iloc[0],
-                                      cloud.loc[cloud['ransac_patch'] == neighbor_patch, 'z'].iloc[0],
-                                      neighbor_patch_rn[0] * .3,
-                                      neighbor_patch_rn[1] * .3,
-                                      neighbor_patch_rn[2] * .3,
-                                      color='yellow')
-
-                            ax.set_aspect('equal')
-                            # title
-                            plt.title(f'{active_patch_ids} - {neighbor_patch} ::  d_sn: {deviation_sn:.1f};   d_rn: {deviation_rn:.1f}:\n{deviation_check}')
-                            # legend below the figure
-                            # plt.legend(['potential cloud', 'cluster points', 'neighbor patch points',
-                            #             'cluster supernormal', 'neighbor patch supernormal',
-                            #             'cluster ransac normal', 'neighbor patch ransac normal'],
-                            #            loc='upper center', bbox_to_anchor=(0.5, -0.05),
-                            #            fancybox=True, shadow=True, ncol=1)
-
-                            plt.tight_layout()
-                            plt.show()
 
                         if deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
                                 deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation:
