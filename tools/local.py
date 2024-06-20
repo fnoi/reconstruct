@@ -1,4 +1,5 @@
 import copy
+import math
 import random
 
 import numpy as np
@@ -15,9 +16,37 @@ from tools.utils import plot_patch
 
 
 def supernormal_svd(normals):
+    if np.isnan(normals).any():
+        print('nan in normals')
+    normal_src = np.copy(normals)
+    normals = consistency_flip(normals)
+    # check if normals contain nan
+    if np.isnan(normals).any():
+        print('nan in normals')
+
     U, S, Vt = svd(normals, full_matrices=False)
+
     # U, S, Vt = np.linalg.svd(normals)
     return Vt[-1, :]
+
+
+def consistency_flip(vectors):
+    # normalize vectors
+    vector_norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    vectors_norm = vectors / np.where(vector_norms == 0, 1, vector_norms)
+
+    # mean resultant vector
+    vector_mean = np.mean(vectors_norm, axis=0)
+    if np.linalg.norm(vector_mean) == 0:
+        print('zero vector mean')
+        return vectors_norm
+    vector_mean /= np.linalg.norm(vector_mean)
+
+    # flip vectors that have opposite orientation
+    dot_products = np.dot(vectors_norm, vector_mean)
+    vectors_flipped = np.where(dot_products[:, np.newaxis] < 0, -vectors, vectors)
+
+    return vectors_flipped
 
 
 def supernormal_confidence(supernormal, normals):
@@ -39,13 +68,29 @@ def supernormal_confidence(supernormal, normals):
     normals /= norms
 
     # normals /= np.linalg.norm(normals, axis=1)[:, None]
-    angles = np.arccos(np.dot(supernormal, normals.T))
-    angles = np.abs(np.rad2deg(angles))
-    angles = np.abs(angles - 90)
-    angles = np.clip(angles, 0, 90)
-    normalized_angles = angles / 90
-    c = np.average(1 - normalized_angles)
-    c *= len(normals)
+    n_sn_90_dev = np.arccos(np.dot(supernormal, normals.T))
+    n_sn_90_dev = np.abs(np.rad2deg(n_sn_90_dev))
+    n_sn_90_dev = np.abs(n_sn_90_dev - 90)
+    n_sn_90_dev = np.clip(n_sn_90_dev, 0, 90)
+    n_sn_90_dev = n_sn_90_dev / 90
+    n_sn_90_dev = np.mean(n_sn_90_dev)
+    n_sn_90_dev = 1 - n_sn_90_dev
+
+    # def from reference / mean normal
+    normals_flipped = consistency_flip(normals)
+    n_ref = np.mean(normals_flipped, axis=0)
+    n_ref /= np.linalg.norm(n_ref)
+
+    n_dev = np.arccos(np.dot(n_ref, normals.T))
+    n_dev = np.abs(np.rad2deg(n_dev))
+    n_dev = np.clip(n_dev, 0, 90)
+    n_dev = np.mean(n_dev)
+
+    c = math.sqrt(math.sqrt(len(normals)) * n_dev * n_sn_90_dev)
+
+    # c = np.mean(n_sn_90_dev)
+    #
+    # c *= len(normals)
 
     return c
 

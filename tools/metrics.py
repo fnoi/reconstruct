@@ -254,8 +254,23 @@ def supernormal_evaluation(cloud, config):
     # plot cloud
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='jet')
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='spring')
+    # set equal
+    ax.set_aspect('equal')
+    ax.set_title('supernormal gt deviation')
     plt.show()
+
+    # plot cloud with confidence colors
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['confidence'], cmap='spring')
+    # set equal
+    ax.set_aspect('equal')
+    ax.set_title('supernormal pred confidence')
+    plt.show()
+
+
+
 
     # calculate mean and median deviation
     mean_dev = np.mean(cloud['supernormal_dev_gt'])
@@ -285,8 +300,10 @@ def normal_evaluation(cloud, config):
 
     # plot both histograms
     fig = plt.figure()
-    plt.hist(cloud['normal_dev_gt'], bins=90, alpha=0.5, label='normal')
-    plt.hist(cloud['ransac_normal_dev_gt'], bins=90, alpha=0.5, label='ransac normal')
+    # fix bin widths for both histograms
+    bins = np.linspace(0, 90, 91)
+    plt.hist(cloud['normal_dev_gt'], bins=bins, alpha=0.5, label='normal')
+    plt.hist(cloud['ransac_normal_dev_gt'], bins=bins, alpha=0.5, label='ransac normal')
     plt.xlabel('angle between normal and ground truth orientation')
     plt.ylabel('frequency')
     plt.legend()

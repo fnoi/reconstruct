@@ -121,7 +121,8 @@ def region_growing(cloud, config):
             if smart_choices and growth_iter > 1:
                 # calculate supernormal based on cluster points
                 # cluster_normals = cloud.loc[cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
-                cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['rnx', 'rny', 'rnz']].to_numpy()
+                # cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['rnx', 'rny', 'rnz']].to_numpy()
+                cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
                 # cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
                 print('in')
                 cluster_sn = supernormal_svd(cluster_normals)
@@ -176,6 +177,14 @@ def region_growing(cloud, config):
             ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
             ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
             ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
+            #line plot for cluster_sn next to scatter
+            # line starts at cluster center point + 0.5 x and y
+            start_pt = np.mean(potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['x', 'y', 'z']].values, axis=0)
+            start_pt[0:2] += 0.5
+            end_pt = (start_pt + cluster_sn).flatten()
+            ax1.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
+            ax2.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
+
             ax1.set_aspect('equal')
             ax2.set_aspect('equal')
             ax1.axis('off')
@@ -187,48 +196,52 @@ def region_growing(cloud, config):
             visited_neighbors = []
             # for each of those neighbors, if they belong to a patch, check if patch can be added
             for neighbor in actual_neighbors:
+                # check if candidate is available
                 if (neighbor in visited_neighbors
                         or cloud[cloud['id'] == neighbor]['ransac_patch'].values[0] in active_patch_ids
                         # or cloud.loc[neighbor, 'ransac_patch'] in active_patch_ids
                         or neighbor in sink_point_ids
                 ):
                     continue
+
+                # main check
                 else:
-                    neighbor_patch = cloud[cloud['id'] == neighbor]['ransac_patch'].values[0]
-                    # neighbor_patch = cloud.loc[neighbor, 'ransac_patch']
-                    if neighbor_patch == 0:
+                    neighbor_patch = potential_cloud.loc[potential_cloud['id'] == neighbor, 'ransac_patch'].values[0]
+                    if neighbor_patch == 0:  # free point: not member of a ransac patch
                         # check if neighbor point can be added
-                        neighbor_sn = cloud.loc[cloud['id'] == neighbor, ['snx', 'sny', 'snz']].values
-                        # neighbor_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
+                        neighbor_sn = potential_cloud.loc[potential_cloud['id'] == neighbor, ['snx', 'sny', 'snz']].values
                         deviation_sn = angular_deviation(cluster_sn, neighbor_sn) % 180
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
+                        # USED PARAMETER: REGION_GROWING.SUPERNORMAL_POINT_ANGLE_DEVIATION
                         if deviation_sn < config.region_growing.supernormal_point_angle_deviation:
                             active_point_ids.append(neighbor)
                             source_point_ids.remove(neighbor)
-                    else:
-                        # check if patch can be added
-                        neighbor_patch_sn = cloud[cloud['id'] == neighbor][['snx', 'sny', 'snz']].values
-                        neighbor_patch_rn = cloud[cloud['id'] == neighbor][['rnx', 'rny', 'rnz']].values
-                        # neighbor_patch_sn = cloud.loc[neighbor, ['snx', 'sny', 'snz']].values
-                        # neighbor_patch_rn = cloud.loc[neighbor, ['rnx', 'rny', 'rnz']].values
+                            print(f'added point {neighbor}')
+                    else:  # patch point: member of a ransac patch
+                        # check if the entire patch can be added
+                        neighbor_patch_sns = potential_cloud.loc[potential_cloud['ransac_patch'] == neighbor_patch, ['snx', 'sny', 'snz']].values
+                        # find mean direction of sns vectors in the patch
+                        neighbor_patch_sn = np.mean(neighbor_patch_sns, axis=0)
+                        # neighbor_patch_sn = potential_cloud.loc[potential_cloud['id'] == neighbor, ['snx', 'sny', 'snz']].values
+                        # what is the patch supernormal?!? mean SN of all points in the patch?
+                        neighbor_patch_rn = potential_cloud.loc[potential_cloud['id'] == neighbor, ['rnx', 'rny', 'rnz']].values
 
                         deviation_sn = angular_deviation(cluster_sn, neighbor_patch_sn) % 180
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
                         deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
                         deviation_rn = min(deviation_rn, 90 - deviation_rn)
 
+                        # USED PARAMETER: REGION_GROWING.SUPERNORMAL_PATCH_ANGLE_DEVIATION
+                        # USED PARAMETER: REGION_GROWING.RANSACNORMAL_PATCH_ANGLE_DEVIATION
                         if deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
                                 deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation:
                             active_patch_ids.append(neighbor_patch)
                             active_point_ids.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
 
-                            # active_point_ids.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
-                            # visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
                             if neighbor_patch not in source_patch_ids:
-                                a = 0  ## ?
+                                raise ValueError('patch not in source patches')
                             source_patch_ids.remove(neighbor_patch)
-                            src = copy.deepcopy(source_point_ids)
 
                             # speed up the removal of visited neighbors
                             source_point_ids_array = np.array(source_point_ids)
@@ -240,9 +253,10 @@ def region_growing(cloud, config):
 
                             source_point_ids = source_point_ids_filtered.tolist()
 
+                            print(f'added patch {neighbor_patch}')
+
                         else:
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
-                            # visited_neighbors.extend(cloud.index[cloud['ransac_patch'] == neighbor_patch].tolist())
 
             if len_log == len(active_point_ids):
                 # scatter plot active cloud

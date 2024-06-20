@@ -17,8 +17,8 @@ local_features:
   max_nn: 30
   max_dist_cross: 0.4
   max_dist_to_plane: 0.05
-  supernormal_input: ransac
-  supernormal_radius: 0.15
+  supernormal_input: no ransac
+  supernormal_radius: 0.25
   neighbor_shape: sphere
   supernormal_cube_dist: 0.15
   supernormal_ellipsoid_a: 0.1
@@ -42,18 +42,18 @@ clustering:
   count_thresh_dbscan: 10
   dist_thresh_ball: 0.12
   ransac_n: 3
-  ransac_dist_thresh: 0.01
+  ransac_dist_thresh: 0.005
   ransac_iterations: 100000000
   ransac_min_count: 1000
   ransac_rest_thresh: 50
   ransac_blanks: 100
-  dbscan_eps_dist: 0.03
+  dbscan_eps_dist: 0.02
   dbscan_min_count: 10
 
 region_growing:
   neighbors_found_min: 10
   supernormal_point_angle_deviation: 10
-  supernormal_patch_angle_deviation: 10
+  supernormal_patch_angle_deviation: 15
   ransacnormal_patch_angle_deviation: 15
   neighborhood_radius_a: 0.1
   neighborhood_radius_bc: 0.05

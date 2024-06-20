@@ -89,6 +89,9 @@ if __name__ == '__main__':
         cloud = ransac_patches(cloud, config)
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=1)
 
+        # store to x,y,z,ransac_id
+        cloud.to_csv(f'{config.project.parking_path}/cloud_ransac_patches.txt', sep=' ', index=False)
+
         # optional quality check
         control_normals = True
         if control_normals:
