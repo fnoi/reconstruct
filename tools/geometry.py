@@ -157,10 +157,17 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 def warped_vectors_intersection(seg1, seg2):
-    dir1 = seg1.line_raw_right - seg1.line_raw_left
-    dir2 = seg2.line_raw_right - seg2.line_raw_left
+    # dir1 = seg1.line_raw_right - seg1.line_raw_left
+    # dir2 = seg2.line_raw_right - seg2.line_raw_left
     # dir1 = seg1.pca
     # dir2 = seg2.pca
+    dir1 = seg1.line_cog_right - seg1.line_cog_left
+    dir2 = seg2.line_cog_right - seg2.line_cog_left
+
+    # calculate angle of "intersection"
+    angle = np.arccos(np.dot(dir1, dir2) / (np.linalg.norm(dir1) * np.linalg.norm(dir2)))
+    angle = np.degrees(angle)
+
     connect = np.cross(dir1, dir2)
 
     if np.nonzero(connect) is False:
@@ -194,7 +201,7 @@ def warped_vectors_intersection(seg1, seg2):
     rating = 0
     # case 1: one segment continuous: dominant
     if (check1 and not check2) or (not check1 and check2):
-        if check1:  # seg1 is dominant
+        if check1:  # seg1 is dominant: case = 0
             rating = np.min(
                 np.asarray(
                     [np.linalg.norm(bridgepoint1 - seg2.line_raw_left), np.linalg.norm(bridgepoint1 - seg2.line_raw_right)]
@@ -202,7 +209,7 @@ def warped_vectors_intersection(seg1, seg2):
             )
             case = 0
 
-        elif check2:  # seg2 is dominant
+        elif check2:  # seg2 is dominant: case = 1
             rating = np.min(
                 np.asarray(
                     [np.linalg.norm(bridgepoint2 - seg1.line_raw_left), np.linalg.norm(bridgepoint2 - seg1.line_raw_right)]
@@ -210,7 +217,7 @@ def warped_vectors_intersection(seg1, seg2):
             )
             case = 1
 
-    # case 2: no dominant segment
+    # case 2: no dominant segment: case = 2
     if not check1 and not check2:
         # find mean intersection interpolated between both segments
         # report the worse rating of both segments
@@ -238,7 +245,7 @@ def warped_vectors_intersection(seg1, seg2):
 
     print(case)
 
-    return bridgepoint1, bridgepoint2, rating, case
+    return bridgepoint1, bridgepoint2, rating, case, angle
 
 
 # def passing_check:

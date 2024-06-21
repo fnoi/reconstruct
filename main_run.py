@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 0
+    cache_flag = 5
     ##########
 
     if cache_flag <= 1:
@@ -146,49 +146,25 @@ if __name__ == '__main__':
 
         # process bones directly
         for bone in skeleton.bones:
-            bone.fit_cs_rev()
+            a = 0
+            try:
+                bone.fit_cs_rev()
+            except:
+                bone.h_beam_params = False
+                bone.h_beam_verts = False
             print(bone.h_beam_params)
         skeleton.cache_pickle(config.project.parking_path)
 
     if cache_flag <= 5:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
-        # create plotly fig
-        fig = go.Figure()
-        for bone in skeleton.bones:
-            bone.cs_lookup()
-            bone.update_axes()
-
-            # plot line_cog_left, line_cog_right as lines
-            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
-                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
-                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
-                                       mode='lines',
-                                       line=dict(color='blue', width=3)))
-            # add line_cog_left, line_cog_right as scatter points
-            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
-                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
-                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
-                                       mode='markers',
-                                       marker=dict(color='magenta', size=5)))
-            # point cloud scatter
-            fig.add_trace(go.Scatter3d(x=bone.points[:, 0],
-                                       y=bone.points[:, 1],
-                                       z=bone.points[:, 2],
-                                       mode='markers',
-                                       marker=dict(color='grey', size=1)))
-
-        # perspective should be ortho
-        fig.layout.scene.camera.projection.type = "orthographic"
-        # no background grid
-        fig.layout.scene.xaxis.visible = False
-        fig.layout.scene.yaxis.visible = False
-        fig.layout.scene.zaxis.visible = False
-
-        # show go figure
-        fig.show()
+        # skeleton.plot_cog_skeleton()
 
         print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
+
+        skeleton.aggregate_bones()
+
+
         # over-aggregate
         # cut by hierarchy (cs dims)
         # join on passing

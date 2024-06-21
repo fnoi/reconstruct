@@ -184,7 +184,7 @@ class Segment(object):
             vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=true_origin_2D,
                                       ransac_highlight=True, ransac_data=ransac_data)
 
-            vis.segment_projection_3D(points, proj_lines)
+            # vis.segment_projection_3D(points, proj_lines)
             # vis.segment_projection_3D(proj_points_plane, proj_lines)
 
         dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)

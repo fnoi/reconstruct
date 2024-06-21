@@ -65,7 +65,7 @@ evaluation:
   pairing_method: hungarian
 
 skeleton:
-  min_points: 100
+  min_points: 200
   ransac_method: open3d
   ransac_dist_thresh: 0.0005
   ransac_picks: 3

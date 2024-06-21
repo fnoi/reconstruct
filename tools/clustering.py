@@ -101,20 +101,20 @@ def region_growing(cloud, config):
             _plot_idle_cluster = cloud.loc[~cloud['id'].isin(active_point_ids)]
             _plot_idle_neighbors = cloud.loc[~cloud['id'].isin(potential_neighbors)]
 
-            fig = plt.figure()
-            ax1 = fig.add_subplot(121, projection='3d')
-            ax2 = fig.add_subplot(122, projection='3d')
-            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
-            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
-            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
-            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
-            ax1.set_aspect('equal')
-            ax2.set_aspect('equal')
-            ax1.axis('off')
-            ax2.axis('off')
-            plt.tight_layout()
-            plt.title(f'potential neighbors: {len(potential_neighbors)}')
-            plt.show()
+            # fig = plt.figure()
+            # ax1 = fig.add_subplot(121, projection='3d')
+            # ax2 = fig.add_subplot(122, projection='3d')
+            # ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
+            # ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
+            # ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
+            # ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
+            # ax1.set_aspect('equal')
+            # ax2.set_aspect('equal')
+            # ax1.axis('off')
+            # ax2.axis('off')
+            # plt.tight_layout()
+            # plt.title(f'potential neighbors: {len(potential_neighbors)}')
+            # plt.show()
 
             actual_neighbors = []
             smart_choices = True
@@ -170,28 +170,28 @@ def region_growing(cloud, config):
             _plot_idle_cluster = cloud.loc[~cloud['id'].isin(active_point_ids)]
             _plot_idle_neighbors = cloud.loc[~cloud['id'].isin(actual_neighbors)]
 
-            fig = plt.figure()
-            ax1 = fig.add_subplot(121, projection='3d')
-            ax2 = fig.add_subplot(122, projection='3d')
-            ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
-            ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
-            ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
-            ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
-            #line plot for cluster_sn next to scatter
-            # line starts at cluster center point + 0.5 x and y
-            start_pt = np.mean(potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['x', 'y', 'z']].values, axis=0)
-            start_pt[0:2] += 0.5
-            end_pt = (start_pt + cluster_sn).flatten()
-            ax1.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
-            ax2.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
-
-            ax1.set_aspect('equal')
-            ax2.set_aspect('equal')
-            ax1.axis('off')
-            ax2.axis('off')
-            plt.title(f'actual neighbors: {len(actual_neighbors)}')
-            plt.tight_layout()
-            plt.show()
+            # fig = plt.figure()
+            # ax1 = fig.add_subplot(121, projection='3d')
+            # ax2 = fig.add_subplot(122, projection='3d')
+            # ax1.scatter(_plot_cluster['x'], _plot_cluster['y'], _plot_cluster['z'], s=.02, c='violet')
+            # ax1.scatter(_plot_idle_cluster['x'], _plot_idle_cluster['y'], _plot_idle_cluster['z'], s=.02, c='grey', alpha=0.4)
+            # ax2.scatter(_plot_neighbors['x'], _plot_neighbors['y'], _plot_neighbors['z'], s=.02, c='green')
+            # ax2.scatter(_plot_idle_neighbors['x'], _plot_idle_neighbors['y'], _plot_idle_neighbors['z'], s=.02, c='grey', alpha=0.4)
+            # #line plot for cluster_sn next to scatter
+            # # line starts at cluster center point + 0.5 x and y
+            # start_pt = np.mean(potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['x', 'y', 'z']].values, axis=0)
+            # start_pt[0:2] += 0.5
+            # end_pt = (start_pt + cluster_sn).flatten()
+            # ax1.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
+            # ax2.plot([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]], [start_pt[2], end_pt[2]], c='orange', linewidth=2)
+            #
+            # ax1.set_aspect('equal')
+            # ax2.set_aspect('equal')
+            # ax1.axis('off')
+            # ax2.axis('off')
+            # plt.title(f'actual neighbors: {len(actual_neighbors)}')
+            # plt.tight_layout()
+            # plt.show()
 
             visited_neighbors = []
             # for each of those neighbors, if they belong to a patch, check if patch can be added
@@ -258,7 +258,7 @@ def region_growing(cloud, config):
                         else:
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
 
-            plot_cluster = False
+            plot_cluster = True
             if len_log == len(active_point_ids) and plot_cluster:
                 # scatter plot active cloud
                 fig = plt.figure()
