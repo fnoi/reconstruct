@@ -88,11 +88,146 @@ class Skeleton:
         self.joints2joint_array()
         self.joints2joint_frame()
 
+        # for-loop over rows in joint_frame
         for joint in self.joint_frame.iterrows():
+            bone_1 = self.bones[int(joint[1][0])]
+            bone_2 = self.bones[int(joint[1][1])]
             acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
             if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
-                # case 1: both bones are in sequence
-                a = 0
+                # find minimum distance
+                P0 = bone_1.line_cog_left
+                P1 = bone_1.line_cog_right
+                P2 = bone_2.line_cog_left
+                P3 = bone_2.line_cog_right
+                L0 = np.linalg.norm(P0 - P2)
+                L1 = np.linalg.norm(P0 - P3)
+                L2 = np.linalg.norm(P1 - P2)
+                L3 = np.linalg.norm(P1 - P3)
+                LX1 = np.linalg.norm(P0 - P1)
+                LX2 = np.linalg.norm(P2 - P3)
+
+                if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
+                    continue
+                else:
+                    origin_coords = [-1e3, -1e3, -1e3]
+                    # identify main: longer
+                    if LX1 > LX2:
+                        long_ind = 0
+                        LA = L0
+                        # project P2 and P3 to 3D vector defined by P0 and P1
+                        P2 = P0 + np.dot(P2 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                        P3 = P0 + np.dot(P3 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                        # project origin_coords to line defined by P0 and P1
+                        origin = P0 + np.dot(origin_coords - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                        oP0 = np.linalg.norm(origin - P0)
+                        oP1 = np.linalg.norm(origin - P1)
+                        oP2 = np.linalg.norm(origin - P2)
+                        oP3 = np.linalg.norm(origin - P3)
+
+                        if oP0 > oP1:
+                            P0_ = P1
+                            P1_ = P0
+                            P0 = P0_
+                            P1 = P1_
+                        if oP2 > oP3:
+                            P2_ = P3
+                            P3_ = P2
+                            P2 = P2_
+                            P3 = P3_
+
+                        LB = np.linalg.norm(P0 - P2)
+                        LC = np.linalg.norm(P0 - P3)
+
+                    else:
+                        long_ind = 1
+                        LA = L1
+                        # project P0 and P1 to 3D vector defined by P2 and P3
+                        P0 = P2 + np.dot(P0 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                        P1 = P2 + np.dot(P1 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                        # project origin_coords to line defined by P2 and P3
+                        origin = P2 + np.dot(origin_coords - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                        oP0 = np.linalg.norm(origin - P0)
+                        oP1 = np.linalg.norm(origin - P1)
+                        oP2 = np.linalg.norm(origin - P2)
+                        oP3 = np.linalg.norm(origin - P3)
+
+                        if oP0 > oP1:
+                            P0_ = P1
+                            P1_ = P0
+                            P0 = P0_
+                            P1 = P1_
+                        if oP2 > oP3:
+                            P2_ = P3
+                            P3_ = P2
+                            P2 = P2_
+                            P3 = P3_
+
+                        LB = np.linalg.norm(P0 - P2)
+                        LC = np.linalg.norm(P0 - P3)
+
+                    # case A
+                    if LA <= LB:
+                        print('case A')
+                        # in line, connect
+                    elif LB <= LA:
+                        # overlap, connect
+                        print('case B')
+                    elif LC <= LA:
+                        # integrate
+                        print('case C')
+                    else:
+                        raise Exception('case not covered')
+
+                    # # plot the two bone lines
+                    # fig = go.Figure()
+                    # fig.add_trace(go.Scatter3d(
+                    #     x=[P0[0], P1[0]],
+                    #     y=[P0[1], P1[1]],
+                    #     z=[P0[2], P1[2]],
+                    #     mode='lines',
+                    #     line=dict(
+                    #         color='red',
+                    #         width=6
+                    #     )
+                    # ))
+                    # fig.add_trace(go.Scatter3d(
+                    #     x=[P2[0], P3[0]],
+                    #     y=[P2[1], P3[1]],
+                    #     z=[P2[2], P3[2]],
+                    #     mode='lines',
+                    #     line=dict(
+                    #         color='blue',
+                    #         width=6
+                    #     )
+                    # ))
+                    # # start and endpoint of the longer bone
+                    # fig.add_trace(go.Scatter3d(
+                    #     x=[P0[0], P1[0]],
+                    #     y=[P0[1], P1[1]],
+                    #     z=[P0[2], P1[2]],
+                    #     mode='markers',
+                    #     marker=dict(
+                    #         size=10,
+                    #         color='red'
+                    #     )
+                    # ))
+                    # # start and endpoint of the shorter bone
+                    # fig.add_trace(go.Scatter3d(
+                    #     x=[P2[0], P3[0]],
+                    #     y=[P2[1], P3[1]],
+                    #     z=[P2[2], P3[2]],
+                    #     mode='markers',
+                    #     marker=dict(
+                    #         size=10,
+                    #         color='blue'
+                    #     )
+                    # ))
+                    # fig.show()
+
+                    a = 0
+
+
+
 
                 # case 2: bones overlap
                 a = 0
@@ -505,8 +640,13 @@ class Skeleton:
         joint_frame['bridgepoint2'] = joint_frame[['bp2x', 'bp2y', 'bp2z']].values.tolist()
         joint_frame = joint_frame.drop(columns=['bp1x', 'bp1y', 'bp1z', 'bp2x', 'bp2y', 'bp2z'])
 
+        # datatype conversion
+        joint_frame['bone1'] = joint_frame['bone1'].astype(int)
+        joint_frame['bone2'] = joint_frame['bone2'].astype(int)
+        joint_frame['case'] = joint_frame['case'].astype(int)
+
         self.joint_frame = joint_frame
-        return 
+        return
 
     def plot_cog_skeleton(self):
         # create plotly fig
