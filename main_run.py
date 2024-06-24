@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 5
+    cache_flag = 5.1
     ##########
 
     if cache_flag <= 1:
@@ -164,12 +164,16 @@ if __name__ == '__main__':
 
         skeleton.aggregate_bones()
 
+        skeleton.cache_pickle(config.project.parking_path)
 
-        # over-aggregate
-        # cut by hierarchy (cs dims)
-        # join on passing
-        # join open ends (stronger dim stays in place? dim and point support?)
+    if cache_flag <= 5.5:
+        print('\n- skeleton bones join on passing')
+        skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+        skeleton.plot_cog_skeleton()
         skeleton.join_on_passing()
+        skeleton.plot_cog_skeleton()
+
+        skeleton.cache_pickle(config.project.parking_path)
 
 
     if cache_flag <= 6:

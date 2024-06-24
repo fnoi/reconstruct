@@ -84,90 +84,90 @@ class Skeleton:
             self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case, angle])  # KEY
 
     def aggregate_bones(self):
+
         self.plot_cog_skeleton()
 
-        self.find_joints()
-        self.joints2joint_array()
-        self.joints2joint_frame()
+        while True:
+            self.find_joints()
+            self.joints2joint_array()
+            self.joints2joint_frame()
 
-        # for-loop over rows in joints_array (which is a numpy array)
-        for joint in self.joints_array:
-            id_bone_1 = int(joint[0])
-            id_bone_2 = int(joint[1])
-            bone_1 = self.bones[id_bone_1]
-            bone_2 = self.bones[id_bone_2]
-            acute_angle = min(joint[10], 180 - joint[10])
+            # if len(self.joints_array) == 19:
+            #     a = 0
 
-        # # for-loop over rows in joint_frame
-        # for joint in self.joint_frame.iterrows():
-        #     print(joint)
-        #     bone_1 = self.bones[int(joint[1][0])]
-        #     bone_2 = self.bones[int(joint[1][1])]
-        #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
-            if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
-                # find minimum distance
-                P0 = bone_1.line_cog_left
-                P1 = bone_1.line_cog_right
-                P2 = bone_2.line_cog_left
-                P3 = bone_2.line_cog_right
-                L0 = np.linalg.norm(P0 - P2)
-                L1 = np.linalg.norm(P0 - P3)
-                L2 = np.linalg.norm(P1 - P2)
-                L3 = np.linalg.norm(P1 - P3)
-                LX1 = np.linalg.norm(P0 - P1)
-                LX2 = np.linalg.norm(P2 - P3)
+            # for-loop over rows in joints_array (which is a numpy array)
+            for i, joint in enumerate(self.joints_array):
+                id_bone_1 = int(joint[0])
+                id_bone_2 = int(joint[1])
+                bone_1 = self.bones[id_bone_1]
+                bone_2 = self.bones[id_bone_2]
+                acute_angle = min(joint[10], 180 - joint[10])
 
-                if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
-                    continue
+            # # for-loop over rows in joint_frame
+            # for joint in self.joint_frame.iterrows():
+            #     print(joint)
+            #     bone_1 = self.bones[int(joint[1][0])]
+            #     bone_2 = self.bones[int(joint[1][1])]
+            #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
+                if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
+                    # find minimum distance
+                    P0 = bone_1.line_cog_left
+                    P1 = bone_1.line_cog_right
+                    P2 = bone_2.line_cog_left
+                    P3 = bone_2.line_cog_right
+                    L0 = np.linalg.norm(P0 - P2)
+                    L1 = np.linalg.norm(P0 - P3)
+                    L2 = np.linalg.norm(P1 - P2)
+                    L3 = np.linalg.norm(P1 - P3)
+                    LX1 = np.linalg.norm(P0 - P1)
+                    LX2 = np.linalg.norm(P2 - P3)
 
-                else:
-                    # identify main: longer
-                    if LX1 >= LX2:
-                        (ind_long, ind_short) = (id_bone_1, id_bone_2)
+                    if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
+                        continue
+
                     else:
-                        (ind_long, ind_short) = (id_bone_2, id_bone_1)
-                    points_long = self.bones[ind_long].points
-                    points_short = self.bones[ind_short].points
-                    print(f'currently {len(self.bones)} bones')
+                        # identify main: longer
+                        if LX1 >= LX2:
+                            (ind_long, ind_short) = (id_bone_1, id_bone_2)
+                        else:
+                            (ind_long, ind_short) = (id_bone_2, id_bone_1)
+                        points_long = self.bones[ind_long].points
+                        points_short = self.bones[ind_short].points
+                        print(f'currently {len(self.bones)} bones')
 
-                    # remove both bones
-                    if ind_long > ind_short:
-                        segment_new = Segment(name=f'beam_{ind_short}', config=self.config)
-                        segment_new.points = np.concatenate((points_long, points_short), axis=0)
-                        self.bones.pop(ind_long)
-                        self.bones.pop(ind_short)
-                    else:
-                        segment_new = Segment(name=f'beam_{ind_long}', config=self.config)
-                        segment_new.points = np.concatenate((points_long, points_short), axis=0)
-                        self.bones.pop(ind_short)
-                        self.bones.pop(ind_long)
+                        # remove both bones
+                        if ind_long > ind_short:
+                            segment_new = Segment(name=f'beam_{ind_short}', config=self.config)
+                            segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                            self.bones.pop(ind_long)
+                            self.bones.pop(ind_short)
+                        else:
+                            segment_new = Segment(name=f'beam_{ind_long}', config=self.config)
+                            segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                            self.bones.pop(ind_short)
+                            self.bones.pop(ind_long)
 
-                    segment_new.calc_axes()
-                    # add new bone
-                    self.add_cloud(segment_new)
-                    self.update_bones()
-                    # self.add_bone(segment_new)
-                    try:
-                        self.bones[-1].fit_cs_rev()
-                    except:
-                        self.bones[-1].h_beam_params = False
-                        self.bones[-1].h_beam_verts = False
-                    print(self.bones[-1].h_beam_params)
+                        segment_new.calc_axes()
+                        # add new bone
+                        self.add_cloud(segment_new)
+                        self.update_bones()
+                        # self.add_bone(segment_new)
+                        try:
+                            self.bones[-1].fit_cs_rev()
+                        except:
+                            self.bones[-1].h_beam_params = False
+                            self.bones[-1].h_beam_verts = False
+                        print(self.bones[-1].h_beam_params)
 
-                    print(f'ummm now {len(self.bones)} bones')
+                        print(f'ummm now {len(self.bones)} bones')
 
-                    self.aggregate_bones()
+                        break
+                        # self.aggregate_bones()
 
-
-
-
-                    # calc axes
-                    # project fit etc
-                    # remove short
-
-                    a = 0
-
-
+            if i == self.joints_array.shape[0] - 1:
+                self.plot_cog_skeleton()
+                print('done with aggregation')
+                break
 
                 # redundant if recompute!
                 # else:
@@ -299,18 +299,6 @@ class Skeleton:
                     #     )
                     # ))
                     # fig.show()
-
-                    a = 0
-
-
-
-
-                # case 2: bones overlap
-                a = 0
-
-
-
-        a = 0
 
     def join_on_passing(self):
         log = 0
