@@ -141,7 +141,7 @@ def fitting_fct(points_array_2D):
                      maxiter=maxiter,
                      phip=phip,
                      phig=phig,
-                     debug=True)
+                     debug=False)
 
     # xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
     #                  swarmsize=swarm_size, maxiter=max_iter)

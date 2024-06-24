@@ -71,7 +71,7 @@ class Skeleton:
                             f'l 1 2 \n')
 
     def find_joints(self):
-        all_joints = list(itertools.combinations(range(len(self.bones)), 2))
+        all_joints = list(itertools.combinations(range(self.bone_count), 2))
         self.joints_in = []
         for joint in all_joints:
             # calculate distance
@@ -84,18 +84,26 @@ class Skeleton:
             self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case, angle])  # KEY
 
     def aggregate_bones(self):
-        a = 0
         self.plot_cog_skeleton()
 
         self.find_joints()
         self.joints2joint_array()
         self.joints2joint_frame()
 
-        # for-loop over rows in joint_frame
-        for joint in self.joint_frame.iterrows():
-            bone_1 = self.bones[int(joint[1][0])]
-            bone_2 = self.bones[int(joint[1][1])]
-            acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
+        # for-loop over rows in joints_array (which is a numpy array)
+        for joint in self.joints_array:
+            id_bone_1 = int(joint[0])
+            id_bone_2 = int(joint[1])
+            bone_1 = self.bones[id_bone_1]
+            bone_2 = self.bones[id_bone_2]
+            acute_angle = min(joint[10], 180 - joint[10])
+
+        # # for-loop over rows in joint_frame
+        # for joint in self.joint_frame.iterrows():
+        #     print(joint)
+        #     bone_1 = self.bones[int(joint[1][0])]
+        #     bone_2 = self.bones[int(joint[1][1])]
+        #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
             if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
                 # find minimum distance
                 P0 = bone_1.line_cog_left
@@ -115,9 +123,9 @@ class Skeleton:
                 else:
                     # identify main: longer
                     if LX1 >= LX2:
-                        (ind_long, ind_short) = (int(joint[1][0]), int(joint[1][1]))
+                        (ind_long, ind_short) = (id_bone_1, id_bone_2)
                     else:
-                        (ind_long, ind_short) = (int(joint[1][1]), int(joint[1][0]))
+                        (ind_long, ind_short) = (id_bone_2, id_bone_1)
                     points_long = self.bones[ind_long].points
                     points_short = self.bones[ind_short].points
                     print(f'currently {len(self.bones)} bones')
@@ -137,6 +145,7 @@ class Skeleton:
                     segment_new.calc_axes()
                     # add new bone
                     self.add_cloud(segment_new)
+                    self.update_bones()
                     # self.add_bone(segment_new)
                     try:
                         self.bones[-1].fit_cs_rev()
@@ -676,7 +685,10 @@ class Skeleton:
             self.potential[2] = 1
         return
 
-    def update_bones(self, cloud):  # ????
+    def update_bones(self):
+        for i, bone in enumerate(self.bones):
+            bone.name = f'beam_{i}'
+        self.bone_count = len(self.bones)
         return
 
     def joints2joint_array(self):
@@ -723,6 +735,8 @@ class Skeleton:
                 continue
             bone.cs_lookup()
             bone.update_axes()
+            # equal axis
+            fig.update_layout(scene=dict(aspectmode='data'))
 
             # plot line_cog_left, line_cog_right as lines
             fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
@@ -744,7 +758,7 @@ class Skeleton:
                                        marker=dict(color='grey', size=1)))
 
         # perspective should be ortho
-        # fig.layout.scene.camera.projection.type = "orthographic"
+        fig.layout.scene.camera.projection.type = "orthographic"
         # no background grid
         fig.layout.scene.xaxis.visible = False
         fig.layout.scene.yaxis.visible = False
