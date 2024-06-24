@@ -103,12 +103,12 @@ class Skeleton:
                 bone_2 = self.bones[id_bone_2]
                 acute_angle = min(joint[10], 180 - joint[10])
 
-            # # for-loop over rows in joint_frame
-            # for joint in self.joint_frame.iterrows():
-            #     print(joint)
-            #     bone_1 = self.bones[int(joint[1][0])]
-            #     bone_2 = self.bones[int(joint[1][1])]
-            #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
+                # # for-loop over rows in joint_frame
+                # for joint in self.joint_frame.iterrows():
+                #     print(joint)
+                #     bone_1 = self.bones[int(joint[1][0])]
+                #     bone_2 = self.bones[int(joint[1][1])]
+                #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
                 if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
                     # find minimum distance
                     P0 = bone_1.line_cog_left
@@ -249,56 +249,101 @@ class Skeleton:
                 # case A: bones in line
                 # remove smaller bone and add its points to the longer bone
 
+                # TODO: after case is covered, recompute and re-start joint loop; recursion could be a smart move here, the bones and joint change in each iteration if one case ABC is covered
+                # self.aggregate_bones()
+
+                # # plot the two bone lines
+                # fig = go.Figure()
+                # fig.add_trace(go.Scatter3d(
+                #     x=[P0[0], P1[0]],
+                #     y=[P0[1], P1[1]],
+                #     z=[P0[2], P1[2]],
+                #     mode='lines',
+                #     line=dict(
+                #         color='red',
+                #         width=6
+                #     )
+                # ))
+                # fig.add_trace(go.Scatter3d(
+                #     x=[P2[0], P3[0]],
+                #     y=[P2[1], P3[1]],
+                #     z=[P2[2], P3[2]],
+                #     mode='lines',
+                #     line=dict(
+                #         color='blue',
+                #         width=6
+                #     )
+                # ))
+                # # start and endpoint of the longer bone
+                # fig.add_trace(go.Scatter3d(
+                #     x=[P0[0], P1[0]],
+                #     y=[P0[1], P1[1]],
+                #     z=[P0[2], P1[2]],
+                #     mode='markers',
+                #     marker=dict(
+                #         size=10,
+                #         color='red'
+                #     )
+                # ))
+                # # start and endpoint of the shorter bone
+                # fig.add_trace(go.Scatter3d(
+                #     x=[P2[0], P3[0]],
+                #     y=[P2[1], P3[1]],
+                #     z=[P2[2], P3[2]],
+                #     mode='markers',
+                #     marker=dict(
+                #         size=10,
+                #         color='blue'
+                #     )
+                # ))
+                # fig.show()
+
+    def join_on_passing_v2(self):
+        self.find_joints()
+        self.joints2joint_array()
+        agenda = self.joints_array[(self.joints_array[:, 2] == 0) | (self.joints_array[:, 2] == 1)]
+        agenda = agenda[agenda[:, 3].argsort()]
+        for joint in agenda:
+            if joint[2] == 0:  # bone_1 dominant
+                passing = int(joint[0])
+                joining = int(joint[1])
+                bridgepoint_joining = np.array([joint[4], joint[5], joint[6]])
+            elif joint[2] == 1:  # bone_2 dominant
+                passing = int(joint[1])
+                joining = int(joint[0])
+                bridgepoint_joining = np.array([joint[7], joint[8], joint[9]])
+            else:
+                raise Exception('joint type not covered')
+            dist_left = np.linalg.norm(self.bones[joining].line_cog_left - np.array([joint[4], joint[5], joint[6]]))
+            dist_right = np.linalg.norm(self.bones[joining].line_cog_right - np.array([joint[4], joint[5], joint[6]]))
+            if dist_left < dist_right:
+                if self.bones[joining].left_edit:  # edited before
+                    continue
+                else:
+                    self.bones[joining].line_cog_left = bridgepoint_joining
+                    bone = self.bones[joining]
+                    bone.points_center = (bone.line_cog_right + bone.line_cog_left) / 2
+                    self.bones[joining].left_edit = True
+                    print('did sth')
+            else:
+                if self.bones[joining].right_edit:
+                    continue
+                else:
+                    self.bones[joining].line_cog_right = bridgepoint_joining
+                    bone = self.bones[joining]
+                    bone.points_center = (bone.line_cog_right + bone.line_cog_left) / 2
+                    self.bones[joining].right_edit = True
+                    print('did sth')
+            self.bones[passing].intermediate_points.append(joint[2])
+
+        for iter in self.bones:
+            iter.left_edit = False
+            iter.right_edit = False
+
+        return
 
 
-                    # TODO: after case is covered, recompute and re-start joint loop; recursion could be a smart move here, the bones and joint change in each iteration if one case ABC is covered
-                    # self.aggregate_bones()
 
-                    # # plot the two bone lines
-                    # fig = go.Figure()
-                    # fig.add_trace(go.Scatter3d(
-                    #     x=[P0[0], P1[0]],
-                    #     y=[P0[1], P1[1]],
-                    #     z=[P0[2], P1[2]],
-                    #     mode='lines',
-                    #     line=dict(
-                    #         color='red',
-                    #         width=6
-                    #     )
-                    # ))
-                    # fig.add_trace(go.Scatter3d(
-                    #     x=[P2[0], P3[0]],
-                    #     y=[P2[1], P3[1]],
-                    #     z=[P2[2], P3[2]],
-                    #     mode='lines',
-                    #     line=dict(
-                    #         color='blue',
-                    #         width=6
-                    #     )
-                    # ))
-                    # # start and endpoint of the longer bone
-                    # fig.add_trace(go.Scatter3d(
-                    #     x=[P0[0], P1[0]],
-                    #     y=[P0[1], P1[1]],
-                    #     z=[P0[2], P1[2]],
-                    #     mode='markers',
-                    #     marker=dict(
-                    #         size=10,
-                    #         color='red'
-                    #     )
-                    # ))
-                    # # start and endpoint of the shorter bone
-                    # fig.add_trace(go.Scatter3d(
-                    #     x=[P2[0], P3[0]],
-                    #     y=[P2[1], P3[1]],
-                    #     z=[P2[2], P3[2]],
-                    #     mode='markers',
-                    #     marker=dict(
-                    #         size=10,
-                    #         color='blue'
-                    #     )
-                    # ))
-                    # fig.show()
 
     def join_on_passing(self):
         log = 0
@@ -755,4 +800,3 @@ class Skeleton:
         # show go figure
         fig.show()
         return
-

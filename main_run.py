@@ -170,7 +170,7 @@ if __name__ == '__main__':
         print('\n- skeleton bones join on passing')
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         skeleton.plot_cog_skeleton()
-        skeleton.join_on_passing()
+        skeleton.join_on_passing_v2()
         skeleton.plot_cog_skeleton()
 
         skeleton.cache_pickle(config.project.parking_path)
