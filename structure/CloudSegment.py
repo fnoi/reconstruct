@@ -92,7 +92,16 @@ class Segment(object):
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
         points = self.points
-        normals = self.points_data[['nx', 'ny', 'nz']].values
+        try:
+            normals = self.points_data[['nx', 'ny', 'nz']].values
+        except TypeError:  # normals inavailable if called in skeleton aggregation
+            # calculate normals real quick
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                radius=self.config.local_features.normals_radius, max_nn=self.config.local_features.max_nn))
+            normals = np.asarray(pcd.normals)
+
         # find the two best planes and their line of intersection
         planes, direction, origin, inliers_0, inliers_1 = orientation_estimation(
             np.concatenate((points, normals), axis=1),

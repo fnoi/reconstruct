@@ -8,6 +8,7 @@ import pandas as pd
 
 import plotly.graph_objs as go
 
+from structure.CloudSegment import Segment
 from tools.geometry import warped_vectors_intersection
 
 
@@ -52,9 +53,9 @@ class Skeleton:
                     f'l 1 2 \n')
         self.bone_count += 1
 
-    def add_bone(self, bone):
-        self.bones.append(bone)
-        self.bone_count += 1
+    # def add_bone(self, bone):
+    #     self.bones.append(bone)
+    #     self.bone_count += 1
 
     def to_obj(self, topic: str, radius: bool = False):
         for i, bone in enumerate(self.bones):
@@ -73,7 +74,6 @@ class Skeleton:
         all_joints = list(itertools.combinations(range(len(self.bones)), 2))
         self.joints_in = []
         for joint in all_joints:
-
             # calculate distance
             # here the error of not converging is "create"
             bridgepoint1, bridgepoint2, rating, case, angle = warped_vectors_intersection(
@@ -84,6 +84,9 @@ class Skeleton:
             self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case, angle])  # KEY
 
     def aggregate_bones(self):
+        a = 0
+        self.plot_cog_skeleton()
+
         self.find_joints()
         self.joints2joint_array()
         self.joints2joint_frame()
@@ -108,75 +111,139 @@ class Skeleton:
 
                 if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
                     continue
+
                 else:
-                    origin_coords = [-1e3, -1e3, -1e3]
                     # identify main: longer
-                    if LX1 > LX2:
-                        long_ind = 0
-                        LA = L0
-                        # project P2 and P3 to 3D vector defined by P0 and P1
-                        P2 = P0 + np.dot(P2 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                        P3 = P0 + np.dot(P3 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                        # project origin_coords to line defined by P0 and P1
-                        origin = P0 + np.dot(origin_coords - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                        oP0 = np.linalg.norm(origin - P0)
-                        oP1 = np.linalg.norm(origin - P1)
-                        oP2 = np.linalg.norm(origin - P2)
-                        oP3 = np.linalg.norm(origin - P3)
-
-                        if oP0 > oP1:
-                            P0_ = P1
-                            P1_ = P0
-                            P0 = P0_
-                            P1 = P1_
-                        if oP2 > oP3:
-                            P2_ = P3
-                            P3_ = P2
-                            P2 = P2_
-                            P3 = P3_
-
-                        LB = np.linalg.norm(P0 - P2)
-                        LC = np.linalg.norm(P0 - P3)
-
+                    if LX1 >= LX2:
+                        (ind_long, ind_short) = (int(joint[1][0]), int(joint[1][1]))
                     else:
-                        long_ind = 1
-                        LA = L1
-                        # project P0 and P1 to 3D vector defined by P2 and P3
-                        P0 = P2 + np.dot(P0 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                        P1 = P2 + np.dot(P1 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                        # project origin_coords to line defined by P2 and P3
-                        origin = P2 + np.dot(origin_coords - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                        oP0 = np.linalg.norm(origin - P0)
-                        oP1 = np.linalg.norm(origin - P1)
-                        oP2 = np.linalg.norm(origin - P2)
-                        oP3 = np.linalg.norm(origin - P3)
+                        (ind_long, ind_short) = (int(joint[1][1]), int(joint[1][0]))
+                    points_long = self.bones[ind_long].points
+                    points_short = self.bones[ind_short].points
+                    print(f'currently {len(self.bones)} bones')
 
-                        if oP0 > oP1:
-                            P0_ = P1
-                            P1_ = P0
-                            P0 = P0_
-                            P1 = P1_
-                        if oP2 > oP3:
-                            P2_ = P3
-                            P3_ = P2
-                            P2 = P2_
-                            P3 = P3_
-
-                        LB = np.linalg.norm(P0 - P2)
-                        LC = np.linalg.norm(P0 - P3)
-
-                    # case A
-                    if LA <= LB:
-                        print('case A')
-                        # in line, connect
-                    elif LB <= LA:
-                        # overlap, connect
-                        print('case B')
-                    elif LC <= LA:
-                        # integrate
-                        print('case C')
+                    # remove both bones
+                    if ind_long > ind_short:
+                        segment_new = Segment(name=f'beam_{ind_short}', config=self.config)
+                        segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                        self.bones.pop(ind_long)
+                        self.bones.pop(ind_short)
                     else:
-                        raise Exception('case not covered')
+                        segment_new = Segment(name=f'beam_{ind_long}', config=self.config)
+                        segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                        self.bones.pop(ind_short)
+                        self.bones.pop(ind_long)
+
+                    segment_new.calc_axes()
+                    # add new bone
+                    self.add_cloud(segment_new)
+                    # self.add_bone(segment_new)
+                    try:
+                        self.bones[-1].fit_cs_rev()
+                    except:
+                        self.bones[-1].h_beam_params = False
+                        self.bones[-1].h_beam_verts = False
+                    print(self.bones[-1].h_beam_params)
+
+                    print(f'ummm now {len(self.bones)} bones')
+
+                    self.aggregate_bones()
+
+
+
+
+                    # calc axes
+                    # project fit etc
+                    # remove short
+
+                    a = 0
+
+
+
+                # redundant if recompute!
+                # else:
+                #     origin_coords = [-1e3, -1e3, -1e3]
+                #     # identify main: longer
+                #     if LX1 > LX2:
+                #         long_ind = 0
+                #         LA = L0
+                #         # project P2 and P3 to 3D vector defined by P0 and P1
+                #         P2 = P0 + np.dot(P2 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                #         P3 = P0 + np.dot(P3 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                #         # project origin_coords to line defined by P0 and P1
+                #         origin = P0 + np.dot(origin_coords - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
+                #         oP0 = np.linalg.norm(origin - P0)
+                #         oP1 = np.linalg.norm(origin - P1)
+                #         oP2 = np.linalg.norm(origin - P2)
+                #         oP3 = np.linalg.norm(origin - P3)
+                #
+                #         if oP0 > oP1:
+                #             P0_ = P1
+                #             P1_ = P0
+                #             P0 = P0_
+                #             P1 = P1_
+                #         if oP2 > oP3:
+                #             P2_ = P3
+                #             P3_ = P2
+                #             P2 = P2_
+                #             P3 = P3_
+                #
+                #         LB = np.linalg.norm(P0 - P2)
+                #         LC = np.linalg.norm(P0 - P3)
+                #
+                #     else:
+                #         long_ind = 1
+                #         LA = L1
+                #         # project P0 and P1 to 3D vector defined by P2 and P3
+                #         P0 = P2 + np.dot(P0 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                #         P1 = P2 + np.dot(P1 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                #         # project origin_coords to line defined by P2 and P3
+                #         origin = P2 + np.dot(origin_coords - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
+                #         oP0 = np.linalg.norm(origin - P0)
+                #         oP1 = np.linalg.norm(origin - P1)
+                #         oP2 = np.linalg.norm(origin - P2)
+                #         oP3 = np.linalg.norm(origin - P3)
+                #
+                #         if oP0 > oP1:
+                #             P0_ = P1
+                #             P1_ = P0
+                #             P0 = P0_
+                #             P1 = P1_
+                #         if oP2 > oP3:
+                #             P2_ = P3
+                #             P3_ = P2
+                #             P2 = P2_
+                #             P3 = P3_
+                #
+                #         LB = np.linalg.norm(P0 - P2)
+                #         LC = np.linalg.norm(P0 - P3)
+                #
+                #     # case A
+                #     if LA <= LB:
+                #         # in line, connect
+                #         print('case A')
+                #         # add small to long. re-do bone calc: endpoints will and direction might change!
+                #
+                #
+                #         # remove small bone
+                #     elif LB <= LA:
+                #         # overlap, connect
+                #         print('case B')
+                #         # add small to long. re-do bone calc: endpoints and direction might change!
+                #     elif LC <= LA:
+                #         # integrate
+                #         print('case C')
+                #         # add small to long. re-do bone calc: endpoints (should) stay the same but recompute cant hurt
+                #     else:
+                #         raise Exception('case not covered')
+
+                # case A: bones in line
+                # remove smaller bone and add its points to the longer bone
+
+
+
+                    # TODO: after case is covered, recompute and re-start joint loop; recursion could be a smart move here, the bones and joint change in each iteration if one case ABC is covered
+                    # self.aggregate_bones()
 
                     # # plot the two bone lines
                     # fig = go.Figure()
@@ -609,7 +676,7 @@ class Skeleton:
             self.potential[2] = 1
         return
 
-    def update_bones(self, cloud):
+    def update_bones(self, cloud):  # ????
         return
 
     def joints2joint_array(self):

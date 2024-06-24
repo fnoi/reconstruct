@@ -165,7 +165,7 @@ def warped_vectors_intersection(seg1, seg2):
     dir2 = seg2.line_cog_right - seg2.line_cog_left
 
     # calculate angle of "intersection"
-    angle = np.arccos(np.dot(dir1, dir2) / (np.linalg.norm(dir1) * np.linalg.norm(dir2)))
+    angle = np.arccos(np.clip(np.dot(dir1, dir2) / (np.linalg.norm(dir1) * np.linalg.norm(dir2)), -1, 1))
     angle = np.degrees(angle)
 
     connect = np.cross(dir1, dir2)
@@ -174,6 +174,12 @@ def warped_vectors_intersection(seg1, seg2):
         raise 'Vectors are parallel'
     # kicked recently! # dist = np.abs(np.dot(seg1.center - seg2.center, connect)) / np.linalg.norm(connect)
     # source: https://math.stackexchange.com/questions/2213165/find-shortest-distance-between-lines-in-3d
+
+    if seg1.points_center is None:
+        seg1.points_center = (seg1.line_raw_left + seg1.line_raw_right) / 2
+    if seg2.points_center is None:
+        seg2.points_center = (seg2.line_raw_left + seg2.line_raw_right) / 2
+
     t1 = np.dot(np.cross(dir2, connect), (seg2.points_center - seg1.points_center)) / np.dot(connect, connect)
     t2 = np.dot(np.cross(dir1, connect), (seg2.points_center - seg1.points_center)) / np.dot(connect, connect)
 
@@ -239,11 +245,11 @@ def warped_vectors_intersection(seg1, seg2):
         rating = np.linalg.norm(bridgepoint1 - bridgepoint2)
         case = 3
 
-    if rating == 0 or rating > 0 is False:
+    if rating == 0 or rating > 0 == False:
         # if rating > 0 is False:
         rating = 1e8
 
-    print(case)
+    # print(case)
 
     return bridgepoint1, bridgepoint2, rating, case, angle
 

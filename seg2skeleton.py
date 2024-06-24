@@ -38,7 +38,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
         for cache_entry in tqdm(cache, desc='instance orientation and point projection (axes)', total=len(cache)):
             segment = cache_entry[0]
             cloud = cache_entry[1]
-            if len(cloud.points) > config.skeleton.min_points:
+            if len(cloud.points) > config.skeleton.min_points:  # bone size filter! # TODO: think thresh
                 cloud.calc_axes(plot=plot)
                 skeleton.add_cloud(cloud)
                 # skeleton.add_cloud(cloud)
