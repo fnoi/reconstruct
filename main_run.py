@@ -174,6 +174,7 @@ if __name__ == '__main__':
         skeleton.plot_cog_skeleton()
 
         skeleton.cache_pickle(config.project.parking_path)
+        skeleton.cache_json(config.project.parking_path)
 
     if cache_flag <= 6:
         print('\n- collision-free reconstruction with FreeCAD')

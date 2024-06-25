@@ -1,4 +1,4 @@
 {
   "export_filename": "beams_dummy",
-  "path_skeleton": "data/parking/skeleton_cache.pickle"
+  "path_skeleton": "data/parking/skeleton_cache.json"
 }

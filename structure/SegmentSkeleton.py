@@ -1,5 +1,6 @@
 import itertools
 import copy
+import json
 import os
 import pickle
 
@@ -46,6 +47,19 @@ class Skeleton:
     def cache_pickle(self, path):
         with open(f'{path}/skeleton_cache.pickle', 'wb') as f:
             pickle.dump(self, f)
+
+    def cache_json(self, path):
+        export_dict = {}
+        for i, bone in enumerate(self.bones):
+            export_dict[f'bone_{i}'] = {
+                'start': bone.line_cog_left.tolist(),
+                'end': bone.line_cog_right.tolist(),
+                'beam_verts': bone.h_beam_verts.tolist(),
+                'rot_mat': bone.mat_rotation_xy.tolist()
+            }
+        with open(f'{path}/skeleton_cache.json', 'w') as f:
+            json.dump(export_dict, f)
+
 
     def add_cloud(self, cloud):
         self.bones.append(cloud)
