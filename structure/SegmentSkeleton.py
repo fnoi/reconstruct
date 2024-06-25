@@ -318,11 +318,11 @@ class Skeleton:
                 if joint[1]['case'] == 0:  # bone_1 dominant
                     passing = int(joint[1]['bone1'])
                     joining = int(joint[1]['bone2'])
-                    bridgepoint_joining = joint[1]['bridgepoint1']
+                    bridgepoint_joining = joint[1]['bridgepoint2']
                 elif joint[1]['case'] == 1:  # bone_2 dominant
                     passing = int(joint[1]['bone2'])
                     joining = int(joint[1]['bone1'])
-                    bridgepoint_joining = joint[1]['bridgepoint2']
+                    bridgepoint_joining = joint[1]['bridgepoint1']
                 else:
                     raise Exception('joint type not covered')
                 dist_left = np.linalg.norm(np.asarray(self.bones[joining].line_cog_left) - np.asarray(bridgepoint_joining))

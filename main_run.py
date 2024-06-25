@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 5.1
+    cache_flag = 4
     ##########
 
     if cache_flag <= 1:
@@ -175,6 +175,7 @@ if __name__ == '__main__':
 
         skeleton.cache_pickle(config.project.parking_path)
 
-
     if cache_flag <= 6:
-        print('\n- collision-free reconstruction with FreeCAD')  # no idea (but should be fine)
+        print('\n- collision-free reconstruction with FreeCAD')
+        skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+        a = 0
