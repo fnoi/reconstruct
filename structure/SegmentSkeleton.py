@@ -300,52 +300,67 @@ class Skeleton:
                 # fig.show()
 
     def join_on_passing_v2(self):
-        self.find_joints()
-        self.joints2joint_array()
-        self.joints2joint_frame()
 
-        agenda = self.joint_frame[(self.joint_frame['case'] == 0) | (self.joint_frame['case'] == 1)]
-        # sort by rating
-        agenda = agenda.sort_values(by='rating')
-        # only rating < 0.3
-        agenda = agenda[agenda['rating'] < 0.1]  #TODO: replace with config...
+        while True:
 
-        for joint in agenda.iterrows():
-            if joint[1]['case'] == 0:  # bone_1 dominant
-                passing = int(joint[1]['bone1'])
-                joining = int(joint[1]['bone2'])
-                bridgepoint_joining = joint[1]['bridgepoint1']
-            elif joint[1]['case'] == 1:  # bone_2 dominant
-                passing = int(joint[1]['bone2'])
-                joining = int(joint[1]['bone1'])
-                bridgepoint_joining = joint[1]['bridgepoint2']
-            else:
-                raise Exception('joint type not covered')
-            dist_left = np.linalg.norm(np.asarray(self.bones[joining].line_cog_left) - np.asarray(bridgepoint_joining))
-            dist_right = np.linalg.norm(np.asarray(self.bones[joining].line_cog_right) - np.asarray(bridgepoint_joining))
-            if dist_left < dist_right:
-                if self.bones[joining].left_edit:  # edited before
-                    continue
+            self.find_joints()
+            self.joints2joint_array()
+            self.joints2joint_frame()
+
+            agenda = self.joint_frame[(self.joint_frame['case'] == 0) | (self.joint_frame['case'] == 1)]
+            # sort by rating
+            agenda = agenda.sort_values(by='rating')
+            # only rating < 0.3
+            agenda = agenda[agenda['rating'] < 0.1]  #TODO: replace with config...
+
+            edit_flag = False
+            for joint in agenda.iterrows():
+                if joint[1]['case'] == 0:  # bone_1 dominant
+                    passing = int(joint[1]['bone1'])
+                    joining = int(joint[1]['bone2'])
+                    bridgepoint_joining = joint[1]['bridgepoint1']
+                elif joint[1]['case'] == 1:  # bone_2 dominant
+                    passing = int(joint[1]['bone2'])
+                    joining = int(joint[1]['bone1'])
+                    bridgepoint_joining = joint[1]['bridgepoint2']
                 else:
-                    self.bones[joining].line_cog_left = bridgepoint_joining
-                    bone = self.bones[joining]
-                    bone.points_center = (np.asarray(bone.line_cog_right) + np.asarray(bone.line_cog_left)) / 2
-                    self.bones[joining].left_edit = True
-                    print('did sth')
-            else:
-                if self.bones[joining].right_edit:
-                    continue
+                    raise Exception('joint type not covered')
+                dist_left = np.linalg.norm(np.asarray(self.bones[joining].line_cog_left) - np.asarray(bridgepoint_joining))
+                dist_right = np.linalg.norm(np.asarray(self.bones[joining].line_cog_right) - np.asarray(bridgepoint_joining))
+                if dist_left < dist_right:
+                    # if self.bones[joining].left_edit:  # edited before
+                    #     continue
+                    # else:
+                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].line_cog_left))
+                    if delta > 0:
+                        self.bones[joining].line_cog_left = np.asarray(bridgepoint_joining)
+                        # bone = self.bones[joining]
+                        self.bones[joining].points_center = (np.asarray(self.bones[joining].line_cog_right) + np.asarray(self.bones[joining].line_cog_left)) / 2
+                        self.bones[joining].left_edit = True
+                        print(f'did sth, moved bone {joining} by {delta}')
+                        edit_flag = True
                 else:
-                    self.bones[joining].line_cog_right = bridgepoint_joining
-                    bone = self.bones[joining]
-                    bone.points_center = (np.asarray(bone.line_cog_right) + np.asarray(bone.line_cog_left)) / 2
-                    self.bones[joining].right_edit = True
-                    print('did sth')
-            self.bones[passing].intermediate_points.append(joint[1]['case'])
+                    # if self.bones[joining].right_edit:
+                    #     continue
+                    # else:
+                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].line_cog_right))
+                    if delta > 0:
+                        self.bones[joining].line_cog_right = np.asarray(bridgepoint_joining)
+                        # bone = self.bones[joining]
+                        self.bones[joining].points_center = (np.asarray(self.bones[joining].line_cog_right) + np.asarray(self.bones[joining].line_cog_left)) / 2
+                        self.bones[joining].right_edit = True
+                        print(f'did sth, moved bone {joining} by {delta}')
+                        edit_flag = True
 
-        for iter in self.bones:
-            iter.left_edit = False
-            iter.right_edit = False
+                if edit_flag:
+                    break  # break the for-loop over joints
+                # self.bones[passing].intermediate_points.append(joint[1]['case'])
+
+            if not edit_flag:
+                break
+        # for iter in self.bones:
+        #     iter.left_edit = False
+        #     iter.right_edit = False
 
         return
 
@@ -773,8 +788,8 @@ class Skeleton:
         for bone in self.bones:
             if bone.h_beam_params is False:
                 continue
-            bone.cs_lookup()
-            bone.update_axes()
+            # bone.cs_lookup()
+            # bone.update_axes()
             # equal axis
             fig.update_layout(scene=dict(aspectmode='data'))
 

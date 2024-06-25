@@ -210,8 +210,8 @@ def skew_lines(seg1, seg2):
     debug_plot = False
     # if distance < 0.3:
     #     debug_plot = True
-    if not debug_plot:
-        print(f'Rating: {distance}, Case: {case}, Angle: {angle}')
+    # if not debug_plot:
+    #     print(f'Rating: {distance}, Case: {case}, Angle: {angle}')
     if debug_plot:
         fig = go.Figure()
         fig.add_trace(go.Scatter3d(
@@ -261,9 +261,6 @@ def skew_lines(seg1, seg2):
         fig.show()
 
     return bridgepoint_1, bridgepoint_2, distance, case, angle
-
-
-
 
 
 def warped_vectors_intersection(seg1, seg2):
