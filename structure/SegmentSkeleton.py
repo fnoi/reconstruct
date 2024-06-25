@@ -6,10 +6,12 @@ import pickle
 import numpy as np
 import pandas as pd
 
-import plotly.graph_objs as go
-
-from structure.CloudSegment import Segment
-from tools.geometry import warped_vectors_intersection, skew_lines
+try:
+    import plotly.graph_objs as go
+    from structure.CloudSegment import Segment
+    from tools.geometry import warped_vectors_intersection, skew_lines
+except ImportError as e:
+    print(f'Error: {e}')
 
 
 class Skeleton:

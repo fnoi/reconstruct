@@ -3,24 +3,27 @@ import itertools
 import os
 import time
 
-import numpy as np
-import open3d as o3d
-import pandas as pd
-import pyransac3d as pyrsc
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+try:
+    import numpy as np
+    import open3d as o3d
+    import pandas as pd
+    import pyransac3d as pyrsc
+    import matplotlib.pyplot as plt
+    import plotly.graph_objects as go
 
-from pyswarm import pso
-from sklearn.cluster import DBSCAN
+    from pyswarm import pso
+    from sklearn.cluster import DBSCAN
 
-from tools.IO import points2txt, lines2obj, cache_meta
-from tools.fitting_1 import params2verts
-from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
-from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
-    project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
-    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
-    rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
-from tools import visual as vis, fitting_pso
+    from tools.IO import points2txt, lines2obj, cache_meta
+    from tools.fitting_1 import params2verts
+    from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
+    from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
+        project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
+        intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
+        rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
+    from tools import visual as vis, fitting_pso
+except ImportError as e:
+    print(f'Import Error: {e}')
 
 
 class Segment(object):
