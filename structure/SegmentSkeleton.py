@@ -9,7 +9,7 @@ import pandas as pd
 import plotly.graph_objs as go
 
 from structure.CloudSegment import Segment
-from tools.geometry import warped_vectors_intersection
+from tools.geometry import warped_vectors_intersection, skew_lines
 
 
 class Skeleton:
@@ -76,9 +76,10 @@ class Skeleton:
         for joint in all_joints:
             # calculate distance
             # here the error of not converging is "create"
-            bridgepoint1, bridgepoint2, rating, case, angle = warped_vectors_intersection(
-                self.bones[joint[0]],
-                self.bones[joint[1]])
+            # bridgepoint1, bridgepoint2, rating, case, angle = warped_vectors_intersection(
+            #     self.bones[joint[0]],
+            #     self.bones[joint[1]])
+            bridgepoint1, bridgepoint2, rating, case, angle = skew_lines(self.bones[joint[0]], self.bones[joint[1]])
             # print(rating)
             # if rating < self.threshold_distance_join:  ##
             self.joints_in.append([joint[0], joint[1], bridgepoint1, bridgepoint2, rating, case, angle])  # KEY
@@ -301,28 +302,34 @@ class Skeleton:
     def join_on_passing_v2(self):
         self.find_joints()
         self.joints2joint_array()
-        agenda = self.joints_array[(self.joints_array[:, 2] == 0) | (self.joints_array[:, 2] == 1)]
-        agenda = agenda[agenda[:, 3].argsort()]
-        for joint in agenda:
-            if joint[2] == 0:  # bone_1 dominant
-                passing = int(joint[0])
-                joining = int(joint[1])
-                bridgepoint_joining = np.array([joint[4], joint[5], joint[6]])
-            elif joint[2] == 1:  # bone_2 dominant
-                passing = int(joint[1])
-                joining = int(joint[0])
-                bridgepoint_joining = np.array([joint[7], joint[8], joint[9]])
+        self.joints2joint_frame()
+
+        agenda = self.joint_frame[(self.joint_frame['case'] == 0) | (self.joint_frame['case'] == 1)]
+        # sort by rating
+        agenda = agenda.sort_values(by='rating')
+        # only rating < 0.3
+        agenda = agenda[agenda['rating'] < 0.1]  #TODO: replace with config...
+
+        for joint in agenda.iterrows():
+            if joint[1]['case'] == 0:  # bone_1 dominant
+                passing = int(joint[1]['bone1'])
+                joining = int(joint[1]['bone2'])
+                bridgepoint_joining = joint[1]['bridgepoint1']
+            elif joint[1]['case'] == 1:  # bone_2 dominant
+                passing = int(joint[1]['bone2'])
+                joining = int(joint[1]['bone1'])
+                bridgepoint_joining = joint[1]['bridgepoint2']
             else:
                 raise Exception('joint type not covered')
-            dist_left = np.linalg.norm(self.bones[joining].line_cog_left - np.array([joint[4], joint[5], joint[6]]))
-            dist_right = np.linalg.norm(self.bones[joining].line_cog_right - np.array([joint[4], joint[5], joint[6]]))
+            dist_left = np.linalg.norm(np.asarray(self.bones[joining].line_cog_left) - np.asarray(bridgepoint_joining))
+            dist_right = np.linalg.norm(np.asarray(self.bones[joining].line_cog_right) - np.asarray(bridgepoint_joining))
             if dist_left < dist_right:
                 if self.bones[joining].left_edit:  # edited before
                     continue
                 else:
                     self.bones[joining].line_cog_left = bridgepoint_joining
                     bone = self.bones[joining]
-                    bone.points_center = (bone.line_cog_right + bone.line_cog_left) / 2
+                    bone.points_center = (np.asarray(bone.line_cog_right) + np.asarray(bone.line_cog_left)) / 2
                     self.bones[joining].left_edit = True
                     print('did sth')
             else:
@@ -331,10 +338,10 @@ class Skeleton:
                 else:
                     self.bones[joining].line_cog_right = bridgepoint_joining
                     bone = self.bones[joining]
-                    bone.points_center = (bone.line_cog_right + bone.line_cog_left) / 2
+                    bone.points_center = (np.asarray(bone.line_cog_right) + np.asarray(bone.line_cog_left)) / 2
                     self.bones[joining].right_edit = True
                     print('did sth')
-            self.bones[passing].intermediate_points.append(joint[2])
+            self.bones[passing].intermediate_points.append(joint[1]['case'])
 
         for iter in self.bones:
             iter.left_edit = False
@@ -789,6 +796,24 @@ class Skeleton:
                                        z=bone.points[:, 2],
                                        mode='markers',
                                        marker=dict(color='grey', size=1)))
+            # add beam name to center point plus offset
+            center_point = (bone.line_cog_right + bone.line_cog_left) / 2
+            text_point = center_point + np.array([0.4, 0.3, 0.2])
+            # add beam name to text point
+            fig.add_trace(go.Scatter3d(x=[text_point[0]],
+                                        y=[text_point[1]],
+                                        z=[text_point[2]],
+                                        mode='text',
+                                        text=[bone.name],
+                                        textposition='middle center',
+                                        textfont=dict(size=10, color='black')))
+
+            # add line from center_point to text_point
+            fig.add_trace(go.Scatter3d(x=[center_point[0], text_point[0]],
+                                        y=[center_point[1], text_point[1]],
+                                        z=[center_point[2], text_point[2]],
+                                        mode='lines',
+                                        line=dict(color='black', width=1)))
 
         # perspective should be ortho
         fig.layout.scene.camera.projection.type = "orthographic"
