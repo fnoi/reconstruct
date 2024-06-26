@@ -372,6 +372,8 @@ class Segment(object):
         self.downsample_dbscan_rand(points_after_sampling)
         plot_2D_points_bbox(self.points_2D_fitting)
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
+        fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
+
 
     def downsample_dbscan_rand(self, points_after_sampling):
         init_count = self.points_2D.shape[0]

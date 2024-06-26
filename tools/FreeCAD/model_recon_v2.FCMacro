@@ -30,14 +30,9 @@ if __name__ == '__main__':
 
     with open(path_local + config['path_skeleton'], 'rb') as f:
         skeleton_dict = json.load(f)
-        # print(skeleton_dict)
-        # skeleton = pickle.load(f)
-        # print(skeleton.bones)
 
     try:
         App.newDocument(config['export_filename'])
-        # fcdocexport = App.getDocument(config['export_filename'])
-        # fcdocexport.addObject('PartDesign::Body', 'Body')
         fcdoc = App.getDocument(config['export_filename'])
         body = fcdoc.addObject('PartDesign::Body', 'Body')
     except Exception as e:
@@ -47,75 +42,59 @@ if __name__ == '__main__':
     for bone_flag in skeleton_dict.keys():
         bone_id = int(bone_flag.split('_')[1])
         bone = skeleton_dict[bone_flag]
+        start = np.asarray(bone['start'])
+        end = np.asarray(bone['end'])
         # cs vertices
         beam_verts = np.asarray(bone['beam_verts'])
-        # center vertices around origin = bone.line_cog_...
+        beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
+
+        # define T_delta, rotation matrix
         delta_x = beam_verts[0, 0] + (np.max(beam_verts[:, 0] - np.min(beam_verts[:, 0])) / 2)
         delta_y = beam_verts[0, 1] + (np.max(beam_verts[:, 1] - np.min(beam_verts[:, 1])) / 2)
-        beam_verts[:, 0] -= delta_x
-        beam_verts[:, 1] -= delta_y
-        beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
+        delta_z = bone['start'][2]
+        T_delta = np.asarray([[1, 0, 0, -delta_x],
+                              [0, 1, 0, -delta_y],
+                              [0, 0, 1, -delta_z],
+                              [0, 0, 0, 1]])
+
+        beam_verts[:, 0] = beam_verts[:, 0] - delta_x
+        beam_verts[:, 1] = beam_verts[:, 1] - delta_y
+        beam_verts[:, 2] = beam_verts[:, 2] - delta_z
+
         # rotation matrix
         rot_mat = np.asarray(bone['rot_mat'])
-        z_angle_add = bone['angle_xy']
-        # define rotation matrix for z axis rotation
-        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
-                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
-                                [0, 0, 1]])
-        # multiply rotation matrices
-        rot_mat = np.dot(rot_mat.T, rot_mat_z)
-        # transpose matrix
         # rot_mat = rot_mat.T
-
-        if bone_id == 1:
-            print('bone 1:')
-            print(rot_mat)
-
 
         # create placement
         try:
             pl = FreeCAD.Placement()
-            pl.Base = FreeCAD.Vector(bone['start'][0], bone['start'][1], bone['start'][2])
+            pl.Base = FreeCAD.Vector(T_delta[0][3], T_delta[1][3], T_delta[2][3])
             pl.Rotation = FreeCAD.Rotation(rot_mat[0][0], rot_mat[0][1], rot_mat[0][2],
                                            rot_mat[1][0], rot_mat[1][1], rot_mat[1][2],
                                            rot_mat[2][0], rot_mat[2][1], rot_mat[2][2])
+            # pl.Transformation = T_delta
             fcdoc.recompute()
-
-
 
             # create bone line
             vector = np.asarray([bone['end'][i] - bone['start'][i] for i in range(3)])
             length = np.linalg.norm(vector)
-            points = [FreeCAD.Vector(bone['start'][0], bone['start'][1], bone['start'][2]),
-                      FreeCAD.Vector(bone['end'][0], bone['end'][1], bone['end'][2])]
+            points = [FreeCAD.Vector(0, 0, 0),
+                      FreeCAD.Vector(0, 0, length)]
             line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
             Draft.autogroup(line)
             fcdoc.recompute()
-
 
             # pl.Rotation.Matrix = rot_mat
 
             # create offset on yz plane with x coordinate of midpoint + rotated plane
             point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{bone_id}")
-            point.X = bone['start'][0]
-            point.Y = bone['start'][1]
-            point.Z = bone['start'][2]
+            point.X = 0
+            point.Y = 0
+            point.Z = 0
 
-            # create plane
-            # datumplane = fcdoc.getObject('Body').newObject('PartDesign::Plane', f'DatumPlane{bone_id}')
-            # datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000), App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-            # datumplane.MapReversed = False
-
-            # datumplane.Support = [(point, f"Point{bone_id}")]
-            # datumplane.MapPathParameter = 0.000000
-            # datumplane.MapMode = 'Translate'
-            # datumplane.Placement.Rotation.Matrix = rot_mat
-            # datumplane.recompute()
-            #
             # create cross-section
             fcdoc.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{bone_id}')
             polygon = fcdoc.getObject(f'cross_section{bone_id}')
-            # polygon.Support = (fcdoc.getObject(f'DatumPlane{bone_id}'), [''])
             polygon.MapMode = 'FlatFace'
             polygon_edges = []
             for i in range(len(beam_verts)):
@@ -130,7 +109,7 @@ if __name__ == '__main__':
                     App.Vector(beam_verts[edge[1]][0], beam_verts[edge[1]][1], beam_verts[edge[1]][2])),
                     False
                 )
-            polygon.Placement = pl
+            # polygon.Placement = pl
             Draft.autogroup(polygon)
             fcdoc.recompute()
             #
@@ -141,36 +120,18 @@ if __name__ == '__main__':
             sweep.Spine = line
             sweep.Solid = True
             sweep.Frenet = False
+
+            # apply rotation
+            sweep.Placement = pl
+
+
             fcdoc.recompute()
-
-            # beam = Arch.makeStructure(polygon, height=length)
-            # beam.Profile = "Crosssection"
-            # beam.Placement.Base.x += vector[0]
-            # beam.Placement.Base.y += vector[1]
-            # beam.Placement.Base.z += vector[2]
-            #
-            # beam.IfcType = 'Beam'
-            # Draft.autogroup(beam)
-            # fcdoc.recompute()
-            # fcdoc.recompute()
-            #
-            # fcdoc.removeObject(f'DatumPlane{bone_id}')
-            # fcdoc.removeObject(f'DatumPlane{bone_id}')
-            # fcdoc.recompute()
-
-
-
-
-
+            fcdoc.recompute()
 
         except Exception as e:
             print('FreeCAD is not available, running standalone.')
             print(e)
 
-        # rotation matrix
-
-
         # break
-
 
     raise Exception('hello silly my old friend')
