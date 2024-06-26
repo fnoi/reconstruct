@@ -1,11 +1,5 @@
-import os
-import stat
-import pickle
 import json
-
 import numpy as np
-import math
-from sys import platform
 
 try:
     import Part
@@ -19,18 +13,6 @@ except ImportError as e:
     print('FreeCAD is not available, running standalone.')
     print(e)
 
-
-def quaternion_rotation(v, ax=np.array([1.0, 0.0, 0.0])):
-    v = v / norm(v)  # Normalize the vector
-
-    if v[0] == 1.0:  # Vector is already aligned with x-axis
-        q = np.array([1.0, 0.0, 0.0, 0.0])
-    else:
-        axis = np.cross(v, ax)  # Calculate rotation axis
-        angle = np.arccos(np.dot(v, ax))  # Calculate rotation angle
-        q = np.array([np.cos(angle / 2), axis[0] * np.sin(angle / 2), axis[1] * np.sin(angle / 2), axis[2] * np.sin(angle / 2)])  # Convert axis-angle representation to quaternion
-
-    return q
 
 
 if __name__ == '__main__':
@@ -70,16 +52,21 @@ if __name__ == '__main__':
         # center vertices around origin = bone.line_cog_...
         delta_x = beam_verts[0, 0] + (np.max(beam_verts[:, 0] - np.min(beam_verts[:, 0])) / 2)
         delta_y = beam_verts[0, 1] + (np.max(beam_verts[:, 1] - np.min(beam_verts[:, 1])) / 2)
-        beam_verts[:, 0] -= delta_x
-        beam_verts[:, 1] -= delta_y
+        # beam_verts[:, 0] -= delta_x
+        # beam_verts[:, 1] -= delta_y
         beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
         # rotation matrix
         rot_mat = np.asarray(bone['rot_mat'])
+        rot_mat = rot_mat.T
+
 
         # create placement
         try:
             pl = FreeCAD.Placement()
             pl.Base = FreeCAD.Vector(bone['start'][0], bone['start'][1], bone['start'][2])
+            pl.Rotation = FreeCAD.Rotation(rot_mat[0][0], rot_mat[0][1], rot_mat[0][2],
+                                           rot_mat[1][0], rot_mat[1][1], rot_mat[1][2],
+                                           rot_mat[2][0], rot_mat[2][1], rot_mat[2][2])
             fcdoc.recompute()
 
             # create bone line
@@ -101,9 +88,9 @@ if __name__ == '__main__':
             point.Z = bone['start'][2]
 
             # create plane
-            datumplane = fcdoc.getObject('Body').newObject('PartDesign::Plane', f'DatumPlane{bone_id}')
-            datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000), App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-            datumplane.MapReversed = False
+            # datumplane = fcdoc.getObject('Body').newObject('PartDesign::Plane', f'DatumPlane{bone_id}')
+            # datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000), App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
+            # datumplane.MapReversed = False
 
             # datumplane.Support = [(point, f"Point{bone_id}")]
             # datumplane.MapPathParameter = 0.000000
@@ -169,7 +156,7 @@ if __name__ == '__main__':
         # rotation matrix
 
 
-        break
+        # break
 
 
     raise Exception('hello silly my old friend')
