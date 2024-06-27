@@ -1,3 +1,4 @@
+import itertools
 import json
 import numpy as np
 
@@ -7,11 +8,28 @@ try:
     import Draft
     import Arch
     import BOPTools
+    import BOPTools.JoinFeatures
 
     import importOBJ
 except ImportError as e:
     print('FreeCAD is not available, running standalone.')
     print(e)
+
+
+def check_intersection(object_1, object_2):
+    """check for intersection between two objects in FreeCAD"""
+    shape_1 = object_1.Shape
+    shape_2 = object_2.Shape
+
+    # check for intersection
+    common_shape = shape_1.common(shape_2)
+
+    if common_shape.Volume > 1e-6\
+            and common_shape.Area > 1e-6\
+            and common_shape.Length > 1e-6:
+        return True
+    else:
+        return False
 
 
 
@@ -92,26 +110,12 @@ if __name__ == '__main__':
             Draft.autogroup(line)
             fcdoc.recompute()
 
-
-            # pl.Rotation.Matrix = rot_mat
-
             # create offset on yz plane with x coordinate of midpoint + rotated plane
             point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{bone_id}")
             point.X = bone['start'][0]
             point.Y = bone['start'][1]
             point.Z = bone['start'][2]
 
-            # create plane
-            # datumplane = fcdoc.getObject('Body').newObject('PartDesign::Plane', f'DatumPlane{bone_id}')
-            # datumplane.AttachmentOffset = App.Placement(App.Vector(0.0000000000, 0.0000000000, 0.0000000000), App.Rotation(0.0000000000, 0.0000000000, 0.0000000000))
-            # datumplane.MapReversed = False
-
-            # datumplane.Support = [(point, f"Point{bone_id}")]
-            # datumplane.MapPathParameter = 0.000000
-            # datumplane.MapMode = 'Translate'
-            # datumplane.Placement.Rotation.Matrix = rot_mat
-            # datumplane.recompute()
-            #
             # create cross-section
             fcdoc.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{bone_id}')
             polygon = fcdoc.getObject(f'cross_section{bone_id}')
@@ -143,39 +147,58 @@ if __name__ == '__main__':
             sweep.Frenet = False
             fcdoc.recompute()
 
-            # beam = Arch.makeStructure(polygon, height=length)
-            # beam.Profile = "Crosssection"
-            # beam.Placement.Base.x += vector[0]
-            # beam.Placement.Base.y += vector[1]
-            # beam.Placement.Base.z += vector[2]
-            #
-            # beam.IfcType = 'Beam'
-            # Draft.autogroup(beam)
-            # fcdoc.recompute()
-            # fcdoc.recompute()
-            #
-            # fcdoc.removeObject(f'DatumPlane{bone_id}')
-            # fcdoc.removeObject(f'DatumPlane{bone_id}')
-            # fcdoc.recompute()
-
-        # calculate area of cross section for each bone (box 0::6)
-
-        # fetch all connections? narrow down?
-
-        # from the largest involved CS, start joining the bones
-
-
-
-
-
         except Exception as e:
             print('FreeCAD is not available, running standalone.')
             print(e)
 
-        # rotation matrix
+    # calculate area of cross-section for each bone (box 0::6)
+    connection_candidates = cs_area.keys()
+    # sort by area
+    connection_candidates_sorted = sorted(connection_candidates, key=lambda x: cs_area[x], reverse=True)
+    connection_candidates_paired = list(itertools.combinations(connection_candidates_sorted, 2))
+    compounds = {}
+    compound_key = 0
 
+    for connection_candidate in connection_candidates_paired:
+        # #investigate if overlapping
+        # if connection_candidate[0] not in compounds:
+        #     obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        # else:
+        #     compound_id = compounds[connection_candidate[0]]
+        #     obj_1 = fcdoc.getObject(f'compound{compound_id}')
+        #
+        # if connection_candidate[1] not in compounds:
+        #     obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+        # else:
+        #     compound_id = compounds[connection_candidate[1]]
+        #     obj_2 = fcdoc.getObject(f'compound{compound_id}')
 
-        # break
+        # base case
+        obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
 
+        if check_intersection(obj_1, obj_2):
+            print(f'intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+            # create the compound object from the intersecting objects
+            j = Part.BOPTools.JoinFeatures.makeConnect(name='Connect')
+            # compound = Part.makeCompound([obj_1.Shape, obj_2.Shape])
+            # compound = Part.connect(compound)
+            #
+            # # add the compound object
+            # compound_obj = fcdoc.addObject("Part::Feature", f"compound{compound_key}")
+            # compound_obj.Shape = compound
+            #
+            # # map the new compound to both candidates
+            # compounds[connection_candidate[0]] = compound_key
+            # compounds[connection_candidate[1]] = compound_key
+            #
+            # compound_key += 1
+            #
+            # # Recompute the document to update the compound
+            # fcdoc.recompute()
 
-    raise Exception('hello silly my old friend')
+            break
+        else:
+            print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+
+    print('done')
