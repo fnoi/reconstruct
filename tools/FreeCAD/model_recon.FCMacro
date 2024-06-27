@@ -44,11 +44,18 @@ if __name__ == '__main__':
         print('FreeCAD is not available, running standalone.')
         print(e)
 
+    cs_area = {}
     for bone_flag in skeleton_dict.keys():
         bone_id = int(bone_flag.split('_')[1])
         bone = skeleton_dict[bone_flag]
         # cs vertices
         beam_verts = np.asarray(bone['beam_verts'])
+
+        area_x = beam_verts[6, 0] - beam_verts[0, 0]
+        area_y = beam_verts[6, 1] - beam_verts[0, 1]
+        area = area_x * area_y
+        cs_area[bone_id] = area
+
         # center vertices around origin = bone.line_cog_...
         delta_x = beam_verts[0, 0] + (np.max(beam_verts[:, 0] - np.min(beam_verts[:, 0])) / 2)
         delta_y = beam_verts[0, 1] + (np.max(beam_verts[:, 1] - np.min(beam_verts[:, 1])) / 2)
@@ -64,13 +71,6 @@ if __name__ == '__main__':
                                 [0, 0, 1]])
         # multiply rotation matrices
         rot_mat = np.dot(rot_mat.T, rot_mat_z)
-        # transpose matrix
-        # rot_mat = rot_mat.T
-
-        if bone_id == 1:
-            print('bone 1:')
-            print(rot_mat)
-
 
         # create placement
         try:
@@ -158,6 +158,11 @@ if __name__ == '__main__':
             # fcdoc.removeObject(f'DatumPlane{bone_id}')
             # fcdoc.recompute()
 
+        # calculate area of cross section for each bone (box 0::6)
+
+        # fetch all connections? narrow down?
+
+        # from the largest involved CS, start joining the bones
 
 
 
