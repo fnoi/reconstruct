@@ -7,7 +7,6 @@ try:
     import Mesh
     import Draft
     import Arch
-    import BOPTools
     import BOPTools.JoinFeatures
 
     import importOBJ
@@ -145,11 +144,22 @@ if __name__ == '__main__':
             sweep.Spine = line
             sweep.Solid = True
             sweep.Frenet = False
+
+            # remove the polygon from the body
+            fcdoc.getObject('Body').removeObject(polygon)
+
+
+            # old = polygon.getParentGeoFeatureGroup()
+            # old.removeObject(polygon)
+            # fcdoc.getObject(f'beam{bone_id}').addObject(polygon)
+            # # sweep.addObject(polygon)
             fcdoc.recompute()
 
         except Exception as e:
             print('FreeCAD is not available, running standalone.')
             print(e)
+
+    # raise Exception('stop here')
 
     # calculate area of cross-section for each bone (box 0::6)
     connection_candidates = cs_area.keys()
@@ -160,27 +170,36 @@ if __name__ == '__main__':
     compound_key = 0
 
     for connection_candidate in connection_candidates_paired:
-        # #investigate if overlapping
-        # if connection_candidate[0] not in compounds:
-        #     obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
-        # else:
-        #     compound_id = compounds[connection_candidate[0]]
-        #     obj_1 = fcdoc.getObject(f'compound{compound_id}')
-        #
-        # if connection_candidate[1] not in compounds:
-        #     obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
-        # else:
-        #     compound_id = compounds[connection_candidate[1]]
-        #     obj_2 = fcdoc.getObject(f'compound{compound_id}')
+        #investigate if overlapping
+        if connection_candidate[0] not in compounds:
+            obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        else:
+            compound_id = compounds[connection_candidate[0]]
+            obj_1 = fcdoc.getObject(f'compound{compound_id}')
+
+        if connection_candidate[1] not in compounds:
+            obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+        else:
+            compound_id = compounds[connection_candidate[1]]
+            obj_2 = fcdoc.getObject(f'compound{compound_id}')
 
         # base case
-        obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
-        obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+        # obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        # obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+        print(obj_1)
+        print('::::::')
+        print(obj_2)
+
 
         if check_intersection(obj_1, obj_2):
             print(f'intersection between {connection_candidate[0]} and {connection_candidate[1]}')
             # create the compound object from the intersecting objects
-            j = Part.BOPTools.JoinFeatures.makeConnect(name='Connect')
+            j = BOPTools.JoinFeatures.makeConnect(name=f'connect{compound_key}')
+            j.Objects = [obj_1, obj_2]
+            j.Proxy.execute(j)
+            j.purgeTouched()
+            for obj in j.ViewObject.Proxy.claimChildren():
+                obj.ViewObject.hide()
             # compound = Part.makeCompound([obj_1.Shape, obj_2.Shape])
             # compound = Part.connect(compound)
             #
@@ -188,16 +207,16 @@ if __name__ == '__main__':
             # compound_obj = fcdoc.addObject("Part::Feature", f"compound{compound_key}")
             # compound_obj.Shape = compound
             #
-            # # map the new compound to both candidates
-            # compounds[connection_candidate[0]] = compound_key
-            # compounds[connection_candidate[1]] = compound_key
-            #
-            # compound_key += 1
-            #
-            # # Recompute the document to update the compound
-            # fcdoc.recompute()
+            # map the new compound to both candidates
+            compounds[connection_candidate[0]] = compound_key
+            compounds[connection_candidate[1]] = compound_key
 
-            break
+            compound_key += 1
+
+            # Recompute the document to update the compound
+            fcdoc.recompute()
+
+            # break
         else:
             print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
 
