@@ -8,7 +8,8 @@ try:
     import Draft
     import Arch
     import BOPTools.JoinFeatures
-
+    import ifcopenshell
+    import exportIFC
     import importOBJ
 except ImportError as e:
     print('FreeCAD is not available, running standalone.')
@@ -224,6 +225,7 @@ if __name__ == '__main__':
         try:
             keepers.remove(name_1)
             keepers.remove(name_2)
+            print(f'###### removed {name_1} and {name_2} from keepers')
         except ValueError as e:
             print(e)
 
@@ -244,6 +246,12 @@ if __name__ == '__main__':
             obj.ViewObject.hide()
 
         print(f'-- created {name_3}')
+        try:
+            keepers.extend([name_3])
+        except ValueError as e:
+            print(e)
+
+        print(f'#### {keepers}')
 
         # delete obj_1 and obj_2
 
@@ -261,6 +269,8 @@ if __name__ == '__main__':
             compounds[compound_key] = []
         compounds[compound_key] = previously_involved
 
+        # TODO: find why keepers isn't complete
+
         # remove the purged compounds
         for item in purge_from_compounds:
             compounds.pop(item)
@@ -276,3 +286,21 @@ if __name__ == '__main__':
     #     print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
 
     print('done')
+    print(f'exporting keepers: {keepers}')
+
+    # export as obj
+    __objs__ = []
+    for keeper in keepers:
+        __objs__.append(fcdoc.getObject(keeper))
+
+    importOBJ.export(__objs__, path_local + config['export_filename'] + '.obj')
+
+    # export as ifc
+    if hasattr(exportIFC, "exportOptions"):
+        options = exportIFC.exportOptions(f'{path_local}{config["export_filename"]}.ifc')
+        exportIFC.export(__objs__, options)
+    else:
+        exportIFC.export(__objs__, f'{path_local}{config["export_filename"]}.ifc')
+
+    del __objs__
+
