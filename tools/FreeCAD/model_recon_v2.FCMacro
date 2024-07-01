@@ -1,3 +1,4 @@
+import itertools
 import json
 import numpy as np
 
@@ -6,12 +7,28 @@ try:
     import Mesh
     import Draft
     import Arch
-    import BOPTools
+    import BOPTools.JoinFeatures
 
     import importOBJ
 except ImportError as e:
     print('FreeCAD is not available, running standalone.')
     print(e)
+
+
+def check_intersection(object_1, object_2):
+    """check for intersection between two objects in FreeCAD"""
+    shape_1 = object_1.Shape
+    shape_2 = object_2.Shape
+
+    # check for intersection
+    common_shape = shape_1.common(shape_2)
+
+    if common_shape.Volume > 1e-6\
+            and common_shape.Area > 1e-6\
+            and common_shape.Length > 1e-6:
+        return True
+    else:
+        return False
 
 
 
@@ -30,71 +47,78 @@ if __name__ == '__main__':
 
     with open(path_local + config['path_skeleton'], 'rb') as f:
         skeleton_dict = json.load(f)
+        # print(skeleton_dict)
+        # skeleton = pickle.load(f)
+        # print(skeleton.bones)
 
     try:
         App.newDocument(config['export_filename'])
+        # fcdocexport = App.getDocument(config['export_filename'])
+        # fcdocexport.addObject('PartDesign::Body', 'Body')
         fcdoc = App.getDocument(config['export_filename'])
         body = fcdoc.addObject('PartDesign::Body', 'Body')
     except Exception as e:
         print('FreeCAD is not available, running standalone.')
         print(e)
 
+    cs_area = {}
     for bone_flag in skeleton_dict.keys():
         bone_id = int(bone_flag.split('_')[1])
         bone = skeleton_dict[bone_flag]
-        start = np.asarray(bone['start'])
-        end = np.asarray(bone['end'])
         # cs vertices
         beam_verts = np.asarray(bone['beam_verts'])
-        beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
 
-        # define T_delta, rotation matrix
+        area_x = beam_verts[6, 0] - beam_verts[0, 0]
+        area_y = beam_verts[6, 1] - beam_verts[0, 1]
+        area = area_x * area_y
+        cs_area[bone_id] = area
+
+        # center vertices around origin = bone.line_cog_...
         delta_x = beam_verts[0, 0] + (np.max(beam_verts[:, 0] - np.min(beam_verts[:, 0])) / 2)
         delta_y = beam_verts[0, 1] + (np.max(beam_verts[:, 1] - np.min(beam_verts[:, 1])) / 2)
-        delta_z = bone['start'][2]
-        T_delta = np.asarray([[1, 0, 0, -delta_x],
-                              [0, 1, 0, -delta_y],
-                              [0, 0, 1, -delta_z],
-                              [0, 0, 0, 1]])
-
-        beam_verts[:, 0] = beam_verts[:, 0] - delta_x
-        beam_verts[:, 1] = beam_verts[:, 1] - delta_y
-        beam_verts[:, 2] = beam_verts[:, 2] - delta_z
-
+        beam_verts[:, 0] -= delta_x
+        beam_verts[:, 1] -= delta_y
+        beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
         # rotation matrix
         rot_mat = np.asarray(bone['rot_mat'])
-        # rot_mat = rot_mat.T
+        z_angle_add = bone['angle_xy']
+        # define rotation matrix for z axis rotation
+        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                                [0, 0, 1]])
+        # multiply rotation matrices
+        rot_mat = np.dot(rot_mat.T, rot_mat_z)
 
         # create placement
         try:
             pl = FreeCAD.Placement()
-            pl.Base = FreeCAD.Vector(T_delta[0][3], T_delta[1][3], T_delta[2][3])
+            pl.Base = FreeCAD.Vector(bone['start'][0], bone['start'][1], bone['start'][2])
             pl.Rotation = FreeCAD.Rotation(rot_mat[0][0], rot_mat[0][1], rot_mat[0][2],
                                            rot_mat[1][0], rot_mat[1][1], rot_mat[1][2],
                                            rot_mat[2][0], rot_mat[2][1], rot_mat[2][2])
-            # pl.Transformation = T_delta
             fcdoc.recompute()
+
+
 
             # create bone line
             vector = np.asarray([bone['end'][i] - bone['start'][i] for i in range(3)])
             length = np.linalg.norm(vector)
-            points = [FreeCAD.Vector(0, 0, 0),
-                      FreeCAD.Vector(0, 0, length)]
+            points = [FreeCAD.Vector(bone['start'][0], bone['start'][1], bone['start'][2]),
+                      FreeCAD.Vector(bone['end'][0], bone['end'][1], bone['end'][2])]
             line = Draft.make_wire(points, placement=pl, closed=False, face=True, support=None)
             Draft.autogroup(line)
             fcdoc.recompute()
 
-            # pl.Rotation.Matrix = rot_mat
-
             # create offset on yz plane with x coordinate of midpoint + rotated plane
             point = FreeCAD.ActiveDocument.addObject("Part::Vertex", f"Point{bone_id}")
-            point.X = 0
-            point.Y = 0
-            point.Z = 0
+            point.X = bone['start'][0]
+            point.Y = bone['start'][1]
+            point.Z = bone['start'][2]
 
             # create cross-section
             fcdoc.getObject('Body').newObject('Sketcher::SketchObject', f'cross_section{bone_id}')
             polygon = fcdoc.getObject(f'cross_section{bone_id}')
+            # polygon.Support = (fcdoc.getObject(f'DatumPlane{bone_id}'), [''])
             polygon.MapMode = 'FlatFace'
             polygon_edges = []
             for i in range(len(beam_verts)):
@@ -109,7 +133,7 @@ if __name__ == '__main__':
                     App.Vector(beam_verts[edge[1]][0], beam_verts[edge[1]][1], beam_verts[edge[1]][2])),
                     False
                 )
-            # polygon.Placement = pl
+            polygon.Placement = pl
             Draft.autogroup(polygon)
             fcdoc.recompute()
             #
@@ -121,17 +145,129 @@ if __name__ == '__main__':
             sweep.Solid = True
             sweep.Frenet = False
 
-            # apply rotation
-            sweep.Placement = pl
+            # remove the polygon from the body
+            fcdoc.getObject('Body').removeObject(polygon)
 
 
-            fcdoc.recompute()
+            # old = polygon.getParentGeoFeatureGroup()
+            # old.removeObject(polygon)
+            # fcdoc.getObject(f'beam{bone_id}').addObject(polygon)
+            # # sweep.addObject(polygon)
             fcdoc.recompute()
 
         except Exception as e:
             print('FreeCAD is not available, running standalone.')
             print(e)
 
-        # break
+    # raise Exception('stop here')
 
-    raise Exception('hello silly my old friend')
+    # calculate area of cross-section for each bone (box 0::6)
+    connection_candidates = cs_area.keys()
+    # sort by area
+    connection_candidates_sorted = sorted(connection_candidates, key=lambda x: cs_area[x], reverse=True)
+    connection_candidates_paired = list(itertools.combinations(connection_candidates_sorted, 2))
+
+    intersecting_joints = []
+
+    compounds = {}
+    compound_key = None
+
+    for connection_candidate in connection_candidates_paired:
+        print(f'connection_candidate = {connection_candidate}')
+        obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+        if check_intersection(obj_1, obj_2):
+            print(f'intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+            intersecting_joints.append(connection_candidate)
+        else:
+            print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+
+    raise Exception('stop here')
+    max = 20
+
+    for iter, connection_candidate in enumerate(connection_candidates_paired):
+        connect_flags = [0, 0, 0]
+        if iter > max:
+            break
+        #investigate if overlapping
+        if not any(connection_candidate[0] in lst for lst in compounds.values()):
+            obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+            print(f'not connected, beam{connection_candidate[0]}')
+        else:
+            for key, lst in compounds.items():
+                if connection_candidate[0] in lst:
+                    compound_id = key
+                    break
+            obj_1 = fcdoc.getObject(f'connect{compound_id}')
+            connect_flags[0] = 1
+            print(f'aggregate connect{compound_id} includes beam{connection_candidate[0]}')
+
+        if not any(connection_candidate[1] in lst for lst in compounds.values()):
+            obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+            print(f'not connected, beam{connection_candidate[1]}')
+        else:
+            for key, lst in compounds.items():
+                if connection_candidate[1] in lst:
+                    compound_id = key
+                    break
+            obj_2 = fcdoc.getObject(f'connect{compound_id}')
+            connect_flags[1] = 1
+            print(f'aggregate connect{compound_id} includes beam{connection_candidate[1]}')
+
+        if connect_flags[0] == 1 and connect_flags[1] == 1:
+            connect_flags[2] = 1
+
+            raise Exception('O-M-G')
+
+        # base case
+        # obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
+        # obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
+
+        if check_intersection(obj_1, obj_2):
+            if not compound_key:
+                compound_key = 0
+
+            print(f'\nintersection between {connection_candidate[0]} and {connection_candidate[1]}')
+            # create the compound object from the intersecting objects
+            j = BOPTools.JoinFeatures.makeConnect(name=f'connect{compound_key}')
+            j.Objects = [obj_1, obj_2]
+            j.Proxy.execute(j)
+            j.purgeTouched()
+            for obj in j.ViewObject.Proxy.claimChildren():
+                obj.ViewObject.hide()
+
+            print(f'\ncreated connect{compound_key}')
+
+            # delete obj_1 and obj_2
+
+            # print(f'remoing {obj_1.Name} and {obj_2.Name} from the document')
+            # fcdoc.removeObject(obj_1.Name)
+            # fcdoc.removeObject(obj_2.Name)
+
+
+            # # add the compound object
+            # compound_obj = fcdoc.addObject("Part::Feature", f"compound{compound_key}")
+            # compound_obj.Shape = compound
+            #
+            # map the new compound to both candidates
+            if compound_key not in compounds.keys():
+                compounds[compound_key] = []
+            print(f'!!! compound key = {compound_key}, '
+                  f'connection_candidate[0] = {connection_candidate[0]}, '
+                  f'connection_candidate[1] = {connection_candidate[1]}, '
+                  f'compounds = {compounds}')
+            compounds[compound_key].append(connection_candidate[0])
+            compounds[compound_key].append(connection_candidate[1])
+
+
+
+            # Recompute the document to update the compound
+            fcdoc.recompute()
+
+            print(f'\n{compounds}\n')
+
+            # break
+        else:
+            print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+
+    print('done')
