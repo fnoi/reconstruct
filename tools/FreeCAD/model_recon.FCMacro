@@ -163,6 +163,7 @@ if __name__ == '__main__':
 
     # calculate area of cross-section for each bone (box 0::6)
     connection_candidates = cs_area.keys()
+    keepers = [f'beam{item}' for item in connection_candidates]
     # sort by area
     connection_candidates_sorted = sorted(connection_candidates, key=lambda x: cs_area[x], reverse=True)
     connection_candidates_paired = list(itertools.combinations(connection_candidates_sorted, 2))
@@ -170,63 +171,79 @@ if __name__ == '__main__':
 
     for i, connection in enumerate(connection_candidates_paired):
         if check_intersection(fcdoc.getObject(f'beam{connection[0]}'), fcdoc.getObject(f'beam{connection[1]}')):
-            print(f'intersection between {connection[0]} and {connection[1]}')
             connection_mask[i] = True
 
     connection_candidates_paired = [connection_candidates_paired[i] for i in range(len(connection_candidates_paired)) if connection_mask[i]]
+    print(f'connection_candidates_paired = {connection_candidates_paired}')
 
     compounds = {}
-    compound_key = None
+    compound_key = 0
 
-    max = 20 ### for testing purposes TODO remove
+    max = 13 ### for testing purposes TODO remove
 
     for iter, connection_candidate in enumerate(connection_candidates_paired):
 
-        connect_flags = [0, 0, 0] # necessary?
+        previously_involved = []
+        purge_from_compounds = []
+
         if iter > max:
             break
         if not any(connection_candidate[0] in lst for lst in compounds.values()):
-            obj_1 = fcdoc.getObject(f'beam{connection_candidate[0]}')
-            print(f'not connected, beam{connection_candidate[0]}')
+            previously_involved.extend([connection_candidate[0]])
+            name_1 = f'beam{connection_candidate[0]}'
+            obj_1 = fcdoc.getObject(name_1)
+            # print(f'not connected, {name_1}')
         else:
             for key, lst in compounds.items():
                 if connection_candidate[0] in lst:
                     compound_id = key
                     break
-            obj_1 = fcdoc.getObject(f'connect{compound_id}')
-            connect_flags[0] = 1
-            print(f'aggregate connect{compound_id} includes beam{connection_candidate[0]}')
+            previously_involved.extend(compounds[compound_id])
+            purge_from_compounds.append(compound_id)
+            name_1 = f'compound{compound_id}'
+            obj_1 = fcdoc.getObject(name_1)
+            # print(f'aggregate {name_1} includes beam{connection_candidate[0]}')
 
         if not any(connection_candidate[1] in lst for lst in compounds.values()):
-            obj_2 = fcdoc.getObject(f'beam{connection_candidate[1]}')
-            print(f'not connected, beam{connection_candidate[1]}')
+            previously_involved.extend([connection_candidate[1]])
+            name_2 = f'beam{connection_candidate[1]}'
+            obj_2 = fcdoc.getObject(name_2)
+            # print(f'not connected, {name_2}')
         else:
             for key, lst in compounds.items():
                 if connection_candidate[1] in lst:
                     compound_id = key
                     break
-            obj_2 = fcdoc.getObject(f'connect{compound_id}')
-            connect_flags[1] = 1
-            print(f'aggregate connect{compound_id} includes beam{connection_candidate[1]}')
+            previously_involved.extend(compounds[compound_id])
+            purge_from_compounds.append(compound_id)
+            name_2 = f'compound{compound_id}'
+            obj_2 = fcdoc.getObject(name_2)
+            # print(f'aggregate {name_2} includes beam{connection_candidate[1]}')
 
-        if connect_flags[0] == 1 and connect_flags[1] == 1:
-            connect_flags[2] = 1
+        # remove name_1 and name_2 from keepers
+        try:
+            keepers.remove(name_1)
+            keepers.remove(name_2)
+        except ValueError as e:
+            print(e)
 
-            raise Exception('O-M-G')
+        if name_1 == name_2:
+            print(f'---> connection candidate {connection_candidate[0]} and {connection_candidate[1]} are already in the same compound')
+            continue
 
-        if not compound_key:
-            compound_key = 0
+        print(f'-  intersection between {name_1} and {name_2}')
+        compound_key += 1
 
-        print(f'\nintersection between {connection_candidate[0]} and {connection_candidate[1]}')
         # create the compound object from the intersecting objects
-        j = BOPTools.JoinFeatures.makeConnect(name=f'connect{compound_key}')
+        name_3 = f'compound{compound_key}'
+        j = BOPTools.JoinFeatures.makeConnect(name=name_3)
         j.Objects = [obj_1, obj_2]
         j.Proxy.execute(j)
         j.purgeTouched()
         for obj in j.ViewObject.Proxy.claimChildren():
             obj.ViewObject.hide()
 
-        print(f'\ncreated connect{compound_key}')
+        print(f'-- created {name_3}')
 
         # delete obj_1 and obj_2
 
@@ -242,22 +259,20 @@ if __name__ == '__main__':
         # map the new compound to both candidates
         if compound_key not in compounds.keys():
             compounds[compound_key] = []
-        print(f'!!! compound key = {compound_key}, '
-              f'connection_candidate[0] = {connection_candidate[0]}, '
-              f'connection_candidate[1] = {connection_candidate[1]}, '
-              f'compounds = {compounds}')
-        compounds[compound_key].append(connection_candidate[0])
-        compounds[compound_key].append(connection_candidate[1])
+        compounds[compound_key] = previously_involved
 
+        # remove the purged compounds
+        for item in purge_from_compounds:
+            compounds.pop(item)
 
 
         # Recompute the document to update the compound
         fcdoc.recompute()
 
-        print(f'\n{compounds}\n')
+        print(f'-->{compounds}\n')
 
         # break
-    else:
-        print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+    # else:
+    #     print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
 
     print('done')
