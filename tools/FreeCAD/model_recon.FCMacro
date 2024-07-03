@@ -11,6 +11,7 @@ try:
     import ifcopenshell
     import exportIFC
     import importOBJ
+    import FreeCADGui
 except ImportError as e:
     print('FreeCAD is not available, running standalone.')
     print(e)
@@ -37,6 +38,10 @@ if __name__ == '__main__':
 
     try:
         App = FreeCAD
+        # close all documents
+        open_docs = App.listDocuments().keys()
+        for doc in open_docs:
+            App.closeDocument(doc)
     except NameError as e:
         print('FreeCAD is not available, running standalone.')
         print(e)
@@ -180,7 +185,7 @@ if __name__ == '__main__':
     compounds = {}
     compound_key = 0
 
-    max = 13 ### for testing purposes TODO remove
+    max = 19 ### for testing purposes TODO remove
 
     for iter, connection_candidate in enumerate(connection_candidates_paired):
 
@@ -221,14 +226,6 @@ if __name__ == '__main__':
             obj_2 = fcdoc.getObject(name_2)
             # print(f'aggregate {name_2} includes beam{connection_candidate[1]}')
 
-        # remove name_1 and name_2 from keepers
-        try:
-            keepers.remove(name_1)
-            keepers.remove(name_2)
-            print(f'###### removed {name_1} and {name_2} from keepers')
-        except ValueError as e:
-            print(e)
-
         if name_1 == name_2:
             print(f'---> connection candidate {connection_candidate[0]} and {connection_candidate[1]} are already in the same compound')
             continue
@@ -251,7 +248,19 @@ if __name__ == '__main__':
         except ValueError as e:
             print(e)
 
-        print(f'#### {keepers}')
+        print(f'####!! {keepers}')
+
+        # remove name_1 and name_2 from keepers
+        try:
+            keepers.remove(name_1)
+            print(f'###### removed {name_1} from keepers')
+        except ValueError as e:
+            print(e)
+        try:
+            keepers.remove(name_2)
+            print(f'###### removed {name_2} from keepers')
+        except ValueError as e:
+            print(e)
 
         # delete obj_1 and obj_2
 
@@ -272,6 +281,7 @@ if __name__ == '__main__':
         # TODO: find why keepers isn't complete
 
         # remove the purged compounds
+        print(f'to purge: {purge_from_compounds}')
         for item in purge_from_compounds:
             compounds.pop(item)
 
@@ -281,9 +291,7 @@ if __name__ == '__main__':
 
         print(f'-->{compounds}\n')
 
-        # break
-    # else:
-    #     print(f'no intersection between {connection_candidate[0]} and {connection_candidate[1]}')
+
 
     print('done')
     print(f'exporting keepers: {keepers}')
@@ -303,4 +311,8 @@ if __name__ == '__main__':
         exportIFC.export(__objs__, f'{path_local}{config["export_filename"]}.ifc')
 
     del __objs__
+
+    FreeCADGui.ActiveDocument.ActiveView.fitAll()
+    FreeCADGui.SendMsgToActiveView("ViewFit")
+    FreeCADGui.activeDocument().activeView().viewAxometric()
 
