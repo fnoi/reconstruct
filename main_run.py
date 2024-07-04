@@ -149,6 +149,7 @@ if __name__ == '__main__':
             a = 0
             try:
                 bone.fit_cs_rev()
+                bone.cs_lookup()
             except:
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
