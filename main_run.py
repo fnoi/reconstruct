@@ -155,6 +155,8 @@ if __name__ == '__main__':
             print(bone.h_beam_params)
         skeleton.cache_pickle(config.project.parking_path)
 
+        # TODO: are we still retrieving from table?
+
     if cache_flag <= 5:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
