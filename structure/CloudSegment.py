@@ -3,6 +3,8 @@ import itertools
 import os
 import time
 
+from tools.metrics import huber_loss
+
 try:
     import numpy as np
     import open3d as o3d
@@ -469,13 +471,22 @@ class Segment(object):
         bf_fit = self.h_beam_params[4]
         d_fit = self.h_beam_params[5]
 
-        # find best fit row in beams_frame with RMSE
-        beams_frame['RMSE'] = np.sqrt(
-            (beams_frame['tw'] - tw_fit) ** 2 +
-            (beams_frame['tf'] - tf_fit) ** 2 +
-            (beams_frame['bf'] - bf_fit) ** 2 +
-            (beams_frame['d'] - d_fit) ** 2)
-        beams_frame = beams_frame.sort_values(by='RMSE', ascending=True)
+        # find best fit row in beams_frame with Huber Loss
+        delta = 1.0  # TODO: include in config
+        beams_frame['HuberLoss'] = (
+                beams_frame.apply(lambda row: huber_loss(row['tw'] - tw_fit, delta), axis=1) +
+                beams_frame.apply(lambda row: huber_loss(row['tf'] - tf_fit, delta), axis=1) +
+                beams_frame.apply(lambda row: huber_loss(row['bf'] - bf_fit, delta), axis=1) +
+                beams_frame.apply(lambda row: huber_loss(row['d'] - d_fit, delta), axis=1)
+        )
+        beams_frame = beams_frame.sort_values(by='HuberLoss', ascending=True)
+
+        # beams_frame['RMSE'] = np.sqrt(
+        #     (beams_frame['tw'] - tw_fit) ** 2 +
+        #     (beams_frame['tf'] - tf_fit) ** 2 +
+        #     (beams_frame['bf'] - bf_fit) ** 2 +
+        #     (beams_frame['d'] - d_fit) ** 2)
+        # beams_frame = beams_frame.sort_values(by='RMSE', ascending=True)
         tw_lookup = beams_frame['tw'].iloc[0]
         tf_lookup = beams_frame['tf'].iloc[0]
         bf_lookup = beams_frame['bf'].iloc[0]

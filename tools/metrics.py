@@ -196,6 +196,13 @@ def calculate_precision_recall_iou(pred, gt, id_map, thresholds=None):
         return pr_thresh[0.0]['mean_iou_weighted'], pr_thresh[0.0]['mean_iou']
 
 
+def huber_loss(residual, delta):
+    if abs(residual) <= delta:
+        return 0.5 * residual ** 2
+    else:
+        return delta * (abs(residual) - 0.5 * delta)
+
+
 def calculate_metrics(df_cloud, config):
     inst_pred = df_cloud['instance_pr'].to_numpy()
     inst_gt = df_cloud['instance_gt'].to_numpy()
