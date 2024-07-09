@@ -67,6 +67,7 @@ def supernormal_confidence(supernormal, normals):
     norms = norms + 1e-10  # avoid division by zero
     normals /= norms
 
+    # deviation between supernormal and normals (from being perpendicular)
     # normals /= np.linalg.norm(normals, axis=1)[:, None]
     n_sn_90_dev = np.arccos(np.dot(supernormal, normals.T))
     n_sn_90_dev = np.abs(np.rad2deg(n_sn_90_dev))
