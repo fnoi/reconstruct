@@ -15,7 +15,7 @@ from sklearn.cluster import DBSCAN
 from tools.utils import plot_patch
 
 
-def supernormal_svd(normals):
+def supernormal_svd(normals, full_return=False):
     if np.isnan(normals).any():
         print('nan in normals')
     normal_src = np.copy(normals)
@@ -25,9 +25,14 @@ def supernormal_svd(normals):
         print('nan in normals')
 
     U, S, Vt = svd(normals, full_matrices=False)
+    sig_1 = S[0]
+    sig_3 = S[2]
 
     # U, S, Vt = np.linalg.svd(normals)
-    return Vt[-1, :]
+    if full_return:
+        return Vt[-1, :], sig_1, sig_3
+    else:
+        return Vt[-1, :]
 
 
 def consistency_flip(vectors):
@@ -49,7 +54,7 @@ def consistency_flip(vectors):
     return vectors_flipped
 
 
-def supernormal_confidence(supernormal, normals):
+def supernormal_confidence(supernormal, normals, sig_1, sig_3):
     """
     calculate confidence value of supernormal,
     confidence = md_sn / md_n
@@ -63,31 +68,33 @@ def supernormal_confidence(supernormal, normals):
     """
     supernormal /= np.linalg.norm(supernormal)
 
-    norms = np.linalg.norm(normals, axis=1)[:, None]
-    norms = norms + 1e-10  # avoid division by zero
-    normals /= norms
+    # norms = np.linalg.norm(normals, axis=1)[:, None]
+    # norms = norms + 1e-10  # avoid division by zero
+    # normals /= norms
+    #
+    # # deviation between supernormal and normals (from being perpendicular) # TODO: revise confidence calculation and equation in paper
+    # # normals /= np.linalg.norm(normals, axis=1)[:, None]
+    # n_sn_90_dev = np.arccos(np.dot(supernormal, normals.T))
+    # n_sn_90_dev = np.abs(np.rad2deg(n_sn_90_dev))
+    # n_sn_90_dev = np.abs(n_sn_90_dev - 90)
+    # n_sn_90_dev = np.clip(n_sn_90_dev, 0, 90)
+    # n_sn_90_dev = n_sn_90_dev / 90
+    # n_sn_90_dev = np.mean(n_sn_90_dev)
+    # n_sn_90_dev = 1 - n_sn_90_dev
+    #
+    # # def from reference / mean normal
+    # normals_flipped = consistency_flip(normals)
+    # n_ref = np.mean(normals_flipped, axis=0)
+    # n_ref /= np.linalg.norm(n_ref)
+    #
+    # n_dev = np.arccos(np.dot(n_ref, normals.T))
+    # n_dev = np.abs(np.rad2deg(n_dev))
+    # n_dev = np.clip(n_dev, 0, 90)
+    # n_dev = np.mean(n_dev)
+    #
+    # c = math.sqrt(math.sqrt(len(normals)) * n_dev * n_sn_90_dev)
 
-    # deviation between supernormal and normals (from being perpendicular) # TODO: revise confidence calculation and equation in paper
-    # normals /= np.linalg.norm(normals, axis=1)[:, None]
-    n_sn_90_dev = np.arccos(np.dot(supernormal, normals.T))
-    n_sn_90_dev = np.abs(np.rad2deg(n_sn_90_dev))
-    n_sn_90_dev = np.abs(n_sn_90_dev - 90)
-    n_sn_90_dev = np.clip(n_sn_90_dev, 0, 90)
-    n_sn_90_dev = n_sn_90_dev / 90
-    n_sn_90_dev = np.mean(n_sn_90_dev)
-    n_sn_90_dev = 1 - n_sn_90_dev
-
-    # def from reference / mean normal
-    normals_flipped = consistency_flip(normals)
-    n_ref = np.mean(normals_flipped, axis=0)
-    n_ref /= np.linalg.norm(n_ref)
-
-    n_dev = np.arccos(np.dot(n_ref, normals.T))
-    n_dev = np.abs(np.rad2deg(n_dev))
-    n_dev = np.clip(n_dev, 0, 90)
-    n_dev = np.mean(n_dev)
-
-    c = math.sqrt(math.sqrt(len(normals)) * n_dev * n_sn_90_dev)
+    c = math.sqrt(len(normals)) * (sig_3/sig_1)
 
     # c = np.mean(n_sn_90_dev)
     #

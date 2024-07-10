@@ -395,8 +395,8 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
         coords_neighbors = point_coords_arr[ids_neighbors]
         arrowheads = coords_neighbors + normals_neighbors
 
-        supernormal = supernormal_svd(normals_patch)
-        confidence = supernormal_confidence(supernormal, normals_patch)
+        supernormal, sig_1, sig_3 = supernormal_svd(normals_patch, full_return=True)
+        confidence = supernormal_confidence(supernormal, normals_patch, sig_1, sig_3)
         confidences.append(confidence)
 
         supernormals.append(supernormal)
