@@ -1,0 +1,79 @@
+project:
+  # os dependent paths are hardcoded
+  basepath_windows: C:/Users/ga25mal/
+  basepath_macos: /Users/fnoic/
+  project_path: PycharmProjects/reconstruct/
+  parking_path: data/parking/
+
+segmentation:
+  cloud_path: /data/in_full/girder_0.txt
+  orientation_path: /data/in_full/orientation_list.yaml
+  # path to raw cloud
+  #  cloud_path: /data/in_instances/beams.txt
+
+local_features:
+  voxel_size: 0.01
+  normals_radius: 0.05
+  max_nn: 30
+  max_dist_cross: 0.4
+  max_dist_to_plane: 0.05
+  supernormal_input: no ransac
+  supernormal_radius: 0.25
+  neighbor_shape: sphere
+  supernormal_cube_dist: 0.15
+  supernormal_ellipsoid_a: 0.1
+  supernormal_ellipsoid_bc: 0.2
+
+initial:
+  rnd_pick_ratio: 0.05
+
+clustering:
+  max_dist_euc: 0.1  # re-think with cross and to-plane limits
+  max_ransac_iterations: 1000
+  dist_thresh_normal: 0.1
+  angle_thresh_normal: 30
+  dist_thresh_supernormal: 0.5
+  angle_thresh_supernormal: 20
+  dist_thresh_ransac: 0.0075
+  count_thresh_ransac: 1000
+  iter_thresh_ransac: 100000000
+  count_thresh_ransac_rest: 50
+  dist_thresh_dbscan: 0.03
+  count_thresh_dbscan: 10
+  dist_thresh_ball: 0.12
+  ransac_n: 3
+  ransac_dist_thresh: 0.005
+  ransac_iterations: 100000000
+  ransac_min_count: 1000
+  ransac_rest_thresh: 50
+  ransac_blanks: 100
+  dbscan_eps_dist: 0.02
+  dbscan_min_count: 10
+
+region_growing:
+  neighbors_found_min: 10
+  supernormal_point_angle_deviation: 10
+  supernormal_patch_angle_deviation: 15
+  ransacnormal_patch_angle_deviation: 15
+  neighborhood_radius_a: 0.1
+  neighborhood_radius_bc: 0.05
+  leftover_thresh: 0.02
+  neighbor_shape: sphere
+  supernormal_vote_of_confidence: 0.6
+
+evaluation:
+  pairing_method: hungarian
+
+skeleton:
+  min_points: 100
+  ransac_method: open3d
+  ransac_dist_thresh: 0.0005
+  ransac_picks: 3
+  ransac_min_count_rel: 0.2
+  ransac_iterations: 30000
+
+skeleton_visualization:
+  line_length_projection: 0.2
+
+reconstruction:
+

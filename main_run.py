@@ -20,7 +20,7 @@ from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood
 from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_full.yaml')
+    config = OmegaConf.load('config_experiment_1.yaml')
     if os.name == 'nt':
         config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.orientation_path}')
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 5.2
+    cache_flag = 0
     ##########
 
     if cache_flag <= 1:

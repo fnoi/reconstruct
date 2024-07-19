@@ -574,89 +574,89 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
     """takes in xyz array of points, performs ransac until 2 non-planar planes are found
     then returns vector describing the line of intersection between the two planes"""
 
-    match config.skeleton.ransac_method:
-        case "open3d":
-            # convert to open3d point cloud
-            point_cloud = o3d.geometry.PointCloud()
-            point_cloud.points = o3d.utility.Vector3dVector(cluster_ptx_array[:, :3])
-            point_cloud.normals = o3d.utility.Vector3dVector(cluster_ptx_array[:, 3:6])
-            # perform ransac
-            if step == "skeleton":
-                dist_threshold = config.skeleton.ransac_dist_thresh
-                ransac_n = config.skeleton.ransac_picks
-                num_iterations = config.skeleton.ransac_iterations
-                prob = 1.0
-            else:
-                dist_threshold = 0.01
-                ransac_n = 3
-                num_iterations = 10000000
-                prob = 0.9999
+    case = config.skeleton.ransac_method
+    if case == "open3d":
+        # convert to open3d point cloud
+        point_cloud = o3d.geometry.PointCloud()
+        point_cloud.points = o3d.utility.Vector3dVector(cluster_ptx_array[:, :3])
+        point_cloud.normals = o3d.utility.Vector3dVector(cluster_ptx_array[:, 3:6])
+        # perform ransac
+        if step == "skeleton":
+            dist_threshold = config.skeleton.ransac_dist_thresh
+            ransac_n = config.skeleton.ransac_picks
+            num_iterations = config.skeleton.ransac_iterations
+            prob = 1.0
+        else:
+            dist_threshold = 0.01
+            ransac_n = 3
+            num_iterations = 10000000
+            prob = 0.9999
 
-            f_0, inliers_0 = point_cloud.segment_plane(
+        f_0, inliers_0 = point_cloud.segment_plane(
+            distance_threshold=dist_threshold,
+            ransac_n=ransac_n,
+            num_iterations=num_iterations,
+            probability=prob
+        )
+        # remove inliers from point cloud
+        point_cloud = point_cloud.select_by_index(inliers_0, invert=True)
+        while True:
+            # perform ransac again
+            f_1, inliers_1 = point_cloud.segment_plane(
                 distance_threshold=dist_threshold,
                 ransac_n=ransac_n,
-                num_iterations=num_iterations,
-                probability=prob
+                num_iterations=num_iterations
             )
-            # remove inliers from point cloud
-            point_cloud = point_cloud.select_by_index(inliers_0, invert=True)
-            while True:
-                # perform ransac again
-                f_1, inliers_1 = point_cloud.segment_plane(
-                    distance_threshold=dist_threshold,
-                    ransac_n=ransac_n,
-                    num_iterations=num_iterations
-                )
-                angle = np.rad2deg(
-                    np.arccos(
-                        np.dot(
-                            f_0[:3],
-                            f_1[:3]
-                        )
+            angle = np.rad2deg(
+                np.arccos(
+                    np.dot(
+                        f_0[:3],
+                        f_1[:3]
                     )
                 )
-                if 45 < angle % 180 < 135:
-                    inlier_coords = np.asarray(point_cloud.points)[inliers_1]
-                    # find the corresponding id in cluster_ptx_array for every row
-                    inliers_1_fix = np.where(np.isin(cluster_ptx_array[:, :3], inlier_coords).all(axis=1))[0]
-                    inliers_1 = inliers_1_fix.tolist()
+            )
+            if 45 < angle % 180 < 135:
+                inlier_coords = np.asarray(point_cloud.points)[inliers_1]
+                # find the corresponding id in cluster_ptx_array for every row
+                inliers_1_fix = np.where(np.isin(cluster_ptx_array[:, :3], inlier_coords).all(axis=1))[0]
+                inliers_1 = inliers_1_fix.tolist()
 
-                    break
-                else:
-                    print('planes found are not "perpendicular" enough, retrying...')
-                    point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
+                break
+            else:
+                print('planes found are not "perpendicular" enough, retrying...')
+                point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
 
-        case "pyransac":
-            plane = pyrsc.Plane()
-            planes = []
-            points = copy.deepcopy(cluster_ptx_array[:, :3])
-            while True:
-                ransac_result = plane.fit(pts=points,
-                                          thresh=config.skeleton.ransac_dist_thresh,
-                                          minPoints=config.skeleton.ransac_min_count_rel * len(points),
-                                          maxIteration=config.skeleton.ransac_iterations)
-                planes.append(ransac_result[0])
-                points = np.delete(points, ransac_result[1], axis=0)
-                if len(planes) > 1:
-                    plane_combinations = itertools.combinations(range(len(planes)), 2)
-                    for combination in plane_combinations:
-                        f_0 = planes[combination[0]]
-                        f_1 = planes[combination[1]]
+    elif case == "pyransac":
+        plane = pyrsc.Plane()
+        planes = []
+        points = copy.deepcopy(cluster_ptx_array[:, :3])
+        while True:
+            ransac_result = plane.fit(pts=points,
+                                      thresh=config.skeleton.ransac_dist_thresh,
+                                      minPoints=config.skeleton.ransac_min_count_rel * len(points),
+                                      maxIteration=config.skeleton.ransac_iterations)
+            planes.append(ransac_result[0])
+            points = np.delete(points, ransac_result[1], axis=0)
+            if len(planes) > 1:
+                plane_combinations = itertools.combinations(range(len(planes)), 2)
+                for combination in plane_combinations:
+                    f_0 = planes[combination[0]]
+                    f_1 = planes[combination[1]]
 
-                        angle = np.rad2deg(
-                            np.arccos(
-                                np.dot(
-                                    f_0[:3],
-                                    f_1[:3]
-                                )
+                    angle = np.rad2deg(
+                        np.arccos(
+                            np.dot(
+                                f_0[:3],
+                                f_1[:3]
                             )
                         )
-                        if 45 < angle % 180 < 135:
-                            break
-                    raise Exception('planes found are not "perpendicular" enough, cannot retry ...')
+                    )
+                    if 45 < angle % 180 < 135:
+                        break
+                raise Exception('planes found are not "perpendicular" enough, cannot retry ...')
 
-        case _:
-            raise Exception('ransac_method not recognized')
+    else:
+        raise Exception('ransac_method not recognized')
 
     normal1, d1 = np.array(f_0[:3], dtype=np.float64), f_0[3]
     normal2, d2 = np.array(f_1[:3], dtype=np.float64), f_1[3]
