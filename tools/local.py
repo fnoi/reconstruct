@@ -26,11 +26,12 @@ def supernormal_svd(normals, full_return=False):
 
     U, S, Vt = svd(normals, full_matrices=False)
     sig_1 = S[0]
+    sig_2 = S[1]
     sig_3 = S[2]
 
     # U, S, Vt = np.linalg.svd(normals)
     if full_return:
-        return Vt[-1, :], sig_1, sig_3
+        return Vt[-1, :], sig_1, sig_2, sig_3
     else:
         return Vt[-1, :]
 
@@ -54,7 +55,7 @@ def consistency_flip(vectors):
     return vectors_flipped
 
 
-def supernormal_confidence(supernormal, normals, sig_1, sig_3):
+def supernormal_confidence(supernormal, normals, sig_1, sig_2, sig_3):
     """
     calculate confidence value of supernormal,
     confidence = md_sn / md_n
@@ -94,7 +95,9 @@ def supernormal_confidence(supernormal, normals, sig_1, sig_3):
     #
     # c = math.sqrt(math.sqrt(len(normals)) * n_dev * n_sn_90_dev)
 
-    c = math.sqrt(len(normals)) * (sig_3/sig_1)
+    # c = math.sqrt(len(normals)) * (sig_3/sig_1)
+
+    c = math.sqrt(len(normals)) * (sig_2 / sig_1) * (1 - sig_3 / sig_2)
 
     # c = np.mean(n_sn_90_dev)
     #
@@ -164,13 +167,13 @@ def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=
         neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['nx', 'ny', 'nz']].values
 
 
-    seed_supernormal = supernormal_svd(neighbor_normals)
+    seed_supernormal, sig_1, sig_2, sig_3 = supernormal_svd(neighbor_normals, full_return=True)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
 
     cloud.loc[cloud['id'] == seed_id, 'snx'] = seed_supernormal[0]
     cloud.loc[cloud['id'] == seed_id, 'sny'] = seed_supernormal[1]
     cloud.loc[cloud['id'] == seed_id, 'snz'] = seed_supernormal[2]
-    cloud.loc[cloud['id'] == seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals)
+    cloud.loc[cloud['id'] == seed_id, 'confidence'] = supernormal_confidence(seed_supernormal, neighbor_normals, sig_1, sig_2, sig_3)
     # cloud.loc[seed_id, 'snx'] = seed_supernormal[0]
     # cloud.loc[seed_id, 'sny'] = seed_supernormal[1]
     # cloud.loc[seed_id, 'snz'] = seed_supernormal[2]
@@ -611,23 +614,22 @@ def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None,
         else:
             seed_data = cloud.iloc[seed_id]
 
-    match shape:
-        case "sphere":
-            neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config)
-        case "cylinder":
-            neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
-        case "oriented_cuboid":
-            neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
-        case "ellipsoid":
-            neighbor_ids = neighbors_ellipsoid(cloud, seed_id, config)
-        case "cube":
-            neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims)
-        case "oriented_ellipsoid":
-            neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step, patch_sn, seed_data)
-        case "oriented_octahedron":
-            neighbor_ids = neighbors_oriented_octahedron(cloud, seed_id, config)  # TODO: add this fct
-        case _:
-            raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
+    if shape == "sphere":
+        neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config)
+    elif shape == "cylinder":
+        neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
+    elif shape == "oriented_cuboid":
+        neighbor_ids = neighbors_oriented_cuboid(cloud, seed_id, config)
+    elif shape == "ellipsoid":
+        neighbor_ids = neighbors_ellipsoid(cloud, seed_id, config)
+    elif shape == "cube":
+        neighbor_ids = neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims)
+    elif shape == "oriented_ellipsoid":
+        neighbor_ids = neighbors_oriented_ellipsoid(cloud, seed_id, config, step, patch_sn, seed_data)
+    elif shape == "oriented_octahedron":
+        neighbor_ids = neighbors_oriented_octahedron(cloud, seed_id, config)  # TODO: add this fct
+    else:
+        raise ValueError(f'neighborhood shape "{config.local_features.neighbor_shape}" not implemented')
 
     return neighbor_ids
 
@@ -711,93 +713,93 @@ def neighborhood_plot(cloud, seed_id=None, neighbors=None, config=None, cage_ove
         config = None
 
     if config is not None:
-        match config.local_features.neighbor_shape:
-            case "cube":
-                # cornerpoints from seed and supernormal_cube_dist as edge length of cube
-                center = cloud.loc[seed_id, ['x', 'y', 'z']].values
-                edge_length = config.local_features.supernormal_cube_dist
-                p0 = center + np.array([-edge_length, -edge_length, -edge_length])
-                p1 = center + np.array([-edge_length, -edge_length, edge_length])
-                p2 = center + np.array([-edge_length, edge_length, -edge_length])
-                p3 = center + np.array([-edge_length, edge_length, edge_length])
-                p4 = center + np.array([edge_length, -edge_length, -edge_length])
-                p5 = center + np.array([edge_length, -edge_length, edge_length])
-                p6 = center + np.array([edge_length, edge_length, -edge_length])
-                p7 = center + np.array([edge_length, edge_length, edge_length])
-                ax.plot([p0[0], p1[0]], [p0[1], p1[1]], [p0[2], p1[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p1[0], p3[0]], [p1[1], p3[1]], [p1[2], p3[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p3[0], p2[0]], [p3[1], p2[1]], [p3[2], p2[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p2[0], p0[0]], [p2[1], p0[1]], [p2[2], p0[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p4[0], p5[0]], [p4[1], p5[1]], [p4[2], p5[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p5[0], p7[0]], [p5[1], p7[1]], [p5[2], p7[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p7[0], p6[0]], [p7[1], p6[1]], [p7[2], p6[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p6[0], p4[0]], [p6[1], p4[1]], [p6[2], p4[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p0[0], p4[0]], [p0[1], p4[1]], [p0[2], p4[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p1[0], p5[0]], [p1[1], p5[1]], [p1[2], p5[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p2[0], p6[0]], [p2[1], p6[1]], [p2[2], p6[2]], c=cage_color, linewidth=cage_width)
-                ax.plot([p3[0], p7[0]], [p3[1], p7[1]], [p3[2], p7[2]], c=cage_color, linewidth=cage_width)
-            case "sphere":
-                # plot sphere around seed point
-                n_segments = 14
-                center = cloud.loc[seed_id, ['x', 'y', 'z']].values
-                radius = config.local_features.supernormal_radius
-                u = np.linspace(0, 2 * np.pi, n_segments)
-                v = np.linspace(0, np.pi, n_segments)
-                x = radius * np.outer(np.cos(u), np.sin(v)) + center[0]
-                y = radius * np.outer(np.sin(u), np.sin(v)) + center[1]
-                z = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
-                # ax.plot_surface(x, y, z, color='b', alpha=0.1)
-                # wireframe
-                for i in range(n_segments):
-                    ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
-                    ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
+        case = config.local_features.neighbor_shape
+        if case == "cube":
+            # cornerpoints from seed and supernormal_cube_dist as edge length of cube
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            edge_length = config.local_features.supernormal_cube_dist
+            p0 = center + np.array([-edge_length, -edge_length, -edge_length])
+            p1 = center + np.array([-edge_length, -edge_length, edge_length])
+            p2 = center + np.array([-edge_length, edge_length, -edge_length])
+            p3 = center + np.array([-edge_length, edge_length, edge_length])
+            p4 = center + np.array([edge_length, -edge_length, -edge_length])
+            p5 = center + np.array([edge_length, -edge_length, edge_length])
+            p6 = center + np.array([edge_length, edge_length, -edge_length])
+            p7 = center + np.array([edge_length, edge_length, edge_length])
+            ax.plot([p0[0], p1[0]], [p0[1], p1[1]], [p0[2], p1[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p1[0], p3[0]], [p1[1], p3[1]], [p1[2], p3[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p3[0], p2[0]], [p3[1], p2[1]], [p3[2], p2[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p2[0], p0[0]], [p2[1], p0[1]], [p2[2], p0[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p4[0], p5[0]], [p4[1], p5[1]], [p4[2], p5[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p5[0], p7[0]], [p5[1], p7[1]], [p5[2], p7[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p7[0], p6[0]], [p7[1], p6[1]], [p7[2], p6[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p6[0], p4[0]], [p6[1], p4[1]], [p6[2], p4[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p0[0], p4[0]], [p0[1], p4[1]], [p0[2], p4[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p1[0], p5[0]], [p1[1], p5[1]], [p1[2], p5[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p2[0], p6[0]], [p2[1], p6[1]], [p2[2], p6[2]], c=cage_color, linewidth=cage_width)
+            ax.plot([p3[0], p7[0]], [p3[1], p7[1]], [p3[2], p7[2]], c=cage_color, linewidth=cage_width)
+        if case == "sphere":
+            # plot sphere around seed point
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            radius = config.local_features.supernormal_radius
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = radius * np.outer(np.cos(u), np.sin(v)) + center[0]
+            y = radius * np.outer(np.sin(u), np.sin(v)) + center[1]
+            z = radius * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
+            # ax.plot_surface(x, y, z, color='b', alpha=0.1)
+            # wireframe
+            for i in range(n_segments):
+                ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
 
-            case "ellipsoid":
-                # plot ellipsoid around seed point
-                n_segments = 14
-                center = cloud.loc[seed_id, ['x', 'y', 'z']].values
-                a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
-                b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
-                u = np.linspace(0, 2 * np.pi, n_segments)
-                v = np.linspace(0, np.pi, n_segments)
-                x = a * np.outer(np.cos(u), np.sin(v)) + center[0]
-                y = b * np.outer(np.sin(u), np.sin(v)) + center[1]
-                z = b * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
-                # ax.plot_surface(x, y, z, color='b', alpha=0.1)
-                # wireframe
-                for i in range(n_segments):
-                    ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
-                    ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
+        if case == "ellipsoid":
+            # plot ellipsoid around seed point
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
+            b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = a * np.outer(np.cos(u), np.sin(v)) + center[0]
+            y = b * np.outer(np.sin(u), np.sin(v)) + center[1]
+            z = b * np.outer(np.ones(np.size(u)), np.cos(v)) + center[2]
+            # ax.plot_surface(x, y, z, color='b', alpha=0.1)
+            # wireframe
+            for i in range(n_segments):
+                ax.plot(x[i, :], y[i, :], z[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x[:, i], y[:, i], z[:, i], c=cage_color, linewidth=cage_width)
 
-            case "oriented_ellipsoid":
-                n_segments = 14
-                center = cloud.loc[seed_id, ['x', 'y', 'z']].values
-                a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
-                b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
-                u = np.linspace(0, 2 * np.pi, n_segments)
-                v = np.linspace(0, np.pi, n_segments)
-                x = a * np.outer(np.cos(u), np.sin(v))
-                y = b * np.outer(np.sin(u), np.sin(v))
-                z = b * np.outer(np.ones(np.size(u)), np.cos(v))
+        if case == "oriented_ellipsoid":
+            n_segments = 14
+            center = cloud.loc[seed_id, ['x', 'y', 'z']].values
+            a = config.local_features.supernormal_ellipsoid_a  # Semi-major axis (along x)
+            b = config.local_features.supernormal_ellipsoid_bc  # Semi-minor axes (along y and z)
+            u = np.linspace(0, 2 * np.pi, n_segments)
+            v = np.linspace(0, np.pi, n_segments)
+            x = a * np.outer(np.cos(u), np.sin(v))
+            y = b * np.outer(np.sin(u), np.sin(v))
+            z = b * np.outer(np.ones(np.size(u)), np.cos(v))
 
-                direction = cloud.loc[seed_id, ['snx', 'sny', 'snz']].values
+            direction = cloud.loc[seed_id, ['snx', 'sny', 'snz']].values
 
-                rot_mat = find_orthonormal_basis(direction)
+            rot_mat = find_orthonormal_basis(direction)
 
-                ellipsoid_points = np.vstack([x.ravel(), y.ravel(), z.ravel()])
-                rotated_points = rot_mat @ ellipsoid_points
+            ellipsoid_points = np.vstack([x.ravel(), y.ravel(), z.ravel()])
+            rotated_points = rot_mat @ ellipsoid_points
 
-                x_rotated = rotated_points[0, :].reshape(x.shape) + center[0]
-                y_rotated = rotated_points[1, :].reshape(y.shape) + center[1]
-                z_rotated = rotated_points[2, :].reshape(z.shape) + center[2]
+            x_rotated = rotated_points[0, :].reshape(x.shape) + center[0]
+            y_rotated = rotated_points[1, :].reshape(y.shape) + center[1]
+            z_rotated = rotated_points[2, :].reshape(z.shape) + center[2]
 
-                for i in range(n_segments):
-                    ax.plot(x_rotated[i, :], y_rotated[i, :], z_rotated[i, :], c=cage_color, linewidth=cage_width)
-                    ax.plot(x_rotated[:, i], y_rotated[:, i], z_rotated[:, i], c=cage_color, linewidth=cage_width)
+            for i in range(n_segments):
+                ax.plot(x_rotated[i, :], y_rotated[i, :], z_rotated[i, :], c=cage_color, linewidth=cage_width)
+                ax.plot(x_rotated[:, i], y_rotated[:, i], z_rotated[:, i], c=cage_color, linewidth=cage_width)
 
-            case _:
-                print(
-                    f'\nno cage plot implemented for the neighborhood shape of {config.local_features.neighbor_shape}')
+        else:
+            print(
+                f'\nno cage plot implemented for the neighborhood shape of {config.local_features.neighbor_shape}')
 
     ax.set_aspect('equal')
 

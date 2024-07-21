@@ -3,22 +3,24 @@ import copy
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from matplotlib import rcParams
 from scipy.optimize import linear_sum_assignment
+from scipy.stats import gaussian_kde
 from sklearn.metrics import average_precision_score, precision_recall_curve
 
-from tools.utils import load_angles
+from tools.IO import load_angles
 
 
 def find_pairs(pred, gt, method):
-    match method:
-        case 'greedy_gt':
-            return find_pairs_greedy_gt(pred, gt)
-        case 'greedy_pred':
-            return find_pairs_greedy_pred(pred, gt)
-        case 'hungarian':
-            return find_pairs_hungarian(pred, gt)
-        case _:
-            raise ValueError(f"Invalid method: {method}")
+
+    if method == 'greedy_gt':
+        return find_pairs_greedy_gt(pred, gt)
+    elif method == 'greedy_pred':
+        return find_pairs_greedy_pred(pred, gt)
+    elif method == 'hungarian':
+        return find_pairs_hungarian(pred, gt)
+    else:
+        raise ValueError(f"Invalid method: {method}")
 
 
 def find_pairs_greedy_gt(pred, gt):
@@ -246,38 +248,124 @@ def supernormal_evaluation(cloud, config):
         sn = [row['snx'], row['sny'], row['snz']]
         # calculate angle
         angle = np.rad2deg(np.arccos(np.dot(gt_orientation, sn)))
+        cloud.at[idx, 'supernormal_dev_gt_raw'] = angle
         if angle > 90:
             angle = 180 - angle
         # append to list
         cloud.at[idx, 'supernormal_dev_gt'] = angle
 
-    # plot histogram
-    fig = plt.figure()
-    plt.hist(cloud['supernormal_dev_gt'], bins=90)
-    plt.xlabel('angle between supernormal and ground truth orientation')
-    plt.ylabel('frequency')
-    plt.show()
+    # Set font to Times New Roman for all text
+    rcParams['font.family'] = 'Times New Roman'
+    rcParams['font.sans-serif'] = ['Times New Roman']
+    rcParams['font.size'] = 12
 
     # plot cloud
-    fig = plt.figure()
+    fig = plt.figure(figsize=(7, 4))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='spring')
-    # set equal
-    ax.set_aspect('equal')
-    ax.set_title('supernormal gt deviation')
+
+    # Create the scatter plot
+    scatter = ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='viridis')
+
+    # Get the limits of the data
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    # Calculate the range of each dimension
+    x_range = abs(x_limits[1] - x_limits[0])
+    y_range = abs(y_limits[1] - y_limits[0])
+    z_range = abs(z_limits[1] - z_limits[0])
+
+    # Find the greatest range for normalization
+    max_range = max(x_range, y_range, z_range)
+
+    # Calculate the midpoints
+    x_middle = np.mean(x_limits)
+    y_middle = np.mean(y_limits)
+    z_middle = np.mean(z_limits)
+
+    # Set the new limits
+    ax.set_xlim3d([x_middle - max_range / 2, x_middle + max_range / 2])
+    ax.set_ylim3d([y_middle - max_range / 2, y_middle + max_range / 2])
+    ax.set_zlim3d([z_middle - max_range / 2, z_middle + max_range / 2])
+
+    # Adjust layout to prevent cutting off labels
+    plt.tight_layout()
+
     plt.show()
+    plt.savefig('supernormal_gt_deviation.pdf', bbox_inches='tight', dpi=300)
 
     # plot cloud with confidence colors
-    fig = plt.figure()
+    fig = plt.figure(figsize=(7, 4))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['confidence'], cmap='spring')
-    # set equal
-    ax.set_aspect('equal')
-    ax.set_title('supernormal pred confidence')
+
+    # Create the scatter plot
+    scatter = ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['confidence'], cmap='viridis')
+
+    # Get the limits of the data
+    x_limits = ax.get_xlim3d()
+    y_limits = ax.get_ylim3d()
+    z_limits = ax.get_zlim3d()
+
+    # Calculate the range of each dimension
+    x_range = abs(x_limits[1] - x_limits[0])
+    y_range = abs(y_limits[1] - y_limits[0])
+    z_range = abs(z_limits[1] - z_limits[0])
+
+    # Find the greatest range for normalization
+    max_range = max(x_range, y_range, z_range)
+
+    # Calculate the midpoints
+    x_middle = np.mean(x_limits)
+    y_middle = np.mean(y_limits)
+    z_middle = np.mean(z_limits)
+
+    # Set the new limits
+    ax.set_xlim3d([x_middle - max_range / 2, x_middle + max_range / 2])
+    ax.set_ylim3d([y_middle - max_range / 2, y_middle + max_range / 2])
+    ax.set_zlim3d([z_middle - max_range / 2, z_middle + max_range / 2])
+
+    # Set tick labels to Times New Roman
+    for label in ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels():
+        label.set_fontname('Times New Roman')
+
+    # Adjust layout to prevent cutting off labels
+    plt.tight_layout()
+
     plt.show()
 
 
+    x = cloud['confidence']
+    y = cloud['supernormal_dev_gt']
+    x = np.array(x, dtype=np.float64)
+    y = np.array(y, dtype=np.float64)
 
+    xy = np.vstack([x, y])
+    z = gaussian_kde(xy)(xy)
+    idx = z.argsort()
+    x, y, z = x[idx], y[idx], z[idx]
+
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    # Scatter plot with color representing density
+    scatter = ax.scatter(x, y, c=z, cmap='viridis', s=1, alpha=0.5)
+
+    # Set y-axis to logarithmic scale
+    ax.set_yscale('log')
+
+    # Label axes with LaTeX math notation
+    ax.set_xlabel(r'Confidence $c_s$')
+    ax.set_ylabel(r'Supernormal Deviation $\theta_\Delta$')
+
+    # Add colorbar
+    cbar = plt.colorbar(scatter)
+    cbar.set_label('Density', rotation=270, labelpad=15)
+
+    # Adjust layout to prevent cutting off labels
+    plt.tight_layout()
+
+    plt.show()
+    fig.savefig('supernormal_deviation.pdf', bbox_inches='tight', dpi=300)
 
     # calculate mean and median deviation
     mean_dev = np.mean(cloud['supernormal_dev_gt'])

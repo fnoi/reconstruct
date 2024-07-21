@@ -6,6 +6,8 @@ import numpy as np
 
 from omegaconf import OmegaConf
 
+from tools.utils import calculate_view_direction
+
 
 def get_is_conf():
     config = OmegaConf.load('config.yaml')
@@ -104,3 +106,14 @@ def cache_io(xyz=False, normals=False, supernormals=False, confidence=False,
     cloud_to_write.to_csv(f'{path}cache_cloud_{cache_flag}.txt', sep=' ', header=False, index=False)
 
     return
+
+
+def load_angles(yaml_path):
+    orientation_gt = OmegaConf.load(yaml_path)
+    vecs = {}
+    for key in orientation_gt:
+        rpy = orientation_gt[str(int(key))]
+        rpy = [rpy.X1, rpy.Y2, rpy.Z3]
+        gt_orientation = calculate_view_direction(rpy[0], rpy[1], rpy[2])
+        vecs[int(key)] = gt_orientation
+    return vecs

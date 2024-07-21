@@ -29,10 +29,10 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 0
+    cache_flag = 2
     ##########
 
-    if cache_flag <= 1:
+    if cache_flag == 0:
         print('\n- compute normals')
         with open(config.project.path, 'r') as f:
             # TODO: add option to load rgb here, currently XYZ, label only
