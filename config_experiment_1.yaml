@@ -42,12 +42,12 @@ clustering:
   count_thresh_dbscan: 10
   dist_thresh_ball: 0.12
   ransac_n: 3
-  ransac_dist_thresh: 0.005
+  ransac_dist_thresh: 0.01
   ransac_iterations: 100000000
-  ransac_min_count: 1000
+  ransac_min_count: 100
   ransac_rest_thresh: 50
   ransac_blanks: 100
-  dbscan_eps_dist: 0.02
+  dbscan_eps_dist: 0.025
   dbscan_min_count: 10
 
 region_growing:
@@ -77,3 +77,4 @@ skeleton_visualization:
 
 reconstruction:
 
+planar_patch:

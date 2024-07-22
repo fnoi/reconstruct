@@ -222,25 +222,28 @@ def calculate_supernormals_rev(cloud=None, cloud_tree=None, config=None):
 
 
 def ransac_patches(cloud, config):
-    print(f'ransac patching')
+    print('ransac patching')
     cloud['rnx'] = 0.0
     cloud['rny'] = 0.0
     cloud['rnz'] = 0.0
     cloud['ransac_patch'] = 0
     mask_remaining = np.ones(len(cloud), dtype=bool)
-    progress = tqdm()
+    progress = tqdm(total=len(cloud))
     blanks = config.clustering.ransac_blanks
 
     label_id = 0  # label 0 indicates unclustered
-    while True:
-        o3d_cloud_current = o3d.geometry.PointCloud()
-        o3d_cloud_current.points = o3d.utility.Vector3dVector(cloud.loc[mask_remaining, ['x', 'y', 'z']].values)
+    o3d_cloud = o3d.geometry.PointCloud()
+
+    while np.sum(mask_remaining) > 0:
+        current_points = cloud.loc[mask_remaining, ['x', 'y', 'z']].values
+        o3d_cloud.points = o3d.utility.Vector3dVector(current_points)
 
         # ransac plane fitting
-        ransac_plane, ransac_inliers = o3d_cloud_current.segment_plane(
+        ransac_plane, ransac_inliers = o3d_cloud.segment_plane(
             distance_threshold=config.clustering.ransac_dist_thresh,
             ransac_n=config.clustering.ransac_n,
-            num_iterations=config.clustering.ransac_iterations
+            num_iterations=config.clustering.ransac_iterations,
+
         )
         ransac_normal = ransac_plane[0:3]
         inliers_global_idx = np.where(mask_remaining)[0][ransac_inliers]
@@ -249,28 +252,51 @@ def ransac_patches(cloud, config):
         dbscan_clustering = DBSCAN(
             eps=config.clustering.dbscan_eps_dist,
             min_samples=config.clustering.dbscan_min_count
-        ).fit(cloud.loc[inliers_global_idx, ['x', 'y', 'z']].values)
-        active_idx = np.where(mask_remaining)[0]
+        ).fit(current_points[ransac_inliers])
 
-        if len(np.unique(dbscan_clustering.labels_)) == 1:
+        clusters = np.unique(dbscan_clustering.labels_)
+
+        if len(clusters) == 1 and clusters[0] == -1:
             blanks -= 1
             if blanks == 0:
                 print(f'over, {label_id} patches found')
                 break
+            continue
 
-        for cluster in np.unique(dbscan_clustering.labels_[dbscan_clustering.labels_ != -1]):
-            # these points form a valid cluster
-            # find the index of the points in the original cloud
-            label_id += 1
-            cluster_idx = np.where(dbscan_clustering.labels_ == cluster)[0]
-            external_cluster_idx = active_idx[ransac_inliers][cluster_idx]
-            cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
-            cloud.loc[external_cluster_idx, 'rnx'] = ransac_normal[0]
-            cloud.loc[external_cluster_idx, 'rny'] = ransac_normal[1]
-            cloud.loc[external_cluster_idx, 'rnz'] = ransac_normal[2]
-            mask_remaining[external_cluster_idx] = False
+        # remove -1 from clusters
+        clusters = clusters[clusters != -1]
+        # find biggest cluster
+        cluster_sizes = np.array([np.sum(dbscan_clustering.labels_ == cluster) for cluster in clusters])
+        biggest_cluster = clusters[np.argmax(cluster_sizes)]
 
-        progress.update()
+        label_id += 1
+        cluster_idx = np.where(dbscan_clustering.labels_ == biggest_cluster)[0]
+        external_cluster_idx = inliers_global_idx[cluster_idx]
+        cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
+        cloud.loc[external_cluster_idx, ['rnx', 'rny', 'rnz']] = ransac_normal
+        mask_remaining[external_cluster_idx] = False
+        progress.update(len(external_cluster_idx))
+
+        # a = 0
+        #
+        #
+        # points_processed = 0
+        # for cluster in clusters:
+        #     if cluster == -1:
+        #         continue  # Skip noise points, they remain in mask_remaining
+        #
+        #     label_id += 1
+        #     cluster_idx = np.where(dbscan_clustering.labels_ == cluster)[0]
+        #     external_cluster_idx = inliers_global_idx[cluster_idx]
+        #     cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
+        #     cloud.loc[external_cluster_idx, ['rnx', 'rny', 'rnz']] = ransac_normal
+        #     mask_remaining[external_cluster_idx] = False
+        #     points_processed += len(external_cluster_idx)
+        #
+        # progress.update(points_processed)
+
+    print(f'remaining points {np.sum(mask_remaining)} of {len(mask_remaining)}')
+    progress.close()
 
     debug_plot = True
     if debug_plot:

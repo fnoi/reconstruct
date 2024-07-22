@@ -16,8 +16,8 @@ import tools.utils
 from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1
-from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation
+from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1, planar_patches
+from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation, calculate_purity
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_experiment_1.yaml')
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 3
+    cache_flag = 1
     ##########
 
     if cache_flag == 0:
@@ -81,16 +81,27 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=0)
 
     if cache_flag <= 1:
-        print('\n- compute ransac patches')
+        print('\n- compute planar patches')
         with open(f'{config.project.parking_path}/cache_cloud_0.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
 
         cloud = ransac_patches(cloud, config)
+        # cloud = planar_patches(cloud, config)
+        # report mean patch size
+        patch_sizes = cloud.groupby('ransac_patch').size()
+        print(f'mean patch size: {patch_sizes.mean()}')
+        print(f'median patch size: {patch_sizes.median()}')
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=1)
+
+        report_purity = True
+        if report_purity:
+            planar_patch_ids = cloud['ransac_patch'].unique()
+            purity = calculate_purity(gt=cloud['instance_gt'], pred=cloud['ransac_patch'], )
 
         # store to x,y,z,ransac_id
         cloud.to_csv(f'{config.project.parking_path}/cloud_ransac_patches.txt', sep=' ', index=False)
+        raise ValueError('stop here')
 
         # optional quality check
         control_normals = True

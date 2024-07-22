@@ -87,14 +87,41 @@ def find_pairs_greedy_pred(pred, gt):
     return label_pairs
 
 
-def calculate_purity(pred, gt):
-    gt_clusters = np.unique(gt)
-    purity_vector = np.zeros(len(gt_clusters))
-    purity = 0
-    for gt_cluster in gt_clusters:
-        pred_prominent = np.argmax(np.bincount(pred[gt == gt_cluster]))
-        purity += np.sum(pred[gt == gt_cluster] == pred_prominent)
-    purity /= len(gt)
+def calculate_purity(gt, pred):
+
+    gt = np.asarray(gt, dtype=int).flatten()
+    pred = np.asarray(pred, dtype=int).flatten()
+
+    # remove all pred zero label rows; unclustered points dont go into metric!
+    mask = pred != 0
+
+    gt = gt[mask]
+    pred = pred[mask]
+
+
+    if gt.shape != pred.shape:
+        raise ValueError("Ground truth and prediction must have the same shape")
+
+    pred_labels = np.unique(pred)
+
+    pts_correct = 0
+    pts_total = len(gt)
+    worst_value = 2
+
+    for label in pred_labels:
+        mask = pred == label
+        gt_cluster = gt[mask]
+
+        if len(gt_cluster) > 0:
+            most_common_gt = np.bincount(gt_cluster).argmax()
+            correct = np.sum(gt_cluster == most_common_gt)
+            pts_correct += correct
+            local_purity = correct / len(gt_cluster)
+            if local_purity < worst_value:
+                worst_value = local_purity
+
+    purity = pts_correct / pts_total
+    print(f'worst cluster purity: {worst_value:.2f}, mean purity {purity:.6f}')
 
     return purity
 
