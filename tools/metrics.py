@@ -87,6 +87,18 @@ def find_pairs_greedy_pred(pred, gt):
     return label_pairs
 
 
+def calculate_purity(pred, gt):
+    gt_clusters = np.unique(gt)
+    purity_vector = np.zeros(len(gt_clusters))
+    purity = 0
+    for gt_cluster in gt_clusters:
+        pred_prominent = np.argmax(np.bincount(pred[gt == gt_cluster]))
+        purity += np.sum(pred[gt == gt_cluster] == pred_prominent)
+    purity /= len(gt)
+
+    return purity
+
+
 def find_pairs_hungarian(pred, gt):
     """
     Find the best matching between predicted and ground truth instances using the Hungarian algorithm,
@@ -114,6 +126,55 @@ def find_pairs_hungarian(pred, gt):
                 union = np.sum((pred == pred_label) | (gt == gt_label))
                 iou = intersection / union if union > 0 else 0
                 cost_matrix[i, j] = 1 - iou
+
+    # iou_matrix, precision_matrix, recall_matrix: no padding!
+    iou_matrix = np.zeros((len(unique_pred), len(unique_gt)))
+    precision_matrix = np.zeros((len(unique_pred), len(unique_gt)))
+    recall_matrix = np.zeros((len(unique_pred), len(unique_gt)))
+
+    for i, pred_label in enumerate(pred_labels):
+        gt_now = gt[pred == pred_label]
+        # to int
+        gt_now = gt_now.astype(int)
+        # find most common label in gt_now
+        gt_prominent = np.argmax(np.bincount(gt_now))
+
+        for j, gt_label in enumerate(gt_labels):
+            if pred_label != 0 and gt_label != 0:
+                intersection = np.sum((pred == pred_label) & (gt == gt_label))
+                union = np.sum((pred == pred_label) | (gt == gt_label))
+                iou = intersection / union if union > 0 else 0
+                iou_matrix[i, j] = iou
+                precision = intersection / np.sum(pred == pred_label) if np.sum(pred == pred_label) > 0 else 0
+                recall = intersection / np.sum(gt == gt_label) if np.sum(gt == gt_label) > 0 else 0
+                precision_matrix[i, j] = precision
+                recall_matrix[i, j] = recall
+
+    # plot iou matrix, precision matrix, recall matrix
+    rcParams.update({'font.size': 8})
+    fig, axs = plt.subplots(1, 2, figsize=(4, 4))
+    axs[0].imshow(precision_matrix, cmap='viridis')
+    axs[0].set_title('Precision matrix')
+    axs[0].set_xlabel('gt')
+    axs[0].set_ylabel('pred')
+    axs[1].imshow(recall_matrix, cmap='viridis')
+    axs[1].set_title('Recall matrix')
+    axs[1].set_xlabel('gt')
+    axs[1].set_ylabel('pred')
+
+    # uniqe_gt to int, unique_pred to int
+    unique_gt = unique_gt.astype(int)
+    unique_pred = unique_pred.astype(int)
+
+    # label axes with labels
+    for ax in axs:
+        ax.set_xticks(range(len(unique_gt)))
+        ax.set_xticklabels(unique_gt)
+        ax.set_yticks(range(len(unique_pred)))
+        ax.set_yticklabels(unique_pred)
+
+    plt.show()
+    plt.savefig('iou_precision_recall_matrix.png', dpi=300)
 
     # Hungarian algorithm to find the minimum cost assignment (1 - IOU)
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
@@ -234,7 +295,7 @@ def calculate_metrics(df_cloud, config):
         raise ValueError('undefined return for greedy comparison')
 
 
-def supernormal_evaluation(cloud, config):
+def supernormal_evaluation(cloud, config, inplace=False):
     orientation_gt = load_angles(config.project.orientation_gt_path)
     # orientation_gt = load_angles('instance_orientation.yaml')
     # iterate over rows in cloud
@@ -248,130 +309,18 @@ def supernormal_evaluation(cloud, config):
         sn = [row['snx'], row['sny'], row['snz']]
         # calculate angle
         angle = np.rad2deg(np.arccos(np.dot(gt_orientation, sn)))
-        cloud.at[idx, 'supernormal_dev_gt_raw'] = angle
         if angle > 90:
             angle = 180 - angle
         # append to list
         cloud.at[idx, 'supernormal_dev_gt'] = angle
-
-    # Set font to Times New Roman for all text
-    rcParams['font.family'] = 'Times New Roman'
-    rcParams['font.sans-serif'] = ['Times New Roman']
-    rcParams['font.size'] = 12
-
-    # plot cloud
-    fig = plt.figure(figsize=(7, 4))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Create the scatter plot
-    scatter = ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['supernormal_dev_gt'], cmap='viridis')
-
-    # Get the limits of the data
-    x_limits = ax.get_xlim3d()
-    y_limits = ax.get_ylim3d()
-    z_limits = ax.get_zlim3d()
-
-    # Calculate the range of each dimension
-    x_range = abs(x_limits[1] - x_limits[0])
-    y_range = abs(y_limits[1] - y_limits[0])
-    z_range = abs(z_limits[1] - z_limits[0])
-
-    # Find the greatest range for normalization
-    max_range = max(x_range, y_range, z_range)
-
-    # Calculate the midpoints
-    x_middle = np.mean(x_limits)
-    y_middle = np.mean(y_limits)
-    z_middle = np.mean(z_limits)
-
-    # Set the new limits
-    ax.set_xlim3d([x_middle - max_range / 2, x_middle + max_range / 2])
-    ax.set_ylim3d([y_middle - max_range / 2, y_middle + max_range / 2])
-    ax.set_zlim3d([z_middle - max_range / 2, z_middle + max_range / 2])
-
-    # Adjust layout to prevent cutting off labels
-    plt.tight_layout()
-
-    plt.show()
-    plt.savefig('supernormal_gt_deviation.pdf', bbox_inches='tight', dpi=300)
-
-    # plot cloud with confidence colors
-    fig = plt.figure(figsize=(7, 4))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Create the scatter plot
-    scatter = ax.scatter(cloud['x'], cloud['y'], cloud['z'], s=0.3, c=cloud['confidence'], cmap='viridis')
-
-    # Get the limits of the data
-    x_limits = ax.get_xlim3d()
-    y_limits = ax.get_ylim3d()
-    z_limits = ax.get_zlim3d()
-
-    # Calculate the range of each dimension
-    x_range = abs(x_limits[1] - x_limits[0])
-    y_range = abs(y_limits[1] - y_limits[0])
-    z_range = abs(z_limits[1] - z_limits[0])
-
-    # Find the greatest range for normalization
-    max_range = max(x_range, y_range, z_range)
-
-    # Calculate the midpoints
-    x_middle = np.mean(x_limits)
-    y_middle = np.mean(y_limits)
-    z_middle = np.mean(z_limits)
-
-    # Set the new limits
-    ax.set_xlim3d([x_middle - max_range / 2, x_middle + max_range / 2])
-    ax.set_ylim3d([y_middle - max_range / 2, y_middle + max_range / 2])
-    ax.set_zlim3d([z_middle - max_range / 2, z_middle + max_range / 2])
-
-    # Set tick labels to Times New Roman
-    for label in ax.get_xticklabels() + ax.get_yticklabels() + ax.get_zticklabels():
-        label.set_fontname('Times New Roman')
-
-    # Adjust layout to prevent cutting off labels
-    plt.tight_layout()
-
-    plt.show()
-
-
-    x = cloud['confidence']
-    y = cloud['supernormal_dev_gt']
-    x = np.array(x, dtype=np.float64)
-    y = np.array(y, dtype=np.float64)
-
-    xy = np.vstack([x, y])
-    z = gaussian_kde(xy)(xy)
-    idx = z.argsort()
-    x, y, z = x[idx], y[idx], z[idx]
-
-    fig, ax = plt.subplots(figsize=(7, 4))
-
-    # Scatter plot with color representing density
-    scatter = ax.scatter(x, y, c=z, cmap='viridis', s=1, alpha=0.5)
-
-    # Set y-axis to logarithmic scale
-    ax.set_yscale('log')
-
-    # Label axes with LaTeX math notation
-    ax.set_xlabel(r'Confidence $c_s$')
-    ax.set_ylabel(r'Supernormal Deviation $\theta_\Delta$')
-
-    # Add colorbar
-    cbar = plt.colorbar(scatter)
-    cbar.set_label('Density', rotation=270, labelpad=15)
-
-    # Adjust layout to prevent cutting off labels
-    plt.tight_layout()
-
-    plt.show()
-    fig.savefig('supernormal_deviation.pdf', bbox_inches='tight', dpi=300)
 
     # calculate mean and median deviation
     mean_dev = np.mean(cloud['supernormal_dev_gt'])
     median_dev = np.median(cloud['supernormal_dev_gt'])
     print(f'mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
 
+    if inplace:
+        return cloud
 
 def normal_evaluation(cloud, config):
     orientation_gt = load_angles(config.project.orientation_gt_path)

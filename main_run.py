@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 2
+    cache_flag = 3
     ##########
 
     if cache_flag == 0:
@@ -111,7 +111,8 @@ if __name__ == '__main__':
         # optional quality check
         control_supernormals = True
         if control_supernormals:
-            supernormal_evaluation(cloud, config)
+            cloud = supernormal_evaluation(cloud, config, inplace=True)
+            cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=2)
         o3d_cloud_0 = o3d.geometry.PointCloud()
         o3d_cloud_0.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
         o3d_cloud_0.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
