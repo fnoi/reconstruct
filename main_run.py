@@ -16,7 +16,7 @@ import tools.utils
 from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
 from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1, planar_patches
+from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1
 from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation, calculate_purity
 
 if __name__ == '__main__':
@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 1
+    cache_flag = 3
     ##########
 
     if cache_flag == 0:
