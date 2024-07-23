@@ -1,3 +1,3 @@
-from .CloudSegment import Segment
-from .SegmentSkeleton import Skeleton
+from .Cloud import Segment
+from .Skeleton import Skeleton
 

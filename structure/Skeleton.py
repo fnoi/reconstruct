@@ -9,7 +9,7 @@ import pandas as pd
 
 try:
     import plotly.graph_objs as go
-    from structure.CloudSegment import Segment
+    from structure.Cloud import Segment
     from tools.geometry import warped_vectors_intersection, skew_lines
 except ImportError as e:
     print(f'Error: {e}')

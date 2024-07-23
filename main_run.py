@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 3
+    cache_flag = 4
     ##########
 
     if cache_flag == 0:
@@ -151,7 +151,7 @@ if __name__ == '__main__':
         raise ValueError('stop here')
 
     if cache_flag <= 4:
-        print('\n- project instance points to plane, initiate skeleton, fit cs')
+        print('\n- initiate skeleton, aggregate skeleton (incl. orientation and projection)')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=True)
