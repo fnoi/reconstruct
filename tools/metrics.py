@@ -302,6 +302,7 @@ def calculate_metrics(df_cloud, config):
     print(f'mapped pairs {len(id_map)}, {id_map}')
     metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
     print(metrics)
+    purity = calculate_purity(gt=inst_gt, pred=inst_pred)
 
     greedy_compare = False
     if not greedy_compare:
