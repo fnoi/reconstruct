@@ -627,7 +627,9 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
                 point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
                 # if not enough points left, break
                 if len(point_cloud.points) < 0.1 * len(cluster_ptx_array):
-                    raise Exception('not enough points left to retry')
+                    print('not enough points left to retry')
+                    return None, None, None, None, None
+
 
     elif case == "pyransac":
         plane = pyrsc.Plane()

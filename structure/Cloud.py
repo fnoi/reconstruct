@@ -30,6 +30,7 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.break_flag = None
         self.cog_3D = None
         self.angle_2D = None
         self.points_2D_fitting = None
@@ -113,6 +114,11 @@ class Segment(object):
             config=self.config,
             step="skeleton"
         )
+        print(origin)
+
+        if planes is None:
+            self.break_flag = True
+            return
 
         points_on_line, closest_ind = project_points_to_line(points, origin, direction)
 
@@ -201,12 +207,15 @@ class Segment(object):
             # vis.segment_projection_3D(points, proj_lines)
             # vis.segment_projection_3D(proj_points_plane, proj_lines)
 
-        dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
+        # dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
+        dists = np.linalg.norm(self.points_2D - np.median(self.points_2D, axis=0), axis=1)
         closest_ind = np.argmin(dists)
         self.cog_2D = self.points_2D[closest_ind]
         self.cog_3D = points[closest_ind]
 
+        print(origin)
         origin = self.cog_3D
+        print(origin)
         points_on_line, closest_ind = project_points_to_line(points, origin, direction)
 
         ref_x = -100000

@@ -170,12 +170,12 @@ class Skeleton:
                         self.add_cloud(segment_new)
                         self.update_bones()
                         # self.add_bone(segment_new)
-                        try:
-                            self.bones[-1].fit_cs_rev()
-                        except:
-                            self.bones[-1].h_beam_params = False
-                            self.bones[-1].h_beam_verts = False
-                        print(self.bones[-1].h_beam_params)
+                        # try:
+                        #     self.bones[-1].fit_cs_rev()
+                        # except:
+                        #     self.bones[-1].h_beam_params = False
+                        #     self.bones[-1].h_beam_verts = False
+                        # print(self.bones[-1].h_beam_params)
 
                         print(f'ummm now {len(self.bones)} bones')
 

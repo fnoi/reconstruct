@@ -1,4 +1,5 @@
 import time
+import sys
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -133,15 +134,23 @@ def fitting_fct(points_array_2D):
     #         swarmsize=100, omega=0.5, phip=0.5, phig=0.5, maxiter=100,
     #         minstep=1e-8, minfunc=1e-8, debug=False)
 
-    xopt, fopt = pso(func=cost_fct_1,
-                     lb=lower_bound,
-                     ub=upper_bound,
-                     args=(points_array_2D,),
-                     swarmsize=swarm_size,
-                     maxiter=maxiter,
-                     phip=phip,
-                     phig=phig,
-                     debug=False)
+    timestamp_very_precise = time.time()
+    original_stdout = sys.stdout
+    with open(f'/experiment_log/output_{timestamp_very_precise}.txt', 'w') as f:
+        sys.stdout = f
+
+        # start writing output to file
+        xopt, fopt = pso(func=cost_fct_1,
+                         lb=lower_bound,
+                         ub=upper_bound,
+                         args=(points_array_2D,),
+                         swarmsize=swarm_size,
+                         maxiter=maxiter,
+                         phip=phip,
+                         phig=phig,
+                         debug=True)
+        sys.stdout = original_stdout
+
 
     # xopt, fopt = pso(cost_fct_1, lower_bound, upper_bound, args=(points_array_2D,),
     #                  swarmsize=swarm_size, maxiter=max_iter)

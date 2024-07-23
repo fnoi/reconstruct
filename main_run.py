@@ -154,18 +154,7 @@ if __name__ == '__main__':
         print('\n- initiate skeleton, aggregate skeleton (incl. orientation and projection)')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
-        skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=True)
-
-        # process bones directly
-        for bone in skeleton.bones:
-            a = 0
-            try:
-                bone.fit_cs_rev()
-                bone.cs_lookup()
-            except:
-                bone.h_beam_params = False
-                bone.h_beam_verts = False
-            print(bone.h_beam_params)
+        skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=False)
         skeleton.cache_pickle(config.project.parking_path)
 
         # TODO: are we still retrieving from table?
@@ -175,9 +164,21 @@ if __name__ == '__main__':
 
         # skeleton.plot_cog_skeleton()
 
-        print('\n- refine skeleton aggregation')  # baseline exists but omg indeed
+        print('\n- skeleton segment aggregation, final cs fit')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
+        skeleton.plot_cog_skeleton()
+
+        for bone in skeleton.bones:
+            a = 0
+            try:
+                bone.fit_cs_rev()
+                bone.cs_lookup()
+            except:
+                bone.h_beam_params = False
+                bone.h_beam_verts = False
+
+            print(bone.h_beam_params)
 
         skeleton.cache_pickle(config.project.parking_path)
 

@@ -23,9 +23,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
 
     if skeleton.beams:
         segments: list = [f'beam_{i}' for i in np.unique(cloud_df['instance_pr']) if i != 0]
-
-        cache = []
-        for segment in tqdm(segments, desc='loading segment data', total=len(segments)):
+        for segment in segments:
             cloud = Segment(name=segment, config=config)
             if df_cloud_flag:
                 cloud.load_from_df(cloud_df, segment)
@@ -33,10 +31,14 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
                 cloud.load_from_txt(segment)
 
             if len(cloud.points) > config.skeleton.min_points:
+                print(f'in for segment {segment} with initial size {len(cloud.points)}')
                 cloud.calc_axes(plot=plot)
-                skeleton.add_cloud(cloud)
+                if not cloud.break_flag:
+                    skeleton.add_cloud(cloud)
+                else:
+                    print(f'dumping segment {segment} due to break flag')
             else:
-                print(f'dumping segment {segment} due to size')
+                print(f'dumping segment {segment} due to initial size')
 
         return skeleton
 
