@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 4
+    cache_flag = 3
     ##########
 
     if cache_flag == 0:
@@ -156,17 +156,19 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=False)
         skeleton.cache_pickle(config.project.parking_path)
+        skeleton.plot_cog_skeleton()
 
         # TODO: are we still retrieving from table?
 
     if cache_flag <= 5:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
-        # skeleton.plot_cog_skeleton()
+        skeleton.plot_cog_skeleton(text=False)
 
         print('\n- skeleton segment aggregation, final cs fit')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
+
         skeleton.plot_cog_skeleton()
 
         for bone in skeleton.bones:
@@ -180,6 +182,7 @@ if __name__ == '__main__':
 
             print(bone.h_beam_params)
 
+        # raise ValueError('stop here')
         skeleton.cache_pickle(config.project.parking_path)
 
     if cache_flag <= 5.5:

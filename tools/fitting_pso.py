@@ -136,7 +136,7 @@ def fitting_fct(points_array_2D):
 
     timestamp_very_precise = time.time()
     original_stdout = sys.stdout
-    with open(f'/experiment_log/output_{timestamp_very_precise}.txt', 'w') as f:
+    with open(f'/Users/fnoic/PycharmProjects/reconstruct/experiment_log/output_{timestamp_very_precise}.txt', 'w') as f:
         sys.stdout = f
 
         # start writing output to file

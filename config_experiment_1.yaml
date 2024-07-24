@@ -33,7 +33,7 @@ clustering:
   dist_thresh_normal: 0.1
   angle_thresh_normal: 30
   dist_thresh_supernormal: 0.5
-  angle_thresh_supernormal: 20
+  angle_thresh_supernormal: 30
   dist_thresh_ransac: 0.0075
   count_thresh_ransac: 1000
   iter_thresh_ransac: 100000000
@@ -71,6 +71,8 @@ skeleton:
   ransac_picks: 3
   ransac_min_count_rel: 0.2
   ransac_iterations: 30000
+  aggregate_distance_max_l: 0.2
+  downsample_points: 50
 
 skeleton_visualization:
   line_length_projection: 0.2

@@ -103,7 +103,7 @@ class Skeleton:
 
     def aggregate_bones(self):
 
-        self.plot_cog_skeleton()
+        # self.plot_cog_skeleton() why here?
 
         while True:
             self.find_joints()
@@ -140,9 +140,17 @@ class Skeleton:
                     LX1 = np.linalg.norm(P0 - P1)
                     LX2 = np.linalg.norm(P2 - P3)
 
-                    if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
-                        continue
+                    min_dist = min([L0, L1, L2, L3])
+                    try:
+                        dist_flag = min_dist > self.config.skeleton.aggregate_distance_max
+                    except:
+                        dist_flag = min_dist > 0.2
 
+                    # if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
+                    #     continue
+
+                    if dist_flag:
+                        continue
                     else:
                         # identify main: longer
                         if LX1 >= LX2:
@@ -181,6 +189,8 @@ class Skeleton:
 
                         break
                         # self.aggregate_bones()
+
+            a = 0
 
             if i == self.joints_array.shape[0] - 1:
                 self.plot_cog_skeleton()
@@ -799,7 +809,7 @@ class Skeleton:
         self.joint_frame = joint_frame
         return
 
-    def plot_cog_skeleton(self):
+    def plot_cog_skeleton(self, text=True):
         # create plotly fig
         fig = go.Figure()
         for bone in self.bones:
@@ -827,25 +837,35 @@ class Skeleton:
                                        y=bone.points[:, 1],
                                        z=bone.points[:, 2],
                                        mode='markers',
-                                       marker=dict(color='grey', size=1)))
+                                       marker=dict(color='grey', size=.6, opacity=0.8)))
             # add beam name to center point plus offset
             center_point = (bone.line_cog_right + bone.line_cog_left) / 2
-            text_point = center_point + np.array([0.4, 0.3, 0.2])
-            # add beam name to text point
-            fig.add_trace(go.Scatter3d(x=[text_point[0]],
-                                        y=[text_point[1]],
-                                        z=[text_point[2]],
-                                        mode='text',
-                                        text=[bone.name],
-                                        textposition='middle center',
-                                        textfont=dict(size=10, color='black')))
+            d_x = 0.4
+            d_y = 0.3
+            d_z = 0.2
+            rel_dist = 0.1
+            end_point = center_point + np.array([d_x, d_y, d_z])
+            text_point = end_point - rel_dist * np.array([d_x, d_y, d_z])
 
             # add line from center_point to text_point
-            fig.add_trace(go.Scatter3d(x=[center_point[0], text_point[0]],
-                                        y=[center_point[1], text_point[1]],
-                                        z=[center_point[2], text_point[2]],
-                                        mode='lines',
-                                        line=dict(color='black', width=1)))
+            if text:
+                # split beam_name at _
+                beam_name = bone.name.split('_')
+                beam_no = int(beam_name[1])
+                # add beam name to text point
+                fig.add_trace(go.Scatter3d(x=[end_point[0]],
+                                           y=[end_point[1]],
+                                           z=[end_point[2]],
+                                           mode='text',
+                                           text=[beam_no],
+                                           textposition='middle center',
+                                           textfont=dict(family='Times New Roman', size=20, color='black')))
+
+                fig.add_trace(go.Scatter3d(x=[center_point[0], text_point[0]],
+                                            y=[center_point[1], text_point[1]],
+                                            z=[center_point[2], text_point[2]],
+                                            mode='lines',
+                                            line=dict(color='black', width=2)))
 
         # perspective should be ortho
         fig.layout.scene.camera.projection.type = "orthographic"
@@ -853,6 +873,25 @@ class Skeleton:
         fig.layout.scene.xaxis.visible = False
         fig.layout.scene.yaxis.visible = False
         fig.layout.scene.zaxis.visible = False
+
+        elev = 30
+        azim = -60
+        r = 1.25  # Distance from center, you may need to adjust this
+        x_eye = r * np.cos(np.radians(azim)) * np.cos(np.radians(elev))
+        y_eye = r * np.sin(np.radians(azim)) * np.cos(np.radians(elev))
+        z_eye = r * np.sin(np.radians(elev))
+
+        fig.update_layout(scene_camera=dict(
+            eye=dict(x=x_eye, y=y_eye, z=z_eye)
+        ))
+
+        fig.update_layout(
+            scene=dict(
+                aspectmode='data',
+                # Optionally, set a custom aspect ratio
+                # aspectratio=dict(x=1, y=1, z=1)
+            )
+        )
 
         # show go figure
         fig.show()

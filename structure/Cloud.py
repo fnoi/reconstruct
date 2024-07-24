@@ -114,7 +114,7 @@ class Segment(object):
             config=self.config,
             step="skeleton"
         )
-        print(origin)
+        # print(origin)
 
         if planes is None:
             self.break_flag = True
@@ -213,9 +213,9 @@ class Segment(object):
         self.cog_2D = self.points_2D[closest_ind]
         self.cog_3D = points[closest_ind]
 
-        print(origin)
+        # print(origin)
         origin = self.cog_3D
-        print(origin)
+        # print(origin)
         points_on_line, closest_ind = project_points_to_line(points, origin, direction)
 
         ref_x = -100000
