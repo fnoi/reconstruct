@@ -29,7 +29,7 @@ if __name__ == '__main__':
         config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
 
     ##########
-    cache_flag = 3
+    cache_flag = 5
     ##########
 
     if cache_flag == 0:
@@ -180,7 +180,7 @@ if __name__ == '__main__':
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
 
-            print(bone.h_beam_params)
+            # print(bone.h_beam_params)
 
         # raise ValueError('stop here')
         skeleton.cache_pickle(config.project.parking_path)
