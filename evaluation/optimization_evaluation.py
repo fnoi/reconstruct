@@ -19,6 +19,9 @@ def extract_data_from_file(file_path):
         content = file.read()
         content = content.replace('\r\n', '\n')  # Normalize line endings
 
+    # check if content is empty
+    if not content:
+        raise ValueError(f"File is empty: {file_path}")
     pattern = r"(?:New best for swarm at iteration|Best after iteration) (\d+): \[([-+\de.\s\n]+)\] ([\d.e-]+)"
 
     matches = re.findall(pattern, content, flags=re.DOTALL)
@@ -51,6 +54,15 @@ def process_log_files(directory):
         if filename.endswith('.txt'):
             file_path = os.path.join(directory, filename)
             cost_data = extract_data_from_file(file_path)
+            # normalize data
+            cost_data_array = np.array(list(cost_data.values()))
+            c_max = np.max(cost_data_array)
+            c_min = np.min(cost_data_array)
+            c_range = c_max - c_min
+            cost_data = {k: (v - c_min) / c_range for k, v in cost_data.items()}
+
+
+
             all_data[filename] = cost_data
 
     # Convert the dictionary to a DataFrame
@@ -83,6 +95,8 @@ def plot_min_cost_vs_iteration(df):
     plt.ylabel('Cost')
     plt.grid(True, linestyle='-', alpha=0.7)
     plt.tight_layout()
+    # save to file
+    plt.savefig('output.png', dpi=300)
     plt.show()
 
 
