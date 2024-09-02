@@ -611,7 +611,7 @@ def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None,
     if step == 'bbox_mask':
         shape = "cube"
     elif step == 'patch growing':
-        shape = config.region_growing.neighbor_shape
+        shape = config.region_growing.neighborhood_shape
         seed_data = cloud.loc[cloud['id'] == seed_id]
         # seed_data = cloud.iloc[seed_id]
     else:
@@ -935,7 +935,7 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
     coordinates_cloud = cloud[['x', 'y', 'z']].values
 
     if step == 'bbox_mask':
-        dist = config.region_growing.neighborhood_radius_a
+        dist = config.local_neighborhood.radius_a
         # check dist from points to cluster_lims
         # find neighbors that are at least dist away from cluster_lims
         x_ok_lower = np.where(coordinates_cloud[:, 0] > cluster_lims[0] - dist)[0]

@@ -34,7 +34,7 @@ def region_growing(cloud, config):
     while True:
         pointcount += 1
         print(f'segment counter: {pointcount}')
-        if len(source_point_ids) <= config.region_growing.leftover_thresh:
+        if len(source_point_ids) <= config.region_growing.leftover_relative * len(cloud):
             break
         # find seed point
         source_cloud = cloud.loc[source_point_ids]
@@ -213,7 +213,7 @@ def region_growing(cloud, config):
                         deviation_sn = angular_deviation(cluster_sn, neighbor_sn) % 180
                         deviation_sn = min(deviation_sn, 180 - deviation_sn)
                         # USED PARAMETER: REGION_GROWING.SUPERNORMAL_POINT_ANGLE_DEVIATION
-                        if deviation_sn < config.region_growing.supernormal_point_angle_deviation:
+                        if deviation_sn < config.region_growing.supernormal_angle_deviation_point:
                             active_point_ids.append(neighbor)
                             source_point_ids.remove(neighbor)
                             print(f'added point {neighbor}')
@@ -233,8 +233,8 @@ def region_growing(cloud, config):
 
                         # USED PARAMETER: REGION_GROWING.SUPERNORMAL_PATCH_ANGLE_DEVIATION
                         # USED PARAMETER: REGION_GROWING.RANSACNORMAL_PATCH_ANGLE_DEVIATION
-                        if deviation_sn < config.region_growing.supernormal_patch_angle_deviation and \
-                                deviation_rn < config.region_growing.ransacnormal_patch_angle_deviation:
+                        if deviation_sn < config.region_growing.supernormal_angle_deviation_patch and \
+                                deviation_rn < config.region_growing.ransacnormal_angle_deviation_patch:
                             active_patch_ids.append(neighbor_patch)
                             active_point_ids.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())

@@ -23,7 +23,25 @@ planar_patch:
 
 local_neighborhood:
   shape: sphere
+  radius_a: 0.1
 
 supernormal:
   radius: 0.3
   input: no ransac
+
+region_growing:
+  neighborhood_shape: sphere
+  leftover_relative: 0.02
+  supernormal_angle_deviation_patch: 10
+  ransacnormal_angle_deviation_patch: 10
+  supernormal_angle_deviation_point: 10
+
+skeleton:
+  init_min_count: 100
+  ransac_method: open3d
+  ransac_distance_threshold: 0.0005
+  ransac_num_iterations: 50000
+  ransac_ransac_n: 3
+
+skeleton_visual:
+  line_length_projection: 0.2

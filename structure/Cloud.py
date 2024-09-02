@@ -105,7 +105,7 @@ class Segment(object):
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points)
             pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-                radius=self.config.local_features.normals_radius, max_nn=self.config.local_features.max_nn))
+                radius=self.config.preprocess.normals_radius, max_nn=self.config.preprocess.normals_max_nn))
             normals = np.asarray(pcd.normals)
 
         # find the two best planes and their line of intersection
@@ -143,7 +143,7 @@ class Segment(object):
         proj_dir_0, proj_origin_0 = intersecting_line(proj_plane, planes[0])
         proj_dir_1, proj_origin_1 = intersecting_line(proj_plane, planes[1])
 
-        len_proj = self.config.skeleton_visualization.line_length_projection
+        len_proj = self.config.skeleton_visual.line_length_projection
         proj_dir_0 = np.array(
             [[self.point[0] - (proj_dir_0[0] * len_proj),
               self.point[1] - (proj_dir_0[1] * len_proj),

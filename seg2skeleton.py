@@ -30,7 +30,7 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
             else:
                 cloud.load_from_txt(segment)
 
-            if len(cloud.points) > config.skeleton.min_points:
+            if len(cloud.points) > config.skeleton.init_min_count:
                 print(f'in for segment {segment} with initial size {len(cloud.points)}')
                 cloud.calc_axes(plot=plot)
                 if not cloud.break_flag:

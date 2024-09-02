@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # 6: model reconstruction with FreeCAD
     ##########
     ##########
-    cache_flag = 2
+    cache_flag = 4
     ##########
     ##########
 

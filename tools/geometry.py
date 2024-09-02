@@ -582,9 +582,9 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
         point_cloud.normals = o3d.utility.Vector3dVector(cluster_ptx_array[:, 3:6])
         # perform ransac
         if step == "skeleton":
-            dist_threshold = config.skeleton.ransac_dist_thresh
-            ransac_n = config.skeleton.ransac_picks
-            num_iterations = config.skeleton.ransac_iterations
+            dist_threshold = config.skeleton.ransac_distance_threshold
+            ransac_n = config.skeleton.ransac_ransac_n
+            num_iterations = config.skeleton.ransac_num_iterations
             prob = 1.0
         else:
             dist_threshold = 0.01
