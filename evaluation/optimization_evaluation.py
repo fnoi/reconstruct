@@ -49,11 +49,13 @@ def process_log_files(directory):
         pd.DataFrame: A DataFrame with iteration numbers as index and filenames as columns.
     """
     all_data = {}
+    all_data_raw = {}
 
     for filename in os.listdir(directory):
         if filename.endswith('.txt'):
             file_path = os.path.join(directory, filename)
             cost_data = extract_data_from_file(file_path)
+            all_data_raw[filename] = cost_data
             # normalize data
             cost_data_array = np.array(list(cost_data.values()))
             c_max = np.max(cost_data_array)
@@ -67,9 +69,11 @@ def process_log_files(directory):
 
     # Convert the dictionary to a DataFrame
     df = pd.DataFrame(all_data)
+    df_raw = pd.DataFrame(all_data_raw)
     df.index.name = 'Iteration'
+    df_raw.index.name = 'Iteration'
 
-    return df
+    return df, df_raw
 
 
 def plot_min_cost_vs_iteration(df):
@@ -105,10 +109,12 @@ if __name__ == "__main__":
     log_directory = '/Users/fnoic/PycharmProjects/reconstruct/experiment_log/'
 
     # Process the log files and create a DataFrame
-    result_df = process_log_files(log_directory)
+    result_df, result_df_raw = process_log_files(log_directory)
 
-    # Print the resulting DataFrame
-    print(result_df)
+    # # Print the resulting DataFrame
+    # print(result_df)
 
     # Plot the minimum cost versus iteration
     plot_min_cost_vs_iteration(result_df)
+    plot_min_cost_vs_iteration(result_df_raw)
+
