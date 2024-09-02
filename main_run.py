@@ -1,39 +1,42 @@
 import os
 import pathlib
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import open3d as o3d
-import plotly.graph_objects as go
 
 from omegaconf import OmegaConf
 
 from scipy.spatial import KDTree
 from tqdm import tqdm
 
-import tools.utils
 from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
-from tools.IO import cache_io
-from tools.local import calculate_supernormals_rev, ransac_patches, neighborhood_plot, patch_growing, grow_stage_1
-from tools.metrics import calculate_metrics, supernormal_evaluation, normal_evaluation, calculate_purity
+from tools.IO import cache_io, config_io
+from tools.local import calculate_supernormals_rev, ransac_patches
+from tools.metrics import calculate_metrics, supernormal_evaluation, calculate_purity
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_experiment_1.yaml')
-    if os.name == 'nt':
-        config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.cloud_path}')
-        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.segmentation.orientation_path}')
-    else:  # os.name == 'posix':
-        config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.cloud_path}')
-        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.segmentation.orientation_path}')
+    config = OmegaConf.load('config_experiment_2.yaml')
+    config = config_io(config)
 
     ##########
-    cache_flag = 5
+    ##########
+    # cache_flag defines starting point
+    # 0: from scratch, preprocess 1: compute planar patches 2: compute supernormals
+    # 3: compute instance predictions through region growing, report metrics
+    # 4: initiate skeleton, aggregate skeleton (incl. orientation and projection)
+    # 5: skeleton segment aggregation, final cs fit
+    # 5.5: skeleton bones join on passing
+    # 6: model reconstruction with FreeCAD
+    ##########
+    ##########
+    cache_flag = 2
+    ##########
     ##########
 
     if cache_flag == 0:
-        print('\n- compute normals')
+        print('\n- from scratch, preprocessing')
         with open(config.project.path, 'r') as f:
             # TODO: add option to load rgb here, currently XYZ, label only
             cloud = pd.read_csv(f, sep=' ', header=None).values
@@ -48,12 +51,12 @@ if __name__ == '__main__':
         downsample = True
         if downsample:
             print(f'original cloud size: {len(cloud)}')
-            cloud_o3d = o3d_cloud.voxel_down_sample(voxel_size=config.local_features.voxel_size)
+            cloud_o3d = o3d_cloud.voxel_down_sample(voxel_size=config.preprocess.voxel_size)
             cloud_frame_new = pd.DataFrame(np.asarray(cloud_o3d.points), columns=['x', 'y', 'z'])
             # add instance_gt column with nan
             cloud_frame_new['instance_gt'] = np.nan
             for row in tqdm(cloud_frame_new.iterrows(), total=len(cloud_frame_new),
-                            desc='Assigning instance_gt to downsampled cloud'):
+                            desc='re-assigning instance_gt to downsampled cloud'):
                 point_coords = np.asarray(row[1])[0:3]
                 # calculate distance to all points in cloud
                 dists = np.linalg.norm(cloud[['x', 'y', 'z']].values - point_coords, axis=1)
@@ -64,15 +67,12 @@ if __name__ == '__main__':
             cloud = cloud_frame_new
             print(f'downsampled cloud size: {len(cloud)}')
         cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-            radius=config.local_features.normals_radius, max_nn=config.local_features.max_nn))
+            radius=config.preprocess.normals_radius, max_nn=config.preprocess.normals_max_nn))
         normals = np.asarray(cloud_o3d.normals)
         normals = normals / np.linalg.norm(normals, axis=1)[:, None]
         cloud['nx'] = normals[:, 0]
         cloud['ny'] = normals[:, 1]
         cloud['nz'] = normals[:, 2]
-
-        # # re-order cloud by ascending z-values
-        # cloud = cloud.sort_values(by='z', ascending=True)
 
         if 'id' not in cloud.columns:
             # add column to cloud that stores integer ID
@@ -135,6 +135,7 @@ if __name__ == '__main__':
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
+
         raise ValueError('stop here')
 
     if cache_flag <= 3:

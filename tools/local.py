@@ -151,7 +151,7 @@ def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=
         start_index = int(len(neighbor_ids) * (1 - relative_neighborhood_size))
         neighbor_ids = neighbor_ids[start_index:]
 
-    if config.local_features.supernormal_input == 'ransac':
+    if config.supernormal.input == 'ransac':
         # neighbor_normals = cloud.loc[neighbor_ids][['rnx', 'rny', 'rnz']].values
         # use 'id' column
         neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['rnx', 'rny', 'rnz']].values
@@ -195,7 +195,7 @@ def calculate_supernormals_rev(cloud=None, cloud_tree=None, config=None):
 
     point_ids = np.arange(len(cloud))
 
-    if config.local_features.neighbor_shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
+    if config.local_neighborhood.shape in ['cube', 'sphere', 'ellipsoid']:  # unoriented neighborhoods
         for seed_id in tqdm(point_ids, desc="computing supernormals, one step", total=len(point_ids)):
                 cloud = neighborhood_calculations(cloud=cloud, cloud_tree=cloud_tree, seed_id=seed_id, config=config,
                                                   plot_ind=plot_ind, plot_flag=plot_flag)
@@ -229,7 +229,7 @@ def ransac_patches(cloud, config):
     cloud['ransac_patch'] = 0
     mask_remaining = np.ones(len(cloud), dtype=bool)
     progress = tqdm(total=len(cloud))
-    blanks = config.clustering.ransac_blanks
+    blanks = config.planar_patch.ransac_blank_ok
 
     label_id = 0  # label 0 indicates unclustered
     o3d_cloud = o3d.geometry.PointCloud()
@@ -240,9 +240,9 @@ def ransac_patches(cloud, config):
 
         # ransac plane fitting
         ransac_plane, ransac_inliers = o3d_cloud.segment_plane(
-            distance_threshold=config.clustering.ransac_dist_thresh,
-            ransac_n=config.clustering.ransac_n,
-            num_iterations=config.clustering.ransac_iterations,
+            distance_threshold=config.planar_patch.ransac_distance_threshold,
+            ransac_n=config.planar_patch.ransac_ransac_n,
+            num_iterations=config.planar_patch.ransac_num_iterations,
 
         )
         ransac_normal = ransac_plane[0:3]
@@ -250,8 +250,8 @@ def ransac_patches(cloud, config):
 
         # dbscan clustering of inliers
         dbscan_clustering = DBSCAN(
-            eps=config.clustering.dbscan_eps_dist,
-            min_samples=config.clustering.dbscan_min_count
+            eps=config.planar_patch.dbscan_eps,
+            min_samples=config.planar_patch.dbscan_min_samples
         ).fit(current_points[ransac_inliers])
 
         clusters = np.unique(dbscan_clustering.labels_)
@@ -276,24 +276,6 @@ def ransac_patches(cloud, config):
         cloud.loc[external_cluster_idx, ['rnx', 'rny', 'rnz']] = ransac_normal
         mask_remaining[external_cluster_idx] = False
         progress.update(len(external_cluster_idx))
-
-        # a = 0
-        #
-        #
-        # points_processed = 0
-        # for cluster in clusters:
-        #     if cluster == -1:
-        #         continue  # Skip noise points, they remain in mask_remaining
-        #
-        #     label_id += 1
-        #     cluster_idx = np.where(dbscan_clustering.labels_ == cluster)[0]
-        #     external_cluster_idx = inliers_global_idx[cluster_idx]
-        #     cloud.loc[external_cluster_idx, 'ransac_patch'] = label_id
-        #     cloud.loc[external_cluster_idx, ['rnx', 'rny', 'rnz']] = ransac_normal
-        #     mask_remaining[external_cluster_idx] = False
-        #     points_processed += len(external_cluster_idx)
-        #
-        # progress.update(points_processed)
 
     print(f'remaining points {np.sum(mask_remaining)} of {len(mask_remaining)}')
     progress.close()
@@ -633,7 +615,7 @@ def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None,
         seed_data = cloud.loc[cloud['id'] == seed_id]
         # seed_data = cloud.iloc[seed_id]
     else:
-        shape = config.local_features.neighbor_shape
+        shape = config.local_neighborhood.shape
         # if cloud has 'id' column:
         if 'id' in cloud.columns:
             seed_data = cloud.loc[cloud['id'] == seed_id]
@@ -931,7 +913,7 @@ def neighbors_sphere(cloud_tree, seed_data, config):
     else:
         x, y, z = seed_data['x'].values[0], seed_data['y'].values[0], seed_data['z'].values[0]
 
-    idx = cloud_tree.query_ball_point([x, y, z], r=config.local_features.supernormal_radius)
+    idx = cloud_tree.query_ball_point([x, y, z], r=config.supernormal.radius)
 
     return idx
 

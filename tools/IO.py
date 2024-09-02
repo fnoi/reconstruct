@@ -9,6 +9,16 @@ from omegaconf import OmegaConf
 from tools.utils import calculate_view_direction
 
 
+def config_io(config):
+    if os.name == 'nt':
+        config.project.path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.data.cloud_path}')
+        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_windows}{config.project.project_path}{config.data.orientation_path}')
+    else:  # os.name == 'posix':
+        config.project.path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.data.cloud_path}')
+        config.project.orientation_gt_path = pathlib.Path(f'{config.project.basepath_macos}{config.project.project_path}{config.data.orientation_path}')
+
+    return config
+
 def get_is_conf():
     config = OmegaConf.load('config.yaml')
     if os.name == 'nt':

@@ -1,0 +1,29 @@
+project:
+  basepath_windows: C:/Users/ga25mal/
+  basepath_macos: /Users/fnoic/
+  project_path: PycharmProjects/reconstruct/
+  parking_path: data/parking/
+
+data:
+  cloud_path: /data/experiment/initial_1.txt
+  orientation_path: /data/in_full/orientation_list.yaml
+
+preprocess:
+  voxel_size: 0.01
+  normals_radius: 0.05
+  normals_max_nn: 30
+
+planar_patch:
+  ransac_blank_ok: 100
+  ransac_distance_threshold: 0.005
+  ransac_ransac_n: 3
+  ransac_num_iterations: 100000000
+  dbscan_eps: 0.03
+  dbscan_min_samples: 10
+
+local_neighborhood:
+  shape: sphere
+
+supernormal:
+  radius: 0.3
+  input: no ransac
