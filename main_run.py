@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # 6: model reconstruction with FreeCAD
     ##########
     ##########
-    cache_flag = 3
+    cache_flag = 4
     ##########
     ##########
 
@@ -81,6 +81,7 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=0)
 
     if cache_flag <= 1:
+        # compute planar patches
         print('\n- compute planar patches')
         with open(f'{config.project.parking_path}/cache_cloud_0.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
@@ -109,6 +110,7 @@ if __name__ == '__main__':
             normal_evaluation(cloud, config)
 
     if cache_flag <= 2:
+        # compute supernormals
         print('\n- compute supernormals')
         with open(f'{config.project.parking_path}/cache_cloud_1.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
@@ -139,6 +141,7 @@ if __name__ == '__main__':
         raise ValueError('stop here')
 
     if cache_flag <= 3:
+        # region growing
         print('\n- compute instance predictions through region growing, report metrics')
         with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
@@ -152,6 +155,7 @@ if __name__ == '__main__':
         raise ValueError('stop here')
 
     if cache_flag <= 4:
+        # skeleton: initiate
         print('\n- initiate skeleton, aggregate skeleton (incl. orientation and projection)')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
@@ -162,6 +166,7 @@ if __name__ == '__main__':
         # TODO: are we still retrieving from table?
 
     if cache_flag <= 4:
+        # skeleton: aggregate, fit cross-sections
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
         skeleton.plot_cog_skeleton(text=False)
@@ -169,8 +174,6 @@ if __name__ == '__main__':
         print('\n- skeleton segment aggregation, final cs fit')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
-
-
         skeleton.plot_cog_skeleton()
 
         for bone in skeleton.bones:
@@ -178,16 +181,16 @@ if __name__ == '__main__':
             try:
                 bone.fit_cs_rev()
                 bone.cs_lookup()
+                # bone. TODO: -> cog update as class method?
             except:
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
 
-            # print(bone.h_beam_params)
-
-        # raise ValueError('stop here')
         skeleton.cache_pickle(config.project.parking_path)
+        raise ValueError('stop here')
 
     if cache_flag <= 5.5:
+        # skeleton refinement
         print('\n- skeleton bones join on passing')
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         skeleton.plot_cog_skeleton()

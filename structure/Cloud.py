@@ -20,9 +20,9 @@ try:
     from tools.fitting_1 import params2verts
     from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
     from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
-        project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
-        intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
-        rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D
+    project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
+    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
+    rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D, rotate_xy2xyz
     from tools import visual as vis, fitting_pso
 except ImportError as e:
     print(f'Import Error: {e}')
@@ -211,27 +211,26 @@ class Segment(object):
         dists = np.linalg.norm(self.points_2D - np.median(self.points_2D, axis=0), axis=1)
         closest_ind = np.argmin(dists)
         #### TODO
-        self.cog_2D = self.points_2D[closest_ind]
-        self.cog_3D = points[closest_ind]
 
-        # print(origin)
-        origin = self.cog_3D
-        # print(origin)
-        points_on_line, closest_ind = project_points_to_line(points, origin, direction)
+        cog2D_x = np.mean(self.points_2D[:, 0])
+        cog2D_y = np.mean(self.points_2D[:, 1])
+        self.cog_2D = np.array([cog2D_x, cog2D_y])
 
-        ref_x = -100000
-        ref_t = (ref_x - origin[0]) / direction[0]
-        ref_pt = origin + ref_t * direction
+        self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
+
+        points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
+        # find left and right points
+        ref_x = -99999999
+        ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
+        ref_pt = self.cog_3D + ref_t * self.line_raw_dir
         vecs = points_on_line - ref_pt
         dists = np.linalg.norm(vecs, axis=1)
         l_ind = np.argmin(dists)
         r_ind = np.argmax(dists)
-
-        # raw line data from points projected to segment direction vector
         self.line_cog_left = points_on_line[l_ind]
         self.line_cog_right = points_on_line[r_ind]
-        self.line_raw_dir = direction
-        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2  # not actual center of gravity
+        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+
 
     def update_axes(self):
         """bring back center of gravity cog (from lookup) to its correct position in the original coordinate system"""
@@ -381,7 +380,7 @@ class Segment(object):
         grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
-        self.downsample_dbscan_rand(points_after_sampling)
+        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk
         plot_2D_points_bbox(self.points_2D_fitting)
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
         fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
@@ -390,24 +389,8 @@ class Segment(object):
         cog_y = (self.h_beam_params[5][1] + self.h_beam_params[0][1]) / 2
         self.cog_2D = np.array((cog_x, cog_y))
 
-        # scatter plot points and cog
-        fig, ax = plt.subplots()
-        ax.scatter(self.points_2D_fitting[:, 0], self.points_2D_fitting[:, 1], s=0.1)
-        ax.scatter(self.cog_2D[0], self.cog_2D[1], s=10)
-        plt.show()
+        self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
 
-        rot_mat = np.asarray(self.mat_rotation_xy)
-        z_angle_add = self.angle_2D
-        # define rotation matrix for z axis rotation
-        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
-                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
-                                [0, 0, 1]])
-        # multiply rotation matrices
-        rot_mat = np.dot(rot_mat.T, rot_mat_z)
-
-        # for self.cog_3D: rotate cog_2D using rot_mat
-        self.cog_3D = np.array(np.dot(np.array([self.cog_2D[0], self.cog_2D[1], 0]), rot_mat.T))
-        # project points to the line defined by cog_3D and line_raw_dir
         points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
         # find left and right points
         ref_x = -99999999
@@ -420,11 +403,6 @@ class Segment(object):
         self.line_cog_left = points_on_line[l_ind]
         self.line_cog_right = points_on_line[r_ind]
         self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
-
-
-        a = 0
-
-        # TODO: get actual COG and update cog_line_xxx values in skeleton!
 
 
     def downsample_dbscan_rand(self, points_after_sampling):

@@ -707,4 +707,20 @@ def orientation_2D(cloud):
         if len(coords[active_mask]) < 0.1 * len(coords):
             break
 
-    a = 0
+
+def rotate_xy2xyz(point_2D, rot_matrix, xy_angle):
+    rot_mat = np.asarray(rot_matrix)
+    z_angle_add = xy_angle
+    rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                            [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                            [0, 0, 1]])
+    rot_mat = np.dot(rot_mat.T, rot_mat_z)
+
+    point_3D = np.array(np.dot(
+        np.array([point_2D[0], point_2D[1], 0]),
+        rot_mat.T
+    ))
+
+    return point_3D
+
+
