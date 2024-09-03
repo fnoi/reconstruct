@@ -127,7 +127,7 @@ class Skeleton:
                 #     bone_1 = self.bones[int(joint[1][0])]
                 #     bone_2 = self.bones[int(joint[1][1])]
                 #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
-                if acute_angle < 15:  # TODO: replace with self.config.skeleton.aggregate_angle_max (needs skeleton rebuild...)
+                if acute_angle < self.config.skeleton.aggregate_angle_max:
                     # find minimum distance
                     P0 = bone_1.line_cog_left
                     P1 = bone_1.line_cog_right
@@ -145,9 +145,6 @@ class Skeleton:
                         dist_flag = min_dist > self.config.skeleton.aggregate_distance_max
                     except:
                         dist_flag = min_dist > 0.2
-
-                    # if min([L0, L1, L2, L3]) > 0.2:  # TODO: replace with self.config.skeleton.aggregate_distance_max
-                    #     continue
 
                     if dist_flag:
                         continue

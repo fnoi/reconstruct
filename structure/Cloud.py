@@ -210,6 +210,7 @@ class Segment(object):
         # dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
         dists = np.linalg.norm(self.points_2D - np.median(self.points_2D, axis=0), axis=1)
         closest_ind = np.argmin(dists)
+        #### TODO
         self.cog_2D = self.points_2D[closest_ind]
         self.cog_3D = points[closest_ind]
 
@@ -230,7 +231,7 @@ class Segment(object):
         self.line_cog_left = points_on_line[l_ind]
         self.line_cog_right = points_on_line[r_ind]
         self.line_raw_dir = direction
-        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2  # not actual center of gravity
 
     def update_axes(self):
         """bring back center of gravity cog (from lookup) to its correct position in the original coordinate system"""
@@ -384,6 +385,44 @@ class Segment(object):
         plot_2D_points_bbox(self.points_2D_fitting)
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
         fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
+
+        cog_x = (self.h_beam_params[11][0] + self.h_beam_params[0][0]) / 2
+        cog_y = (self.h_beam_params[5][1] + self.h_beam_params[0][1]) / 2
+        self.cog_2D = np.array((cog_x, cog_y))
+
+        # scatter plot points and cog
+        fig, ax = plt.subplots()
+        ax.scatter(self.points_2D_fitting[:, 0], self.points_2D_fitting[:, 1], s=0.1)
+        ax.scatter(self.cog_2D[0], self.cog_2D[1], s=10)
+        plt.show()
+
+        rot_mat = np.asarray(self.mat_rotation_xy)
+        z_angle_add = self.angle_2D
+        # define rotation matrix for z axis rotation
+        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                                [0, 0, 1]])
+        # multiply rotation matrices
+        rot_mat = np.dot(rot_mat.T, rot_mat_z)
+
+        # for self.cog_3D: rotate cog_2D using rot_mat
+        self.cog_3D = np.array(np.dot(np.array([self.cog_2D[0], self.cog_2D[1], 0]), rot_mat.T))
+        # project points to the line defined by cog_3D and line_raw_dir
+        points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
+        # find left and right points
+        ref_x = -99999999
+        ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
+        ref_pt = self.cog_3D + ref_t * self.line_raw_dir
+        vecs = points_on_line - ref_pt
+        dists = np.linalg.norm(vecs, axis=1)
+        l_ind = np.argmin(dists)
+        r_ind = np.argmax(dists)
+        self.line_cog_left = points_on_line[l_ind]
+        self.line_cog_right = points_on_line[r_ind]
+        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+
+
+        a = 0
 
         # TODO: get actual COG and update cog_line_xxx values in skeleton!
 

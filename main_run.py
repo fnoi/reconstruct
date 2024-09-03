@@ -31,7 +31,7 @@ if __name__ == '__main__':
     # 6: model reconstruction with FreeCAD
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 3
     ##########
     ##########
 
@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
         # TODO: are we still retrieving from table?
 
-    if cache_flag <= 5:
+    if cache_flag <= 4:
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
         skeleton.plot_cog_skeleton(text=False)
@@ -169,6 +169,7 @@ if __name__ == '__main__':
         print('\n- skeleton segment aggregation, final cs fit')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
+
 
         skeleton.plot_cog_skeleton()
 
