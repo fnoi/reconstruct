@@ -35,6 +35,7 @@ if __name__ == '__main__':
     ##########
     ##########
     cache_flag = 4
+    single_step = False
     ##########
     ##########
 
@@ -82,6 +83,8 @@ if __name__ == '__main__':
             cloud['id'] = [i for i in range(len(cloud))]
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=0)
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 1:
         # compute planar patches
@@ -105,12 +108,13 @@ if __name__ == '__main__':
 
         # store to x,y,z,ransac_id
         cloud.to_csv(f'{config.project.parking_path}/cloud_ransac_patches.txt', sep=' ', index=False)
-        raise ValueError('stop here')
+        if single_step:
+            raise ValueError('stop here, single step')
 
-        # optional quality check
-        control_normals = True
-        if control_normals:
-            normal_evaluation(cloud, config)
+        # # optional quality check
+        # control_normals = True
+        # if control_normals:
+        #     normal_evaluation(cloud, config)
 
     if cache_flag <= 2:
         # compute supernormals
@@ -140,8 +144,8 @@ if __name__ == '__main__':
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
-
-        raise ValueError('stop here')
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 3:
         # region growing
@@ -155,7 +159,8 @@ if __name__ == '__main__':
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt
         cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev.txt', sep=' ', index=False)
-        raise ValueError('stop here')
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 4:
         # skeleton: initiate
@@ -167,6 +172,8 @@ if __name__ == '__main__':
         skeleton.plot_cog_skeleton()
 
         # TODO: are we still retrieving from table?
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 5:
         # skeleton: aggregate, compute metrics
@@ -185,6 +192,8 @@ if __name__ == '__main__':
             miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
 
         skeleton.plot_cog_skeleton()
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 6:
         # fit cross-sections
@@ -198,7 +207,8 @@ if __name__ == '__main__':
                 bone.h_beam_verts = False
 
         skeleton.cache_pickle(config.project.parking_path)
-        raise ValueError('stop here')
+        if single_step:
+            raise ValueError('stop here, single step')
 
     if cache_flag <= 7:
         # skeleton refinement
@@ -210,6 +220,8 @@ if __name__ == '__main__':
 
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.cache_json(config.project.parking_path)
+        if single_step:
+            raise ValueError('stop here, single step')
 
     # if cache_flag <= 6:
     #     print('\n- collision-free reconstruction with FreeCAD')

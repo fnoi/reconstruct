@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 try:
+    import matplotlib.pyplot as plt
     import plotly.graph_objs as go
     from structure.Cloud import Segment
     from tools.geometry import warped_vectors_intersection, skew_lines
@@ -806,10 +807,32 @@ class Skeleton:
         self.joint_frame = joint_frame
         return
 
-    def plot_cog_skeleton(self, text=True):
+    def plot_cog_skeleton(self, text=True, colorswitch=True):
         # create plotly fig
         fig = go.Figure()
-        for bone in self.bones:
+
+        num_bones = len(self.bones)
+
+        if colorswitch:
+            colorset = ['blue', 'orange', 'green', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+            color_num = 10
+            linecolor = []
+            cogcolor = []
+            pointcloudcolor = []
+
+            for j in range(num_bones):
+                color_index = j % color_num
+                linecolor.append(colorset[color_index])
+                cogcolor.append(colorset[color_index])
+                pointcloudcolor.append(colorset[color_index])
+
+        else:
+            linecolor = ['blue' for _ in range(num_bones)]
+            cogcolor = ['magenta' for _ in range(num_bones)]
+            pointcloudcolor = ['grey' for _ in range(num_bones)]
+
+
+        for i, bone in enumerate(self.bones):
             if bone.h_beam_params is False:
                 continue
             # bone.cs_lookup()
@@ -822,19 +845,19 @@ class Skeleton:
                                        y=[bone.line_cog_left[1], bone.line_cog_right[1]],
                                        z=[bone.line_cog_left[2], bone.line_cog_right[2]],
                                        mode='lines',
-                                       line=dict(color='blue', width=3)))
+                                       line=dict(color=linecolor[i], width=3)))
             # add line_cog_left, line_cog_right as scatter points
             fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
                                        y=[bone.line_cog_left[1], bone.line_cog_right[1]],
                                        z=[bone.line_cog_left[2], bone.line_cog_right[2]],
                                        mode='markers',
-                                       marker=dict(color='magenta', size=5)))
+                                       marker=dict(color=cogcolor[i], size=5)))
             # point cloud scatter
             fig.add_trace(go.Scatter3d(x=bone.points[:, 0],
                                        y=bone.points[:, 1],
                                        z=bone.points[:, 2],
                                        mode='markers',
-                                       marker=dict(color='grey', size=.6, opacity=0.8)))
+                                       marker=dict(color=pointcloudcolor[i], size=.6, opacity=0.8)))
             # add beam name to center point plus offset
             center_point = (bone.line_cog_right + bone.line_cog_left) / 2
             d_x = 0.4
