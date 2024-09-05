@@ -7,6 +7,7 @@ from matplotlib import rcParams
 from scipy.optimize import linear_sum_assignment
 from scipy.stats import gaussian_kde
 from sklearn.metrics import average_precision_score, precision_recall_curve
+from tqdm import tqdm
 
 from tools.IO import load_angles
 
@@ -293,9 +294,37 @@ def huber_loss(residual, delta):
         return delta * (abs(residual) - 0.5 * delta)
 
 
-def calculate_metrics(df_cloud, config):
-    inst_pred = df_cloud['instance_pr'].to_numpy()
-    inst_gt = df_cloud['instance_gt'].to_numpy()
+def calculate_metrics(df_cloud, base='cloud', skeleton=None):
+    """
+    base: 'cloud' or 'skeleton'
+    """
+    if base == 'cloud':
+        inst_pred = df_cloud['instance_pr'].to_numpy()
+        inst_gt = df_cloud['instance_gt'].to_numpy()
+    elif base == 'skeleton':
+        inst_gt = df_cloud['instance_gt'].to_numpy()
+        inst_pred = np.ones_like(inst_gt) * -1
+        label_ind = 0
+        pred_label = 0
+        for bone in tqdm(skeleton.bones, desc='retrieving gt from cloud bone by bone'):
+            for point in bone.points:
+                mask = (
+                    (df_cloud['x'] == point[0]) &
+                    (df_cloud['y'] == point[1]) &
+                    (df_cloud['z'] == point[2])
+                )
+                matching_rows = df_cloud[mask]
+                if len(matching_rows) == 0:
+                    raise ValueError('no matching points in cloud, go look why')
+                elif len(matching_rows) == 1:
+                    inst_pred[matching_rows.index] = pred_label
+                else:
+                    raise ValueError('multiple matching points in cloud, go look why')
+
+            pred_label = pred_label + 1
+    else:
+        raise ValueError(f"Invalid base: {base}")
+
 
     print('hungarian matching')
     id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='hungarian')

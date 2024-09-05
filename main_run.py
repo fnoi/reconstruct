@@ -23,12 +23,15 @@ if __name__ == '__main__':
     ##########
     ##########
     # cache_flag defines starting point
-    # 0: from scratch, preprocess 1: compute planar patches 2: compute supernormals
-    # 3: compute instance predictions through region growing, report metrics
-    # 4: initiate skeleton, aggregate skeleton (incl. orientation and projection)
-    # 5: skeleton segment aggregation, final cs fit
-    # 5.5: skeleton bones join on passing
-    # 6: model reconstruction with FreeCAD
+    # 0: from scratch, preprocessing
+    # 1: planar patches
+    # 2: supernormals
+    # 3: region growing
+    # 4: skeleton initiation
+    # 5: skeleton aggregation
+    # 6: cross-section fitting
+    # 7: skeleton refinement
+    # ((8: model generation))
     ##########
     ##########
     cache_flag = 4
@@ -147,7 +150,7 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
         cloud = region_growing(cloud, config)
-        miou_weighted, miou_unweighted = calculate_metrics(cloud, config)
+        miou_weighted, miou_unweighted = calculate_metrics(cloud, base='cloud')
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt
@@ -165,23 +168,31 @@ if __name__ == '__main__':
 
         # TODO: are we still retrieving from table?
 
-    if cache_flag <= 4:
-        # skeleton: aggregate, fit cross-sections
+    if cache_flag <= 5:
+        # skeleton: aggregate, compute metrics
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
         skeleton.plot_cog_skeleton(text=False)
 
-        print('\n- skeleton segment aggregation, final cs fit')  # baseline exists but omg indeed
+        print('\n- skeleton segment aggregation, metrics revised')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
+
+        metrics_report = True
+        if metrics_report:
+            with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
+                cloud = pd.read_pickle(f)
+            miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
+
         skeleton.plot_cog_skeleton()
 
+    if cache_flag <= 6:
+        # fit cross-sections
         for bone in skeleton.bones:
             a = 0
             try:
                 bone.fit_cs_rev()
                 bone.cs_lookup()
-                # bone. TODO: -> cog update as class method?
             except:
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
@@ -189,7 +200,7 @@ if __name__ == '__main__':
         skeleton.cache_pickle(config.project.parking_path)
         raise ValueError('stop here')
 
-    if cache_flag <= 5.5:
+    if cache_flag <= 7:
         # skeleton refinement
         print('\n- skeleton bones join on passing')
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
