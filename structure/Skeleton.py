@@ -807,7 +807,7 @@ class Skeleton:
         self.joint_frame = joint_frame
         return
 
-    def plot_cog_skeleton(self, text=True, colorswitch=True):
+    def plot_cog_skeleton(self, text=True, colorswitch=True, headline=None):
         # create plotly fig
         fig = go.Figure()
 
@@ -912,6 +912,9 @@ class Skeleton:
                 # aspectratio=dict(x=1, y=1, z=1)
             )
         )
+
+        if headline is not None:
+            fig.update_layout(title_text=headline)
 
         # show go figure
         fig.show()

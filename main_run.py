@@ -34,8 +34,8 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 4
-    single_step = False
+    cache_flag = 1
+    single_step = True
     ##########
     ##########
 
@@ -169,7 +169,7 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=False)
         skeleton.cache_pickle(config.project.parking_path)
-        skeleton.plot_cog_skeleton()
+        skeleton.plot_cog_skeleton(headline='skeleton initiation')
 
         # TODO: are we still retrieving from table?
         if single_step:
@@ -191,18 +191,21 @@ if __name__ == '__main__':
                 cloud = pd.read_pickle(f)
             miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
 
-        skeleton.plot_cog_skeleton()
+        skeleton.plot_cog_skeleton(headline='skeleton aggregation')
         if single_step:
             raise ValueError('stop here, single step')
 
     if cache_flag <= 6:
+        print('\n- fit cross-sections, lookup cross-sections')
         # fit cross-sections
+        skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         for bone in skeleton.bones:
             a = 0
             try:
                 bone.fit_cs_rev()
                 bone.cs_lookup()
-            except:
+            except ValueError as e:
+                print(f'error: {e}')
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
 
@@ -214,6 +217,9 @@ if __name__ == '__main__':
         # skeleton refinement
         print('\n- skeleton bones join on passing')
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+        for bone in skeleton.bones:
+            if not bone.h_beam_verts:
+                raise ValueError('no cross-sections available, stop here')
         skeleton.plot_cog_skeleton()
         skeleton.join_on_passing_v2()
         skeleton.plot_cog_skeleton()
