@@ -380,8 +380,8 @@ class Segment(object):
         grid_resolution = 0.01
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
-        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk
-        plot_2D_points_bbox(self.points_2D_fitting)
+        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
+        plot_2D_points_bbox(self.points_2D_fitting) # TODO: applicability outside of fct? or at least post-param-retrieval
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
         fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 

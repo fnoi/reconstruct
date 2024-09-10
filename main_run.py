@@ -34,8 +34,8 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 1
-    single_step = True
+    cache_flag = 2
+    single_step = False
     ##########
     ##########
 

@@ -300,9 +300,12 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None):
     """
     if base == 'cloud':
         inst_pred = df_cloud['instance_pr'].to_numpy()
+        inst_pred = inst_pred.astype(int)
         inst_gt = df_cloud['instance_gt'].to_numpy()
+        inst_gt = inst_gt.astype(int)
     elif base == 'skeleton':
         inst_gt = df_cloud['instance_gt'].to_numpy()
+        inst_gt = inst_gt.astype(int)
         inst_pred = np.zeros_like(inst_gt)
         pred_label = 0
         for bone in tqdm(skeleton.bones, desc='retrieving gt from cloud bone by bone'):
@@ -317,7 +320,7 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None):
                 if len(matching_rows) == 0:
                     raise ValueError('no matching points in cloud, go look why')
                 elif len(matching_rows) == 1:
-                    inst_pred[matching_rows.index] = pred_label
+                    inst_pred[matching_rows.index] = int(pred_label)
                 else:
                     raise ValueError('multiple matching points in cloud, go look why')
 
