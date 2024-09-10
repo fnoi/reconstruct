@@ -333,6 +333,9 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None):
     print(f'mapped pairs {len(id_map)}, {id_map}')
     metrics = calculate_precision_recall_iou(inst_pred, inst_gt, id_map)
     print(metrics)
+    # calculate aji
+    aji = calculate_aji(inst_pred, inst_gt, id_map)
+    print(f"Aggregated Jaccard Index: {aji}")
     purity = calculate_purity(gt=inst_gt, pred=inst_pred)
 
     greedy_compare = False
@@ -421,6 +424,76 @@ def normal_evaluation(cloud, config):
     print(f'ransac normals vs. orientation gt:    mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
     a = 0
 
+
+import numpy as np
+from typing import List, Tuple
+
+
+def calculate_aji(inst_pred: np.ndarray, inst_gt: np.ndarray, id_map: List[Tuple[int, int]]) -> float:
+    """
+    Calculate Aggregated Jaccard Index (AJI).
+
+    Args:
+    inst_pred: 1D numpy array of predicted instance labels
+    inst_gt: 1D numpy array of ground truth instance labels
+    id_map: List of tuples mapping (predicted instance ID, ground truth instance ID)
+
+    Returns:
+    Aggregated Jaccard Index (AJI)
+    """
+
+    def jaccard_index(a: np.ndarray, b: np.ndarray) -> float:
+        intersection = np.sum(a & b)
+        union = np.sum(a | b)
+        return intersection / union if union > 0 else 0
+
+    C, U = 0, 0
+    used_pred = set()
+
+    # Convert id_map to a dictionary for faster lookup
+    id_map_dict = dict(id_map)
+
+    # Process ground truth instances
+    for gt_id in np.unique(inst_gt):
+        if gt_id == 0:  # Skip background
+            continue
+        gt_mask = inst_gt == gt_id
+        best_iou = 0
+        best_pred_id = None
+
+        # Find best matching predicted instance
+        for pred_id, mapped_gt_id in id_map:
+            if mapped_gt_id == gt_id:
+                pred_mask = inst_pred == pred_id
+                iou = jaccard_index(gt_mask, pred_mask)
+                if iou > best_iou:
+                    best_iou = iou
+                    best_pred_id = pred_id
+
+        if best_pred_id is not None:
+            pred_mask = inst_pred == best_pred_id
+            C += np.sum(gt_mask & pred_mask)
+            U += np.sum(gt_mask | pred_mask)
+            used_pred.add(best_pred_id)
+
+    # Process unused predicted instances
+    for pred_id in np.unique(inst_pred):
+        if pred_id == 0 or pred_id in used_pred:  # Skip background and used instances
+            continue
+        pred_mask = inst_pred == pred_id
+        U += np.sum(pred_mask)
+
+    # Calculate AJI
+    AJI = C / U if U > 0 else 0
+
+    return AJI
+
+# Example usage:
+# inst_pred = np.array([0, 1, 1, 2, 2, 3, 3, 3])
+# inst_gt = np.array([0, 1, 1, 1, 2, 2, 3, 3])
+# id_map = [(1, 1), (2, 1), (3, 2)]
+# aji = calculate_aji(inst_pred, inst_gt, id_map)
+# print(f"Aggregated Jaccard Index: {aji}")
 
 
 
