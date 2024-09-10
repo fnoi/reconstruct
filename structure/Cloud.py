@@ -30,6 +30,7 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.h_beam_verts = None
         self.break_flag = None
         self.cog_3D = None
         self.angle_2D = None
@@ -381,12 +382,12 @@ class Segment(object):
         plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
         self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
-        plot_2D_points_bbox(self.points_2D_fitting) # TODO: applicability outside of fct? or at least post-param-retrieval
+        plot_2D_points_bbox(self.points_2D_fitting)
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
         fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 
-        cog_x = (self.h_beam_params[11][0] + self.h_beam_params[0][0]) / 2
-        cog_y = (self.h_beam_params[5][1] + self.h_beam_params[0][1]) / 2
+        cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
+        cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
         self.cog_2D = np.array((cog_x, cog_y))
 
         self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
@@ -571,9 +572,15 @@ class Segment(object):
         )
 
         self.cog_2D = cog_2D_lookup
-        self.cog_3D = 0
+        self.cog_3D = 0     # TODO FIX
 
-        self.h_beam_params_lookup = {
+        delta_d = self.h_beam_params[5] - d_lookup
+        delta_bf = self.h_beam_params[4] - bf_lookup
+
+        self.h_beam_params[0] = self.h_beam_params[0] + delta_bf / 2
+        self.h_beam_params[1] = self.h_beam_params[1] + delta_d / 2
+
+        self.h_beam_params = { # TODO: double check overwrite correctness... also it is messy af to not preserve structure
             'x0': self.h_beam_params[0],
             'y0': self.h_beam_params[1],
             'type': type_lookup,
@@ -583,6 +590,19 @@ class Segment(object):
             'bf': bf_lookup,
             'd': d_lookup
         }
+
+        self.h_beam_verts = params2verts(
+            [self.h_beam_params['x0'],
+             self.h_beam_params['y0'],
+             self.h_beam_params['tw'],
+             self.h_beam_params['tf'],
+             self.h_beam_params['bf'],
+             self.h_beam_params['d']]
+        )
+
+        # TODO: identify bf and d deltas and move x0/y0 accordingly (to avoid the overall movement)
+
+        fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 
         return
         # return beams_frame
