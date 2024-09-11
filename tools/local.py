@@ -36,21 +36,46 @@ def supernormal_svd(normals, full_return=False):
         return Vt[-1, :]
 
 
+import numpy as np
+
+
 def consistency_flip(vectors):
+    # Ensure input is a numpy array
+    vectors = np.asarray(vectors)
+
+    # Convert input to 2D array if it's a single vector
+    if vectors.ndim == 1:
+        vectors = vectors.reshape(1, -1)
+
+    # Check if vectors is empty
+    if vectors.size == 0:
+        return vectors
+
     # normalize vectors
-    vector_norms = np.linalg.norm(vectors, axis=1, keepdims=True)
-    vectors_norm = vectors / np.where(vector_norms == 0, 1, vector_norms)
+    try:
+        vector_norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    except TypeError:
+        # If TypeError occurs, try converting to float
+        vectors = vectors.astype(float)
+        vector_norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+
+    vectors_norm = np.divide(vectors, vector_norms, where=vector_norms != 0)
 
     # mean resultant vector
     vector_mean = np.mean(vectors_norm, axis=0)
-    if np.linalg.norm(vector_mean) == 0:
+    mean_norm = np.linalg.norm(vector_mean)
+    if mean_norm == 0:
         print('zero vector mean')
         return vectors_norm
-    vector_mean /= np.linalg.norm(vector_mean)
+    vector_mean /= mean_norm
 
     # flip vectors that have opposite orientation
     dot_products = np.dot(vectors_norm, vector_mean)
     vectors_flipped = np.where(dot_products[:, np.newaxis] < 0, -vectors, vectors)
+
+    # If input was a single vector, return a 1D array
+    if vectors.shape[0] == 1:
+        return vectors_flipped.flatten()
 
     return vectors_flipped
 

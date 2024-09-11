@@ -6,7 +6,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from tqdm import tqdm
 
-from tools.local import neighborhood_search, angular_deviation, supernormal_svd
+from tools.local import neighborhood_search, angular_deviation, supernormal_svd, consistency_flip
 
 
 def region_growing(cloud, config):
@@ -259,7 +259,7 @@ def region_growing(cloud, config):
                             visited_neighbors.extend(cloud[cloud['ransac_patch'] == neighbor_patch]['id'].tolist())
 
             plot_cluster = True
-            if len_log == len(active_point_ids) and plot_cluster:
+            if plot_cluster:
                 # scatter plot active cloud
                 fig = plt.figure()
                 active_points_set = set(active_point_ids)
@@ -278,6 +278,8 @@ def region_growing(cloud, config):
                 ax.set_aspect('equal')
                 plt.show()
 
+            if len_log == len(active_point_ids):
+
                 cloud.loc[active_point_ids, 'instance_pr'] = label_instance
                 label_instance += 1
                 # source_point_ids = [_ for _ in source_point_ids if _ not in active_point_ids]
@@ -295,4 +297,179 @@ def region_growing(cloud, config):
     # grow cluster
 
 def region_growing_rev(cloud, config):
-    # re-build RG from scratch bc this is where the music is at
+    """region growing algorithm for instance segmentation"""
+    # check if cloud has 'id' column
+    if 'id' not in cloud.columns:
+        # add column to cloud that stores integer ID
+        cloud['id'] = [i for i in range(len(cloud))]
+
+    # actual annotation
+    label_instance = 1
+    cloud['instance_pr'] = 0  # unlabeled
+    # source: unsegmented
+    source_point_ids = cloud['id'].tolist()
+    source_patch_ids = cloud['ransac_patch'].unique().tolist()
+    # active: now growing, assigned to current segment
+    active_point_ids = []
+    active_patch_ids = []
+    # sink: already segmented
+    sink_point_ids = []
+    sink_patch_ids = []
+
+    patchcount = 0
+
+    while True:
+        patchcount += 1
+        print(f'segment counter: {patchcount}')
+        if len(source_point_ids) <= config.region_growing.leftover_relative * len(cloud):
+            break
+        # find seed point
+        source_cloud = cloud.loc[source_point_ids]
+        # sort source cloud by confidence
+        source_cloud.sort_values(by='confidence', ascending=False, inplace=True)
+        # seed point
+        for i, row in source_cloud.iterrows():
+            if row['ransac_patch'] == 0:
+                continue
+            else:
+                seed_point_id = row['id']
+                break
+
+        # retrieve 'sn' and 'rn' values from the seed point
+        seed_sn = cloud.loc[cloud['id'] == seed_point_id, ['snx', 'sny', 'snz']].values
+        seed_rn = cloud.loc[cloud['id'] == seed_point_id, ['rnx', 'rny', 'rnz']].values
+
+        # seed patch
+        seed_patch_id = cloud.loc[cloud['id'] == seed_point_id, 'ransac_patch'].values[0]
+        # find 'id's of points in the seed patch
+        seed_patch_point_ids = cloud.loc[cloud['ransac_patch'] == seed_patch_id, 'id'].tolist()
+
+        # inventory
+        active_point_ids.extend(seed_patch_point_ids)
+        seed_patch_point_ids_set = set(seed_patch_point_ids)
+        source_point_ids = [_ for _ in source_point_ids if _ not in seed_patch_point_ids_set]
+
+        sink_patch_ids.append(seed_patch_id)
+        sink_point_ids.extend(seed_patch_point_ids)
+
+        active_patch_ids.append(cloud.loc[cloud['id'] == seed_point_id, 'ransac_patch'].values[0])
+        if seed_patch_id in source_patch_ids:
+            source_patch_ids.remove(seed_patch_id)
+        else:
+            break
+
+        cluster_blacklist = []
+        growth_iter = 0
+        len_log = 0
+
+        while True:
+            print(f'iteration in segment: {patchcount}')
+            growth_iter += 1
+            bbox_lims = [np.min(cloud.loc[active_point_ids, 'x']),
+                         np.max(cloud.loc[active_point_ids, 'x']),
+                         np.min(cloud.loc[active_point_ids, 'y']),
+                         np.max(cloud.loc[active_point_ids, 'y']),
+                         np.min(cloud.loc[active_point_ids, 'z']),
+                         np.max(cloud.loc[active_point_ids, 'z'])]
+            potential_neighbors = neighborhood_search(
+                cloud=cloud, seed_id=None, config=config,
+                step='bbox_mask', cluster_lims=bbox_lims
+            )
+            potential_cloud = cloud.loc[cloud['id'].isin(potential_neighbors)]
+
+            actual_neighbors = []
+
+            if growth_iter <= 1:
+                cluster_sn = seed_sn
+                cluster_rn = seed_rn
+            else:
+                cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
+                cluster_sn = supernormal_svd(cluster_normals)
+                cluster_sn /= np.linalg.norm(cluster_sn)
+                ransa_patch_sizes = cloud.loc[cloud['id'].isin(active_point_ids), 'ransac_patch'].value_counts()
+                biggest_patch_id = ransa_patch_sizes.idxmax()
+
+                if biggest_patch_id == 0:
+                    # biggest cluster is unpatched
+                    cluster_rn = seed_rn
+                else:
+                    cluster_rn = cloud.loc[cloud['ransac_patch'] == biggest_patch_id, ['rnx', 'rny', 'rnz']][:1]
+                    cluster_rn = cluster_rn.values[0]
+                    cluster_rn /= np.linalg.norm(cluster_rn)
+
+            potential_cloud_tree = KDTree(potential_cloud[['x', 'y', 'z']].values)
+            for active_point in tqdm(active_point_ids, desc="checking potential neighbors", total=len(active_point_ids)):
+                actual_neighbors.extend(neighborhood_search(
+                    cloud=potential_cloud, seed_id=active_point, config=config, cloud_tree=potential_cloud_tree,
+                    step='patch growing', patch_sn=cluster_sn, cluster_lims=bbox_lims
+                ))
+            actual_neighbors = list(set(actual_neighbors))
+            actual_neighbors = potential_cloud.iloc[actual_neighbors]['id'].tolist()
+            actual_neighbors = [_ for _ in actual_neighbors if _ not in active_point_ids]
+
+            # find the neighbors in the cloud that are part of the planar patch 0
+            zeropatch_ids = cloud.loc[cloud['ransac_patch'] == 0, 'id'].tolist()
+            nonzero_neighbors = [_ for _ in actual_neighbors if _ not in zeropatch_ids]
+            zero_neighbors = [_ for _ in actual_neighbors if _ in zeropatch_ids]
+
+            visited_neighbors = []
+
+            if len(nonzero_neighbors) > 0:
+                for patch_neighbor in nonzero_neighbors:
+                    patch_id = cloud.loc[cloud['id'] == patch_neighbor, 'ransac_patch'].values[0]
+                    if patch_id == 0:
+                        continue
+                    if (patch_neighbor in visited_neighbors
+                            or patch_id in active_patch_ids
+                            or patch_neighbor in sink_point_ids
+                            or patch_id in sink_patch_ids
+                    ):
+                        continue
+
+                    neighbor_patch_sns = potential_cloud.loc[potential_cloud['id'] == patch_neighbor, ['snx', 'sny', 'snz']].values
+                    neighbor_patch_sns = consistency_flip(neighbor_patch_sns)
+                    if neighbor_patch_sns.shape == (3,):
+                        neighbor_patch_sn = neighbor_patch_sns
+                    else:
+                        neighbor_patch_sn = np.mean(neighbor_patch_sns, axis=0)
+                    neighbor_patch_rn = potential_cloud.loc[potential_cloud['id'] == patch_neighbor, ['rnx', 'rny', 'rnz']].values
+
+                    deviation_sn = angular_deviation(cluster_sn, neighbor_patch_sn) % 180
+                    deviation_sn = min(deviation_sn, 180 - deviation_sn)
+                    deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
+                    deviation_rn = min(deviation_rn, 90 - deviation_rn)
+
+                    if deviation_sn < config.region_growing.supernormal_angle_deviation_patch and \
+                            deviation_rn < config.region_growing.ransacnormal_angle_deviation_patch:
+                        active_patch_ids.append(patch_neighbor)
+                        active_point_ids.extend(cloud[cloud['ransac_patch'] == patch_neighbor]['id'].tolist())
+                        visited_neighbors.extend(cloud[cloud['ransac_patch'] == patch_neighbor]['id'].tolist())
+
+                        if patch_id not in source_patch_ids:
+                            raise ValueError('patch not in source patches')
+                        source_patch_ids.remove(patch_id)
+
+                        source_point_ids_array = np.array(source_point_ids)
+                        cloud_ids_array = np.array(cloud.loc[cloud['ransac_patch'] == patch_neighbor, 'id'])
+                        indices_to_keep = np.where(~np.isin(source_point_ids_array, cloud_ids_array))
+                        source_point_ids_filtered = source_point_ids_array[indices_to_keep]
+                        source_point_ids = source_point_ids_filtered.tolist()
+
+                        print(f'added patch {patch_neighbor}')
+
+                    else:
+                        visited_neighbors.extend(cloud[cloud['ransac_patch'] == patch_neighbor]['id'].tolist())
+
+                    cloud.loc[active_point_ids, 'instance_pr'] = label_instance
+                    label_instance += 1
+                    # source_point_ids = [_ for _ in source_point_ids if _ not in active_point_ids]
+                    # source_patch_ids = [_ for _ in source_patch_ids if _ not in active_patch_ids]
+                    sink_point_ids.extend(active_point_ids)
+                    sink_patch_ids.extend(active_patch_ids)
+                    active_point_ids = []
+                    active_patch_ids = []
+
+
+            len_log = len(active_point_ids)
+
+    return cloud
