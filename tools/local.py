@@ -957,7 +957,7 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
     """
     find neighbors of seed_id in axis aligned bounding box shape
     """
-    coordinates_cloud = cloud[['x', 'y', 'z']].values
+    coordinates_cloud = cloud[['x', 'y', 'z', 'id']].values
 
     if step == 'bbox_mask':
         dist = config.local_neighborhood.radius_a
@@ -972,6 +972,7 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
         neighbor_ids = np.intersect1d(x_ok_lower, x_ok_upper)
         neighbor_ids = np.intersect1d(neighbor_ids, np.intersect1d(y_ok_lower, y_ok_upper))
         neighbor_ids = np.intersect1d(neighbor_ids, np.intersect1d(z_ok_lower, z_ok_upper))
+
 
     else:
         seed_data = cloud.iloc[seed_id]
@@ -988,8 +989,8 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
         neighbor_ids = np.intersect1d(neighbor_ids,
                                       np.where(np.abs(coordinates_cloud[:, 2] - coordinates_seed[2]) < dist)[0])
 
-    # remove seed_id from neighbor_ids
-    neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
+        # remove seed_id from neighbor_ids
+        neighbor_ids = neighbor_ids[neighbor_ids != seed_id]
 
     # retrieve 'id' values from the indices
     neighbor_ids = cloud.iloc[neighbor_ids].index
