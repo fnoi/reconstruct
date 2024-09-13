@@ -132,6 +132,8 @@ def supernormal_confidence(supernormal, normals, sig_1, sig_2, sig_3):
 
 
 def angular_deviation(vector, reference):
+    if vector is None or reference is None:
+        raise ValueError("input vectors must be non-zero.")
     norm_vector = np.linalg.norm(vector)
     norm_reference = np.linalg.norm(reference)
     if norm_vector == 0 or norm_reference == 0:
