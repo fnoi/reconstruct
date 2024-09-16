@@ -1,6 +1,10 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.spatial import KDTree
+
+import pandas as pd
+pd.options.mode.copy_on_write = True
+
 from tqdm import tqdm
 
 from tools.local import neighborhood_search, supernormal_svd, consistency_flip, angular_deviation
