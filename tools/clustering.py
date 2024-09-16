@@ -1,12 +1,9 @@
-import copy
-import time
-
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import KDTree
 from tqdm import tqdm
 
-from tools.local import neighborhood_search, angular_deviation, supernormal_svd, consistency_flip
+from tools.local import neighborhood_search, angular_deviation, supernormal_svd
 
 
 def region_growing(cloud, config):
@@ -295,54 +292,4 @@ def region_growing(cloud, config):
     return cloud
 
     # grow cluster
-
-def region_growing_rev(cloud, config):
-    """region growing algorithm for instance segmentation"""
-    # check if cloud has 'id' column
-    if 'id' not in cloud.columns:
-        # add column to cloud that stores integer ID
-        cloud['id'] = [i for i in range(len(cloud))]
-
-    # actual annotation
-    label_instance = 1
-    cloud['instance_pr'] = 0  # unlabeled
-    # source: unsegmented
-    source_point_ids = cloud['id'].tolist()
-    source_patch_ids = cloud['ransac_patch'].unique().tolist()
-    # active: now growing, assigned to current segment
-    active_point_ids = []
-    active_patch_ids = []
-    # sink: already segmented
-    sink_point_ids = []
-    sink_patch_ids = []
-
-    patchcount = 0
-
-    while True:
-        patchcount += 1
-        print(f'segment counter: {patchcount}')
-        if len(source_point_ids) <= config.region_growing.leftover_relative * len(cloud):
-            break
-        # find seed point
-        source_cloud = cloud.loc[source_point_ids]
-        # sort source cloud by confidence
-        source_cloud.sort_values(by='confidence', ascending=False, inplace=True)
-        # seed point
-        for i, row in source_cloud.iterrows():
-            if row['ransac_patch'] == 0:
-                continue
-            else:
-                seed_point_id = row['id']
-                break
-
-        # check neihborhood of seed point
-
-        # in the neighborhood check which points are ok, and part of planar patches
-        # store points that are not part of patches
-
-        # repeat neighborhood checks until no change
-
-        # all the non-patch points are now checked, if they can be added based on separate rules/ parameters
-
-        # now initiate new cluster with seed, empty burnt, active, update sink accordingly
 
