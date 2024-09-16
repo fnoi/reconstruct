@@ -35,7 +35,7 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 3
+    cache_flag = 0
     single_step = False
     ##########
     ##########
@@ -52,7 +52,7 @@ if __name__ == '__main__':
         del f
 
         o3d_cloud = o3d.geometry.PointCloud()
-        o3d_cloud.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
+        o3d_cloud.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values.astype(np.float32))
         downsample = True
         if downsample:
             print(f'original cloud size: {len(cloud)}')
@@ -124,7 +124,7 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
 
-        cloud_tree = KDTree(cloud[['x', 'y', 'z']].values)
+        cloud_tree = KDTree(cloud[['x', 'y', 'z']].values.astype(np.float32))
         cloud = calculate_supernormals_rev(cloud, cloud_tree, config)
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=2)
@@ -135,13 +135,13 @@ if __name__ == '__main__':
             cloud = supernormal_evaluation(cloud, config, inplace=True)
             cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=2)
         o3d_cloud_0 = o3d.geometry.PointCloud()
-        o3d_cloud_0.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
-        o3d_cloud_0.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values)
+        o3d_cloud_0.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values.astype(np.float32))
+        o3d_cloud_0.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values.astype(np.float32))
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_normals_trial.ply', o3d_cloud_0)
         # create o3d cloud
         cloud_o3d = o3d.geometry.PointCloud()
-        cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values)
-        cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['snx', 'sny', 'snz']].values)
+        cloud_o3d.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values.astype(np.float32))
+        cloud_o3d.normals = o3d.utility.Vector3dVector(cloud[['snx', 'sny', 'snz']].values.astype(np.float32))
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
