@@ -263,6 +263,8 @@ def ransac_patches(cloud, config):
 
     while np.sum(mask_remaining) > 0:
         current_points = cloud.loc[mask_remaining, ['x', 'y', 'z']].values
+        # convert to datatype float
+        current_points = current_points.astype(np.float32)
         o3d_cloud.points = o3d.utility.Vector3dVector(current_points)
 
         # ransac plane fitting
