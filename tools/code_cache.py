@@ -60,6 +60,8 @@ def region_growing_rev(cloud, config):
         x_l_s = 0
         log_unpatched = None
         new_segment = False
+        chk_log_patches = []
+        chk_log_points = []
 
         while True:
             segment_iter += 1
@@ -103,7 +105,24 @@ def region_growing_rev(cloud, config):
             neighbor_patch_ids = reduced_cloud.loc[reduced_cloud['id'].isin(cluster_neighbors)]['ransac_patch'].unique().tolist()
             if 0 in neighbor_patch_ids:
                 neighbor_patch_ids.remove(0)
+                # neighbor_patch_ids = list(set(neighbor_patch_ids)).sort()
             neighbor_unpatched_point_ids = reduced_cloud[reduced_cloud['ransac_patch'] == 0]['id'].to_list()
+            # neighbor_unpatched_point_ids = list(set(neighbor_unpatched_point_ids)).sort()
+
+            chk_neighbors_0 = chk_log_patches == len(neighbor_patch_ids)
+            chk_log_patches = len(neighbor_patch_ids)
+            chk_neighbors_1 = chk_log_points == len(neighbor_unpatched_point_ids)
+            chk_log_points = len(neighbor_unpatched_point_ids)
+
+            if chk_neighbors_0 and chk_neighbors_1:
+                a = 0
+                # store the free float neighbors for the segment and move on to next segment
+
+            try:
+                print(len(neighbor_unpatched_point_ids))
+            except:
+                a = 0
+
 
             for neighbor_patch in neighbor_patch_ids:
                 if (
@@ -127,10 +146,10 @@ def region_growing_rev(cloud, config):
                     deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
                     deviation_rn = min(deviation_rn, 90 - deviation_rn)
 
-                    check_0 = deviation_sn < config.region_growing.supernormal_angle_deviation_patch
-                    check_1 = deviation_rn < config.region_growing.ransacnormal_angle_deviation_patch
+                    chk_add_patch_0 = deviation_sn < config.region_growing.supernormal_angle_deviation_patch
+                    chk_add_patch_1 = deviation_rn < config.region_growing.ransacnormal_angle_deviation_patch
 
-                    if check_0 and check_1:
+                    if chk_add_patch_0 and chk_add_patch_1:
                         color = 'g'
                         point_ids = cloud[cloud['ransac_patch'] == neighbor_patch]['id'].to_list()
                         active_point_ids.extend(point_ids)
