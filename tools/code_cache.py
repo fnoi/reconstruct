@@ -63,6 +63,8 @@ def region_growing_rev(cloud, config):
         chk_log_patches = []
         chk_log_points = []
 
+        floating_points_dict = {}
+
         while True:
             segment_iter += 1
             print(f'growth iter {segment_iter}')
@@ -115,8 +117,8 @@ def region_growing_rev(cloud, config):
             chk_log_points = len(neighbor_unpatched_point_ids)
 
             if chk_neighbors_0 and chk_neighbors_1:
-                a = 0
-                # store the free float neighbors for the segment and move on to next segment
+                floating_points_dict[seed_patch_id] = neighbor_unpatched_point_ids
+                break
 
             try:
                 print(len(neighbor_unpatched_point_ids))
