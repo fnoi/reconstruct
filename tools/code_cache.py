@@ -120,14 +120,14 @@ def region_growing_rev(cloud, config):
                 cluster_rn = cloud.loc[seed_point_id, ['rnx', 'rny', 'rnz']].values
                 cluster_confidence = seed_confidence
             else:
-                _normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(active_point_ids)][['nx', 'ny', 'nz']])
+                # _normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(active_point_ids)][['nx', 'ny', 'nz']]) # TODO: ???
 
                 __normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(ship_neighbors)][['nx', 'ny', 'nz']])
                 # add a check for supernormal quality to decide if to use the cluster_sn or to recalculate
                 # cluster_sn = supernormal_svd(_normals)
 
                 cluster_sn, _s1, _s2, _s3 = supernormal_svd(__normals, full_return=True)
-                cluster_confidence = supernormal_confidence(cluster_sn, _normals, _s1, _s2, _s3)
+                cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
 
                 if seed_confidence > cluster_confidence:
                     print('seed better')
@@ -158,12 +158,8 @@ def region_growing_rev(cloud, config):
             if chk_neighbors_0 and chk_neighbors_1:
                 floating_points_dict[seed_patch_id] = neighbor_unpatched_point_ids
                 sink_patch_ids.extend(active_patch_ids)
+                cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
                 break
-
-            try:
-                print(len(neighbor_unpatched_point_ids))
-            except:
-                a = 0
 
 
             for neighbor_patch in neighbor_patch_ids:

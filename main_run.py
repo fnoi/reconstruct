@@ -155,7 +155,7 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
         cloud = region_growing_rev(cloud, config)
-        cloud = region_growing(cloud, config)
+        # cloud = region_growing(cloud, config)
         miou_weighted, miou_unweighted = calculate_metrics(cloud, base='cloud')
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
