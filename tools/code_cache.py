@@ -32,10 +32,15 @@ def region_growing_rev(cloud, config):
 
     # counters
     counter_patch = 0
+    game_over = False
 
     # main loop, exit when done
     while True:
-        if len(source_point_ids) <= config.region_growing.leftover_relative * len(cloud):
+        if (
+                len(source_point_ids) <= config.region_growing.leftover_relative * len(cloud)
+                or
+                game_over
+        ):
             break
         counter_patch += 1
         print(f'Cluster {counter_patch}')
@@ -60,9 +65,11 @@ def region_growing_rev(cloud, config):
         active_point_ids = source_cloud[source_cloud['ransac_patch'] == seed_patch_id]['id'].to_list()
         active_patch_ids = [seed_patch_id]
         # remove seed point from source
-        source_point_ids.remove(seed_point_id)
+        source_point_ids = list(set(source_point_ids) - {seed_point_id})
+        # source_point_ids.remove(seed_point_id)
         # remove seed patch from source
-        source_patch_ids.remove(seed_patch_id)
+        source_patch_ids = list(set(source_patch_ids) - {seed_patch_id})
+        # source_patch_ids.remove(seed_patch_id)
 
         #### CLUSTER GROWTH ####
         segment_iter = 0
@@ -96,23 +103,38 @@ def region_growing_rev(cloud, config):
                 ))
             cluster_neighbors = list(set(cluster_neighbors))
             cluster_neighbors = reduced_cloud.iloc[cluster_neighbors]['id'].to_list()
+            ship_neighbors = list(set(cluster_neighbors))
+
+            # ship_neighbors is a temporary fix
+            if len(cluster_neighbors) == 0:
+                print('no neighbors')
+                game_over = True
+                break
+
             cluster_neighbors = list(set(cluster_neighbors) - set(active_point_ids))
 
-            if segment_iter == 1:
+
+
+            if segment_iter == 1 and True == False:
                 cluster_sn = cloud.loc[seed_point_id, ['snx', 'sny', 'snz']].values
                 cluster_rn = cloud.loc[seed_point_id, ['rnx', 'rny', 'rnz']].values
                 cluster_confidence = seed_confidence
             else:
                 _normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(active_point_ids)][['nx', 'ny', 'nz']])
+
+                __normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(ship_neighbors)][['nx', 'ny', 'nz']])
                 # add a check for supernormal quality to decide if to use the cluster_sn or to recalculate
                 # cluster_sn = supernormal_svd(_normals)
 
-                cluster_sn, _s1, _s2, _s3 = supernormal_svd(_normals, full_return=True)
+                cluster_sn, _s1, _s2, _s3 = supernormal_svd(__normals, full_return=True)
                 cluster_confidence = supernormal_confidence(cluster_sn, _normals, _s1, _s2, _s3)
 
                 if seed_confidence > cluster_confidence:
+                    print('seed better')
                     cluster_sn = seed_sn
                     cluster_confidence = seed_confidence
+                else:
+                    print('seed worse')
 
                 # reduce cloud to active ids
                 _cloud = cloud.loc[cloud['id'].isin(active_point_ids)]
@@ -176,7 +198,8 @@ def region_growing_rev(cloud, config):
                         active_plot = copy.deepcopy(active_point_ids)
                         active_point_ids.extend(point_ids)
                         active_patch_ids.append(neighbor_patch)
-                        source_point_ids = list(set(source_point_ids) - set(point_ids))
+                        source_point_ids = list(set(source_point_ids) - set(active_point_ids))
+                        # srouce_point_ids =
                         source_patch_ids.remove(neighbor_patch)
                         source_patch_ids = list(set(source_patch_ids))
                     else:
@@ -187,7 +210,7 @@ def region_growing_rev(cloud, config):
                         inactive_patch_ids.append(neighbor_patch)
 
 
-                    if True:
+                    if True is False:
                         fig = plt.figure(figsize=(20, 20))
 
                         # Function to create scatter plot with supernormal vector line
@@ -255,3 +278,4 @@ def region_growing_rev(cloud, config):
                     print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_point_ids)}')
 
 
+    return cloud
