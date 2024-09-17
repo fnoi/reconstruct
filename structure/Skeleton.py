@@ -188,10 +188,8 @@ class Skeleton:
                         break
                         # self.aggregate_bones()
 
-            a = 0
-
             if i == self.joints_array.shape[0] - 1:
-                self.plot_cog_skeleton()
+                # self.plot_cog_skeleton()
                 print('done with aggregation')
                 break
 

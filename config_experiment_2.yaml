@@ -24,6 +24,7 @@ planar_patch:
 local_neighborhood:
   shape: sphere
   radius_a: 0.1
+  context_radius: 0.05
 
 supernormal:
   radius: 0.3
@@ -31,8 +32,9 @@ supernormal:
 
 region_growing:
   neighborhood_shape: sphere
+  neighborhood_radius: 0.3
   leftover_relative: 0.02
-  supernormal_angle_deviation_patch: 50
+  supernormal_angle_deviation_patch: 30
   ransacnormal_angle_deviation_patch: 10
   supernormal_angle_deviation_point: 10
 
@@ -43,7 +45,7 @@ skeleton:
   ransac_num_iterations: 50000
   ransac_ransac_n: 3
   aggregate_distance_max: 0.2
-  aggregate_angle_max: 15
+  aggregate_angle_max: 10
 
 skeleton_visual:
   line_length_projection: 0.2

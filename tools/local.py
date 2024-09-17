@@ -635,13 +635,16 @@ def plot_patch_v3(cloud, num_colors=None):
     plt.show()
 
 
-def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None, cluster_lims=None, patch_sn=None):
+def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None, cluster_lims=None, patch_sn=None, context=None):
+
+    radius = None
 
     if step == 'bbox_mask':
         shape = "cube"
     elif step == 'patch growing':
         shape = config.region_growing.neighborhood_shape
         seed_data = cloud.loc[cloud['id'] == seed_id]
+        radius = config.region_growing.neighborhood_radius
         # seed_data = cloud.iloc[seed_id]
     else:
         shape = config.local_neighborhood.shape
@@ -652,7 +655,7 @@ def neighborhood_search(seed_id, config, cloud=None, cloud_tree=None, step=None,
             seed_data = cloud.iloc[seed_id]
 
     if shape == "sphere":
-        neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config)
+        neighbor_ids = neighbors_sphere(cloud_tree, seed_data, config, context, radius)
     elif shape == "cylinder":
         neighbor_ids = neighbors_oriented_cylinder(cloud, seed_id, config)
     elif shape == "oriented_cuboid":
@@ -936,13 +939,21 @@ def neighbors_oriented_cylinder(cloud, seed_id, config):
     return idx
 
 
-def neighbors_sphere(cloud_tree, seed_data, config):
+def neighbors_sphere(cloud_tree, seed_data, config, step=None, radius_in=None):
+
     if type(seed_data['x']) == np.float64:
         x, y, z = seed_data['x'], seed_data['y'], seed_data['z']
     else:
         x, y, z = seed_data['x'].values[0], seed_data['y'].values[0], seed_data['z'].values[0]
 
-    idx = cloud_tree.query_ball_point([x, y, z], r=config.supernormal.radius)
+    if step == 'context':
+        radius = config.local_neighborhood.context_radius
+    else:
+        if radius_in is not None:
+            radius = radius_in
+        else:
+            radius = config.supernormal.radius
+    idx = cloud_tree.query_ball_point([x, y, z], r=radius)
 
     return idx
 
@@ -1000,3 +1011,52 @@ def neighbors_aabb_cube(cloud, seed_id, config, step, cluster_lims=None):
     neighbor_ids = cloud.iloc[neighbor_ids].index
 
     return neighbor_ids.tolist()
+
+def patch_context_supernormals(cloud, config):
+    patch_ids = np.unique(cloud['ransac_patch'])
+    patch_ids = patch_ids[patch_ids != 0]
+    # add 'csnx', 'csny', 'csnz' columns to cloud
+    cloud['csnx'] = np.nan
+    cloud['csny'] = np.nan
+    cloud['csnz'] = np.nan
+    cloud['csn_confidence'] = np.nan
+
+    for patch_id in patch_ids:
+        point_ids = cloud.loc[cloud['ransac_patch'] == patch_id]['id']
+        point_ids = point_ids.tolist()
+        context_ids, _ = subset_cluster_neighbor_search(cloud, point_ids, config)
+        context_normals = cloud.loc[context_ids, ['nx', 'ny', 'nz']].values.astype(np.float32)
+        patch_context_sn, sig1, sig2, sig3 = supernormal_svd(context_normals, full_return=True)
+        csn_confidence = supernormal_confidence(patch_context_sn, context_normals, sig1, sig2, sig3)
+
+        cloud.loc[cloud['ransac_patch'] == patch_id, 'csnx'] = patch_context_sn[0]
+        cloud.loc[cloud['ransac_patch'] == patch_id, 'csny'] = patch_context_sn[1]
+        cloud.loc[cloud['ransac_patch'] == patch_id, 'csnz'] = patch_context_sn[2]
+        cloud.loc[cloud['ransac_patch'] == patch_id, 'csn_confidence'] = csn_confidence
+
+    return cloud
+
+
+def subset_cluster_neighbor_search(cloud, active_point_ids, config):
+    active_limits = [np.min(cloud.loc[active_point_ids, 'x']),
+                     np.max(cloud.loc[active_point_ids, 'x']),
+                     np.min(cloud.loc[active_point_ids, 'y']),
+                     np.max(cloud.loc[active_point_ids, 'y']),
+                     np.min(cloud.loc[active_point_ids, 'z']),
+                     np.max(cloud.loc[active_point_ids, 'z'])]
+    neighbor_ids_potential = neighborhood_search(
+        cloud=cloud, seed_id=None, config=config,
+        step='bbox_mask', cluster_lims=active_limits
+    )
+    reduced_cloud = cloud.loc[cloud['id'].isin(neighbor_ids_potential)]
+    reduced_tree = KDTree(reduced_cloud[['x', 'y', 'z']].values)
+    cluster_neighbors = []
+    for x_active_point in active_point_ids:
+        cluster_neighbors.extend(neighborhood_search(
+            cloud=reduced_cloud, seed_id=x_active_point, config=config, cloud_tree=reduced_tree,
+            step='patch growing', patch_sn=None, cluster_lims=None, context='context'
+        ))
+    cluster_neighbors = reduced_cloud.iloc[cluster_neighbors]['id'].tolist()
+
+    return list(set(cluster_neighbors)), reduced_cloud
+

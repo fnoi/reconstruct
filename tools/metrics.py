@@ -369,17 +369,26 @@ def supernormal_evaluation(cloud, config, inplace=False):
         gt_orientation = orientation_gt[instance_id]
         # get supernormal
         sn = [row['snx'], row['sny'], row['snz']]
+        csn = [row['csnx'], row['csny'], row['csnz']]
         # calculate angle
         angle = np.rad2deg(np.arccos(np.dot(gt_orientation, sn)))
+        c_angle = np.rad2deg(np.arccos(np.dot(gt_orientation, csn)))
         if angle > 90:
             angle = 180 - angle
+        if c_angle > 90:
+            c_angle = 180 - c_angle
         # append to list
         cloud.at[idx, 'supernormal_dev_gt'] = angle
+        cloud.at[idx, 'csupernormal_dev_gt'] = c_angle
 
     # calculate mean and median deviation
     mean_dev = np.mean(cloud['supernormal_dev_gt'])
     median_dev = np.median(cloud['supernormal_dev_gt'])
     print(f'mean deviation: {mean_dev:.2f} degrees, median deviation: {median_dev:.2f} degrees')
+
+    mean_dev = np.mean(cloud['csupernormal_dev_gt'])
+    median_dev = np.median(cloud['csupernormal_dev_gt'])
+    print(f'cmean deviation: {mean_dev:.2f} degrees, cmedian deviation: {median_dev:.2f} degrees')
 
     if inplace:
         return cloud

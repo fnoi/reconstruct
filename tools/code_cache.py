@@ -9,7 +9,7 @@ pd.options.mode.copy_on_write = True
 
 from tqdm import tqdm
 
-from tools.local import neighborhood_search, supernormal_svd, consistency_flip, angular_deviation, supernormal_confidence
+from tools.local import neighborhood_search, supernormal_svd, consistency_flip, angular_deviation, supernormal_confidence, subset_cluster_neighbor_search
 
 
 def region_growing_rev(cloud, config):
@@ -27,8 +27,6 @@ def region_growing_rev(cloud, config):
     sink_patch_ids = []
     active_point_ids = []
     active_patch_ids = []
-    inactive_point_ids = []
-    inactive_patch_ids = []
 
     # counters
     counter_patch = 0
@@ -50,7 +48,7 @@ def region_growing_rev(cloud, config):
         # get seed point by row value 'id'
         source_cloud = cloud[cloud['id'].isin(source_point_ids)]
         # source_cloud = cloud.loc[source_point_ids]
-        source_cloud.sort_values(by='confidence', ascending=False, inplace=True)
+        source_cloud.sort_values(by='csn_confidence', ascending=False, inplace=True)
         for i, row in source_cloud.iterrows():
             if (
                     row['ransac_patch'] != 0 and
@@ -74,6 +72,9 @@ def region_growing_rev(cloud, config):
         #### CLUSTER GROWTH ####
         segment_iter = 0
 
+        inactive_point_ids = []
+        inactive_patch_ids = []
+
         chk_log_patches = []
         chk_log_points = []
 
@@ -83,26 +84,7 @@ def region_growing_rev(cloud, config):
             segment_iter += 1
             print(f'growth iter {segment_iter}')
             # find points in bbox around active cluster
-            active_limits = [np.min(cloud.loc[active_point_ids, 'x']),
-                             np.max(cloud.loc[active_point_ids, 'x']),
-                             np.min(cloud.loc[active_point_ids, 'y']),
-                             np.max(cloud.loc[active_point_ids, 'y']),
-                             np.min(cloud.loc[active_point_ids, 'z']),
-                             np.max(cloud.loc[active_point_ids, 'z'])]
-            neighbor_ids_potential = neighborhood_search(
-                cloud=cloud, seed_id=None, config=config,
-                step='bbox_mask', cluster_lims=active_limits
-            )
-            reduced_cloud = cloud.loc[cloud['id'].isin(neighbor_ids_potential)]
-            reduced_tree = KDTree(reduced_cloud[['x', 'y', 'z']].values)
-            cluster_neighbors = []
-            for x_active_point in active_point_ids:
-                cluster_neighbors.extend(neighborhood_search(
-                    cloud=reduced_cloud, seed_id=x_active_point, config=config, cloud_tree=reduced_tree,
-                    step='patch growing', patch_sn=None, cluster_lims=None
-                ))
-            cluster_neighbors = list(set(cluster_neighbors))
-            cluster_neighbors = reduced_cloud.iloc[cluster_neighbors]['id'].to_list()
+            cluster_neighbors, reduced_cloud = subset_cluster_neighbor_search(cloud, active_point_ids, config)
             ship_neighbors = list(set(cluster_neighbors))
 
             # ship_neighbors is a temporary fix
@@ -112,8 +94,6 @@ def region_growing_rev(cloud, config):
                 break
 
             cluster_neighbors = list(set(cluster_neighbors) - set(active_point_ids))
-
-
 
             if segment_iter == 1 and True == False:
                 cluster_sn = cloud.loc[seed_point_id, ['snx', 'sny', 'snz']].values
@@ -128,6 +108,8 @@ def region_growing_rev(cloud, config):
 
                 cluster_sn, _s1, _s2, _s3 = supernormal_svd(__normals, full_return=True)
                 cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
+
+                cluster_csn = cloud.loc[seed_point_id, ['csnx', 'csny', 'csnz']].values
 
                 if seed_confidence > cluster_confidence:
                     print('seed better')
@@ -179,7 +161,13 @@ def region_growing_rev(cloud, config):
                     neighbor_patch_sn = np.mean(neighbor_patch_sns, axis=0)
                     neighbor_patch_rn = cloud.loc[cloud['ransac_patch'] == neighbor_patch].iloc[0][['rnx', 'rny', 'rnz']].values
 
-                    deviation_sn = angular_deviation(cluster_sn, neighbor_patch_sn) % 180
+                    neighbor_patch_first_id = cloud.loc[cloud['ransac_patch'] == neighbor_patch].iloc[0]['id']
+                    neighbor_patch_csn = cloud.loc[neighbor_patch_first_id, ['csnx', 'csny', 'csnz']].values
+
+                    deviation_sn_old = angular_deviation(cluster_sn, neighbor_patch_sn) % 180
+                    deviation_sn_old = min(deviation_sn_old, 180 - deviation_sn_old)
+
+                    deviation_sn = angular_deviation(cluster_sn, neighbor_patch_csn) % 180
                     deviation_sn = min(deviation_sn, 180 - deviation_sn)
 
                     deviation_rn = angular_deviation(cluster_rn, neighbor_patch_rn) % 90
@@ -205,8 +193,8 @@ def region_growing_rev(cloud, config):
                         inactive_point_ids.extend(point_ids)
                         inactive_patch_ids.append(neighbor_patch)
 
-
-                    if True is False:
+                    plot_all = True
+                    if plot_all:
                         fig = plt.figure(figsize=(20, 20))
 
                         # Function to create scatter plot with supernormal vector line
@@ -247,6 +235,14 @@ def region_growing_rev(cloud, config):
                                     [centroid[2], end_point[2]],
                                     color=color, linewidth=2, linestyle='dashed')
 
+                            # create line for cluster_csn, dotted, purple
+                            end_point = centroid + .5 * neighbor_patch_csn
+                            ax.plot([centroid[0], end_point[0]],
+                                    [centroid[1], end_point[1]],
+                                    [centroid[2], end_point[2]],
+                                    color='orange', linewidth=2, linestyle='dotted')
+
+
                             ax.view_init(elev=view_elev, azim=view_azim)
 
                         # Subplot 1: Original perspective
@@ -265,7 +261,8 @@ def region_growing_rev(cloud, config):
                         ax4 = fig.add_subplot(224, projection='3d')
                         create_scatter(ax4, 0, 90)
 
-                        fig.suptitle(f'supernormal (sn) deviation: {deviation_sn:.2f}°\n'
+                        fig.suptitle(f'supernormal with context (csn) deviation: {deviation_sn:.2f}°\n'
+                                     f'supernormal (sn) deviation: {deviation_sn_old:.2f}°\n'
                                      f'ransac normal (rn) deviation: {deviation_rn:.2f}°\n'
                                      f'cluster confidence: {cluster_confidence:.2f}\n')
                         plt.tight_layout()

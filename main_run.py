@@ -14,7 +14,7 @@ from seg2skeleton import inst2skeleton
 from tools.clustering import region_growing
 from tools.code_cache import region_growing_rev
 from tools.IO import cache_io, config_io
-from tools.local import calculate_supernormals_rev, ransac_patches
+from tools.local import calculate_supernormals_rev, ransac_patches, patch_context_supernormals
 from tools.metrics import calculate_metrics, supernormal_evaluation, calculate_purity
 
 if __name__ == '__main__':
@@ -35,7 +35,7 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 3
+    cache_flag = 1
     single_step = False
     ##########
     ##########
@@ -95,6 +95,7 @@ if __name__ == '__main__':
         del f
 
         cloud = ransac_patches(cloud, config)
+        cloud = patch_context_supernormals(cloud, config)
         # cloud = planar_patches(cloud, config)
         # report mean patch size
         patch_sizes = cloud.groupby('ransac_patch').size()
@@ -181,7 +182,7 @@ if __name__ == '__main__':
         # skeleton: aggregate, compute metrics
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
-        skeleton.plot_cog_skeleton(text=False)
+        # skeleton.plot_cog_skeleton(text=False)
 
         print('\n- skeleton segment aggregation, metrics revised')  # baseline exists but omg indeed
 
