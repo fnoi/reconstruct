@@ -1,8 +1,10 @@
 import copy
 
 import numpy as np
+import open3d as o3d
+
 from matplotlib import pyplot as plt
-from scipy.spatial import KDTree
+from scipy.spatial import KDTree, ConvexHull, Delaunay
 
 import pandas as pd
 pd.options.mode.copy_on_write = True
@@ -193,7 +195,7 @@ def region_growing_rev(cloud, config):
                         inactive_point_ids.extend(point_ids)
                         inactive_patch_ids.append(neighbor_patch)
 
-                    plot_all = True
+                    plot_all = False
                     if plot_all:
                         fig = plt.figure(figsize=(20, 20))
 
@@ -269,6 +271,5 @@ def region_growing_rev(cloud, config):
                         plt.show()
 
                     print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_point_ids)}')
-
 
     return cloud

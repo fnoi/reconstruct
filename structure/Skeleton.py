@@ -104,17 +104,11 @@ class Skeleton:
 
     def aggregate_bones(self):
 
-        # self.plot_cog_skeleton() why here?
-
         while True:
             self.find_joints()
             self.joints2joint_array()
             self.joints2joint_frame()
 
-            # if len(self.joints_array) == 19:
-            #     a = 0
-
-            # for-loop over rows in joints_array (which is a numpy array)
             for i, joint in enumerate(self.joints_array):
                 id_bone_1 = int(joint[0])
                 id_bone_2 = int(joint[1])
@@ -122,12 +116,6 @@ class Skeleton:
                 bone_2 = self.bones[id_bone_2]
                 acute_angle = min(joint[10], 180 - joint[10])
 
-                # # for-loop over rows in joint_frame
-                # for joint in self.joint_frame.iterrows():
-                #     print(joint)
-                #     bone_1 = self.bones[int(joint[1][0])]
-                #     bone_2 = self.bones[int(joint[1][1])]
-                #     acute_angle = min(joint[1]['angle'], 180 - joint[1]['angle'])
                 if acute_angle < self.config.skeleton.aggregate_angle_max:
                     # find minimum distance
                     P0 = bone_1.line_cog_left
@@ -172,16 +160,9 @@ class Skeleton:
                             self.bones.pop(ind_long)
 
                         segment_new.calc_axes()
-                        # add new bone
+
                         self.add_cloud(segment_new)
                         self.update_bones()
-                        # self.add_bone(segment_new)
-                        # try:
-                        #     self.bones[-1].fit_cs_rev()
-                        # except:
-                        #     self.bones[-1].h_beam_params = False
-                        #     self.bones[-1].h_beam_verts = False
-                        # print(self.bones[-1].h_beam_params)
 
                         print(f'ummm now {len(self.bones)} bones')
 
@@ -192,135 +173,6 @@ class Skeleton:
                 # self.plot_cog_skeleton()
                 print('done with aggregation')
                 break
-
-                # redundant if recompute!
-                # else:
-                #     origin_coords = [-1e3, -1e3, -1e3]
-                #     # identify main: longer
-                #     if LX1 > LX2:
-                #         long_ind = 0
-                #         LA = L0
-                #         # project P2 and P3 to 3D vector defined by P0 and P1
-                #         P2 = P0 + np.dot(P2 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                #         P3 = P0 + np.dot(P3 - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                #         # project origin_coords to line defined by P0 and P1
-                #         origin = P0 + np.dot(origin_coords - P0, P1 - P0) / np.dot(P1 - P0, P1 - P0) * (P1 - P0)
-                #         oP0 = np.linalg.norm(origin - P0)
-                #         oP1 = np.linalg.norm(origin - P1)
-                #         oP2 = np.linalg.norm(origin - P2)
-                #         oP3 = np.linalg.norm(origin - P3)
-                #
-                #         if oP0 > oP1:
-                #             P0_ = P1
-                #             P1_ = P0
-                #             P0 = P0_
-                #             P1 = P1_
-                #         if oP2 > oP3:
-                #             P2_ = P3
-                #             P3_ = P2
-                #             P2 = P2_
-                #             P3 = P3_
-                #
-                #         LB = np.linalg.norm(P0 - P2)
-                #         LC = np.linalg.norm(P0 - P3)
-                #
-                #     else:
-                #         long_ind = 1
-                #         LA = L1
-                #         # project P0 and P1 to 3D vector defined by P2 and P3
-                #         P0 = P2 + np.dot(P0 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                #         P1 = P2 + np.dot(P1 - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                #         # project origin_coords to line defined by P2 and P3
-                #         origin = P2 + np.dot(origin_coords - P2, P3 - P2) / np.dot(P3 - P2, P3 - P2) * (P3 - P2)
-                #         oP0 = np.linalg.norm(origin - P0)
-                #         oP1 = np.linalg.norm(origin - P1)
-                #         oP2 = np.linalg.norm(origin - P2)
-                #         oP3 = np.linalg.norm(origin - P3)
-                #
-                #         if oP0 > oP1:
-                #             P0_ = P1
-                #             P1_ = P0
-                #             P0 = P0_
-                #             P1 = P1_
-                #         if oP2 > oP3:
-                #             P2_ = P3
-                #             P3_ = P2
-                #             P2 = P2_
-                #             P3 = P3_
-                #
-                #         LB = np.linalg.norm(P0 - P2)
-                #         LC = np.linalg.norm(P0 - P3)
-                #
-                #     # case A
-                #     if LA <= LB:
-                #         # in line, connect
-                #         print('case A')
-                #         # add small to long. re-do bone calc: endpoints will and direction might change!
-                #
-                #
-                #         # remove small bone
-                #     elif LB <= LA:
-                #         # overlap, connect
-                #         print('case B')
-                #         # add small to long. re-do bone calc: endpoints and direction might change!
-                #     elif LC <= LA:
-                #         # integrate
-                #         print('case C')
-                #         # add small to long. re-do bone calc: endpoints (should) stay the same but recompute cant hurt
-                #     else:
-                #         raise Exception('case not covered')
-
-                # case A: bones in line
-                # remove smaller bone and add its points to the longer bone
-
-                # TODO: after case is covered, recompute and re-start joint loop; recursion could be a smart move here, the bones and joint change in each iteration if one case ABC is covered
-                # self.aggregate_bones()
-
-                # # plot the two bone lines
-                # fig = go.Figure()
-                # fig.add_trace(go.Scatter3d(
-                #     x=[P0[0], P1[0]],
-                #     y=[P0[1], P1[1]],
-                #     z=[P0[2], P1[2]],
-                #     mode='lines',
-                #     line=dict(
-                #         color='red',
-                #         width=6
-                #     )
-                # ))
-                # fig.add_trace(go.Scatter3d(
-                #     x=[P2[0], P3[0]],
-                #     y=[P2[1], P3[1]],
-                #     z=[P2[2], P3[2]],
-                #     mode='lines',
-                #     line=dict(
-                #         color='blue',
-                #         width=6
-                #     )
-                # ))
-                # # start and endpoint of the longer bone
-                # fig.add_trace(go.Scatter3d(
-                #     x=[P0[0], P1[0]],
-                #     y=[P0[1], P1[1]],
-                #     z=[P0[2], P1[2]],
-                #     mode='markers',
-                #     marker=dict(
-                #         size=10,
-                #         color='red'
-                #     )
-                # ))
-                # # start and endpoint of the shorter bone
-                # fig.add_trace(go.Scatter3d(
-                #     x=[P2[0], P3[0]],
-                #     y=[P2[1], P3[1]],
-                #     z=[P2[2], P3[2]],
-                #     mode='markers',
-                #     marker=dict(
-                #         size=10,
-                #         color='blue'
-                #     )
-                # ))
-                # fig.show()
 
     def join_on_passing_v2(self):
 
@@ -917,3 +769,10 @@ class Skeleton:
         # show go figure
         fig.show()
         return
+
+    def get_bone(self, i):
+        for bone in self.bones:
+            if bone.name == f'beam_{i}':
+                return bone
+
+        raise ValueError(f'No bone with name "beam_{i}" found')

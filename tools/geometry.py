@@ -621,13 +621,14 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
                 inliers_1_fix = np.where(np.isin(cluster_ptx_array[:, :3], inlier_coords).all(axis=1))[0]
                 inliers_1 = inliers_1_fix.tolist()
 
+                print('ok')
                 break
             else:
-                print('.../...\...') #planes found are not "perpendicular" enough, retrying...')
+                # print('.../...\...') #planes found are not "perpendicular" enough, retrying...')
                 point_cloud = point_cloud.select_by_index(inliers_1, invert=True)
                 # if not enough points left, break
                 if len(point_cloud.points) < 0.1 * len(cluster_ptx_array):
-                    print('not enough points left to retry')
+                    print('fail')
                     return None, None, None, None, None
 
 

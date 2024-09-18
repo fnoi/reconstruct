@@ -35,7 +35,7 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 1
+    cache_flag = 4
     single_step = False
     ##########
     ##########
@@ -181,8 +181,6 @@ if __name__ == '__main__':
     if cache_flag <= 5:
         # skeleton: aggregate, compute metrics
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
-
-        # skeleton.plot_cog_skeleton(text=False)
 
         print('\n- skeleton segment aggregation, metrics revised')  # baseline exists but omg indeed
 

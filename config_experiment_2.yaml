@@ -39,7 +39,9 @@ region_growing:
   supernormal_angle_deviation_point: 10
 
 skeleton:
-  init_min_count: 100
+  init_min_count: 20
+  init_max_angle_rn_sn: 10
+  allocate_max_dist: 0.01
   ransac_method: open3d
   ransac_distance_threshold: 0.0005
   ransac_num_iterations: 50000
