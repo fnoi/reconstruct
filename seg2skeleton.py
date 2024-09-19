@@ -57,6 +57,11 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
 
 
 def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
+    """
+    1. allocate unsegmented patches to the closest segments based on ransac normal/segment orientation angular difference and max distance
+    2. allocate unsegmented unpatched points to the closest segments based on normal / segment orientation angular difference and max distance
+    fast distance computation using convex hulls
+    """
     segment_hulls = {}  # dictionary segment convex hulls
     bone_ids = []
     for bone in skeleton.bones:
@@ -72,8 +77,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
     cloud_nonseg_patched_points = cloud_nonseg_patched['id'].tolist()
     nonseg_patch_ids = cloud_nonseg_patched['ransac_patch'].unique().tolist()
 
-
-    cloud_nonseg_nopatch_points = cloud_nonseg[cloud_nonseg['ransac_patch'] == 0]
+    cloud_nonseg_nopatch_points = cloud[cloud['ransac_patch'] == 0]
     nonseg_point_ids = cloud_nonseg_nopatch_points['id'].tolist()
 
     non_allocated = 0
@@ -82,7 +86,11 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
     for nonseg_patch_point in tqdm(cloud_nonseg_patched_points, desc='allocating non-segmented patch points', total=len(cloud_nonseg_patched_points)):
         if nonseg_patch_point not in to_do:
             continue
-        ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config)
+        # identify centerpoint of patch
+        centerpoint = cloud.loc[nonseg_patch_point, ['x', 'y', 'z']].values.astype(np.float32)
+        centerpoint = np.reshape(centerpoint, (3, 1))
+        centerpoint = np.mean(centerpoint, axis=1)
+        ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config, step='patch')
         # test angle between point ransac normal and segment supernormal
         nonseg_patch_point_rn = cloud.loc[nonseg_patch_point, ['rnx', 'rny', 'rnz']].values
 
@@ -113,6 +121,29 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
 
     print(f'non-segmented patch points not allocated: {non_allocated}')
 
+    added = 0
+    for point_id in tqdm(nonseg_point_ids, desc='allocating non-segmented points', total=len(nonseg_point_ids)):
+        if added == 100:
+            break
+        ranged_segments = point_to_hull_dict(point_id, cloud, segment_hulls, config, step='single')
+        point_normal = cloud.loc[point_id, ['nx', 'ny', 'nz']].values
+        if len(ranged_segments) != 0:
+            for ranged_segment in ranged_segments:
+                segment = skeleton.get_bone(ranged_segment)
+                segment_direction = segment.line_raw_dir
+                angle = angular_deviation(point_normal, segment_direction) % 90
+                angle = min(angle, 90 - angle)
+
+                if angle < config.skeleton.init_max_angle_n_sn:
+                    segment.points = np.vstack((segment.points, cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.points_data = pd.concat([segment.points_data, cloud.loc[cloud['id'] == point_id]])
+                    cloud.loc[point_id, 'instance_pr'] = ranged_segment
+                    added += 1
+                    break
+
+    print(f'non-segmented points allocated: {added}')
+
+
     for i, bone in enumerate(skeleton.bones):
         print(f'bone {bone.name} recalc axes')
         bone.calc_axes(plot=False)
@@ -120,7 +151,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
     return skeleton
 
 
-def point_to_hull_dict(point_id, cloud, hull_dict, config):
+def point_to_hull_dict(point_id, cloud, hull_dict, config, step='patch'):
     segment_dists = {}
     for segment_hull in hull_dict:
         hull = hull_dict[segment_hull]
@@ -136,7 +167,14 @@ def point_to_hull_dict(point_id, cloud, hull_dict, config):
                 ref_point=cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32), mindist=min_dist
             )
 
-        if min_dist < config.skeleton.allocate_max_dist:
+        if step == 'patch':
+            dist_threshold = config.skeleton.allocate_max_dist_patch
+        elif step == 'single':
+            dist_threshold = config.skeleton.allocate_max_dist_point
+        else:
+            raise ValueError(f'step {step} not recognized')
+
+        if min_dist < dist_threshold:
             segment_dists[segment_hull] = min_dist
 
     # return a list of segments ranked by distance, smallest first
