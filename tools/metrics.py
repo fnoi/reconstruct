@@ -298,6 +298,8 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None):
     """
     base: 'cloud' or 'skeleton'
     """
+    # datatype conversion
+    df_cloud[['x', 'y', 'z']] = df_cloud[['x', 'y', 'z']].astype(np.float32)
     if base == 'cloud':
         inst_pred = df_cloud['instance_pr'].to_numpy()
         inst_pred = inst_pred.astype(int)

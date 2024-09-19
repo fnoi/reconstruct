@@ -1,3 +1,4 @@
+import copy
 import itertools
 import os
 import pickle
@@ -76,8 +77,11 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
     nonseg_point_ids = cloud_nonseg_nopatch_points['id'].tolist()
 
     non_allocated = 0
+    to_do = copy.deepcopy(cloud_nonseg_patched_points)
 
     for nonseg_patch_point in tqdm(cloud_nonseg_patched_points, desc='allocating non-segmented patch points', total=len(cloud_nonseg_patched_points)):
+        if nonseg_patch_point not in to_do:
+            continue
         ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config)
         # test angle between point ransac normal and segment supernormal
         nonseg_patch_point_rn = cloud.loc[nonseg_patch_point, ['rnx', 'rny', 'rnz']].values
@@ -91,10 +95,17 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
                 angle = min(angle, 90 - angle)
 
                 if angle < config.skeleton.init_max_angle_rn_sn:
-                    # add point to segment
-                    segment.points = np.vstack((segment.points, cloud.loc[nonseg_patch_point, ['x', 'y', 'z']].values.astype(np.float32)))
-                    segment.points_data = pd.concat([segment.points_data, cloud.loc[nonseg_patch_point, :].to_frame().T])
+                    # patch is burnt
+                    patch_point_ids = cloud.loc[cloud['ransac_patch'] == cloud.loc[nonseg_patch_point, 'ransac_patch'], 'id'].tolist()
+                    # add points to segment
+                    patch_point_data = cloud.loc[cloud['id'].isin(patch_point_ids)]
+                    segment.points = np.vstack((segment.points, patch_point_data[['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.points_data = pd.concat([segment.points_data, patch_point_data])
                     cloud.loc[nonseg_patch_point, 'instance_pr'] = ranged_segment
+                    # remove points from to_do
+                    to_do = [x for x in to_do if x not in patch_point_ids]
+
+
                     break
 
         else:
