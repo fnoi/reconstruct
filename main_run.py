@@ -174,6 +174,10 @@ if __name__ == '__main__':
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.plot_cog_skeleton(headline='skeleton initiation')
 
+        metrics_report = True
+        if metrics_report:
+            miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
+
         # TODO: are we still retrieving from table?
         if single_step:
             raise ValueError('stop here, single step')

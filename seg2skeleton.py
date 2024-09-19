@@ -3,12 +3,14 @@ import os
 import pickle
 from math import ceil, sqrt
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from scipy.spatial import ConvexHull
+from scipy.spatial.distance import cdist
 
 from structure.Cloud import Segment
 from structure.Skeleton import Skeleton
@@ -73,9 +75,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
     cloud_nonseg_nopatch_points = cloud_nonseg[cloud_nonseg['ransac_patch'] == 0]
     nonseg_point_ids = cloud_nonseg_nopatch_points['id'].tolist()
 
-
-
-
+    non_allocated = 0
 
     for nonseg_patch_point in tqdm(cloud_nonseg_patched_points, desc='allocating non-segmented patch points', total=len(cloud_nonseg_patched_points)):
         ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config)
@@ -96,33 +96,144 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
                     segment.points_data = pd.concat([segment.points_data, cloud.loc[nonseg_patch_point, :].to_frame().T])
                     cloud.loc[nonseg_patch_point, 'instance_pr'] = ranged_segment
                     break
-            # break
+
         else:
-            print(f'point {nonseg_patch_point} not allocated to any segment')
+            non_allocated += 1
+
+    print(f'non-segmented patch points not allocated: {non_allocated}')
 
     for i, bone in enumerate(skeleton.bones):
         print(f'bone {bone.name} recalc axes')
         bone.calc_axes(plot=False)
 
-    skeleton.plot_cog_skeleton()
-
-    a = 0
+    return skeleton
 
 
 def point_to_hull_dict(point_id, cloud, hull_dict, config):
     segment_dists = {}
     for segment_hull in hull_dict:
         hull = hull_dict[segment_hull]
-        point = cloud.loc[point_id, ['x', 'y', 'z']].values
-        dists = np.abs(hull.equations.dot(np.append(point, 1))) # abs to avoid negative distances, dont care abt inner/outer
-        min_dist = np.min(dists)
+
+        point = cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32)
+
+        min_dist = point_to_hull_distance(point, hull)
+
+        debug_plot = False
+        if debug_plot:
+            visualize_hull_plotly(
+                hull_points=hull.points, hull=hull, point_cloud=cloud.loc[:, ['x', 'y', 'z']].values.astype(np.float32),
+                ref_point=cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32), mindist=min_dist
+            )
+
         if min_dist < config.skeleton.allocate_max_dist:
-            segment_dists[segment_hull] = np.min(dists)
+            segment_dists[segment_hull] = min_dist
 
     # return a list of segments ranked by distance, smallest first
     sorted_segment_ids = [k for k, v in sorted(segment_dists.items(), key=lambda item: item[1])]
 
+
+
     return sorted_segment_ids
+
+
+def point_to_hull_distance(point, hull):
+    """
+    Calculate the true minimum distance from a point to a convex hull.
+    This accounts for distances to facets, edges, and vertices of any dimension.
+    """
+    hull_points = hull.points[hull.vertices]
+
+    # Distance to vertices
+    distances_to_vertices = cdist([point], hull_points).min()
+    min_distance = distances_to_vertices
+
+    # Function to calculate distance to a line segment
+    def point_to_line_segment(p, a, b):
+        ab = b - a
+        ap = p - a
+        t = np.dot(ap, ab) / np.dot(ab, ab)
+        t = max(0, min(1, t))  # Clamp t to [0, 1]
+        closest = a + t * ab
+        return np.linalg.norm(p - closest)
+
+    # Check distance to each edge
+    for simplex in hull.simplices:
+        n = len(simplex)
+        for i in range(n):
+            for j in range(i + 1, n):
+                p1, p2 = hull.points[simplex[i]], hull.points[simplex[j]]
+                distance = point_to_line_segment(point, p1, p2)
+                min_distance = min(min_distance, distance)
+
+    return min_distance
+
+
+
+def visualize_hull_plotly(hull_points, hull, point_cloud, ref_point, mindist):
+    # Crate scatter of full point cloud
+    scatter_0 = go.Scatter3d(
+        x=point_cloud[:, 0], y=point_cloud[:, 1], z=point_cloud[:, 2],
+        mode='markers',
+        marker=dict(size=1, color='grey'),
+        name='Point Cloud'
+    )
+
+    # reshape ref_point to (3,1) array
+    ref_point = np.reshape(ref_point, (3,1))
+    # Create scatter of reference point
+    ref_point_scatter = go.Scatter3d(
+        x=ref_point[0], y=ref_point[1], z=ref_point[2],
+        mode='markers',
+        marker=dict(size=6, color='black', symbol='diamond'),
+        name='Reference Point'
+    )
+
+
+    # Create scatter plot of original points
+    scatter = go.Scatter3d(
+        x=hull_points[:, 0], y=hull_points[:, 1], z=hull_points[:, 2],
+        mode='markers',
+        marker=dict(size=4, color='blue'),
+        name='Original Points'
+    )
+
+    # Create lines for the edges of the convex hull
+    lines = []
+    for simplex in hull.simplices:
+        lines.append(go.Scatter3d(
+            x=hull_points[simplex, 0],
+            y=hull_points[simplex, 1],
+            z=hull_points[simplex, 2],
+            mode='lines',
+            line=dict(color='red', width=2),
+            showlegend=False
+        ))
+
+    # Create scatter plot of hull points
+    hull_points = hull_points[hull.vertices]
+    hull_scatter = go.Scatter3d(
+        x=hull_points[:, 0], y=hull_points[:, 1], z=hull_points[:, 2],
+        mode='markers',
+        marker=dict(size=6, color='red', symbol='diamond'),
+        name='Hull Points'
+    )
+
+    # Combine all traces
+    data = [scatter, hull_scatter, scatter_0, ref_point_scatter] + lines
+
+    # Set up the layout
+    layout = go.Layout(
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z'
+        ),
+        title=f'mindist: {mindist}',
+    )
+
+    # Create and show the figure
+    fig = go.Figure(data=data, layout=layout)
+    fig.show()
 
 
 if __name__ == '__main__':

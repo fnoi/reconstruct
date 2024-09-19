@@ -41,7 +41,7 @@ region_growing:
 skeleton:
   init_min_count: 20
   init_max_angle_rn_sn: 10
-  allocate_max_dist: 0.01
+  allocate_max_dist: 0.15
   ransac_method: open3d
   ransac_distance_threshold: 0.0005
   ransac_num_iterations: 50000
