@@ -205,18 +205,18 @@ if __name__ == '__main__':
         # fit cross-sections
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         for bone in skeleton.bones:
-            export_3D = f'{config.project.parking_path}/YP/{bone.name}_dump_3D.txt'
-            export_2D = f'{config.project.parking_path}/YP/{bone.name}_dump_2D.txt'
-            # export_orientation = f'{config.project.parking_path}/bone_{bone.id}_dump_orientation.txt'
-            with open(export_3D, 'w') as f:
-                # write bone.points_3D to txt
-                for point in bone.points:
-                    f.write(f'{point[0]} {point[1]} {point[2]}\n')
-            with open(export_2D, 'w') as f:
-                # write bone.points_2D to txt
-                for point in bone.points_2D:
-                    f.write(f'{point[0]} {point[1]}\n')
-            continue
+            # export_3D = f'{config.project.parking_path}/YP/{bone.name}_dump_3D.txt'
+            # export_2D = f'{config.project.parking_path}/YP/{bone.name}_dump_2D.txt'
+            # # export_orientation = f'{config.project.parking_path}/bone_{bone.id}_dump_orientation.txt'
+            # with open(export_3D, 'w') as f:
+            #     # write bone.points_3D to txt
+            #     for point in bone.points:
+            #         f.write(f'{point[0]} {point[1]} {point[2]}\n')
+            # with open(export_2D, 'w') as f:
+            #     # write bone.points_2D to txt
+            #     for point in bone.points_2D:
+            #         f.write(f'{point[0]} {point[1]}\n')
+            # continue
 
             try:
                 bone.fit_cs_rev()

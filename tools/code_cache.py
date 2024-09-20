@@ -35,6 +35,9 @@ def region_growing_rev(cloud, config):
     counter_patch = 0
     game_over = False
 
+    plot_count = 0
+    max_empty_loop = 0
+
     # main loop, exit when done
     while True:
         if (
@@ -56,7 +59,7 @@ def region_growing_rev(cloud, config):
             if (
                     row['ransac_patch'] != 0 and
                     row['ransac_patch'] not in sink_patch_ids and
-                    row['ransac_patch']
+                    len(cloud[cloud['ransac_patch'] == row['ransac_patch']]) >= config.region_growing.min_patch_size
             ):
                 seed_point_id = row['id']
                 seed_patch_id = row['ransac_patch']
@@ -143,7 +146,22 @@ def region_growing_rev(cloud, config):
             if chk_neighbors_0 and chk_neighbors_1:
                 floating_points_dict[seed_patch_id] = neighbor_unpatched_point_ids
                 sink_patch_ids.extend(active_patch_ids)
+
+                source_point_ids = list(set(source_point_ids) - set(active_point_ids))
+                source_patch_ids.remove(active_patch_ids)
+                source_patch_ids = list(set(source_patch_ids))
+
                 cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
+                # plot full cloud and highlight active
+                fig = plt.figure(figsize=(20, 20))
+                ax = fig.add_subplot(111, projection='3d')
+                # non-segment points
+                nonseg_ids = list(set(cloud['id'].to_list()) - set(active_point_ids))
+                ax.scatter(cloud.loc[nonseg_ids, 'x'], cloud.loc[nonseg_ids, 'y'], cloud.loc[nonseg_ids, 'z'], c='grey', s=0.1)
+                ax.scatter(cloud.loc[active_point_ids, 'x'], cloud.loc[active_point_ids, 'y'], cloud.loc[active_point_ids, 'z'], c='r', s=0.1)
+                fig.suptitle(f'Cluster {counter_patch}')
+                plt.show()
+
                 break
 
 
@@ -225,7 +243,10 @@ def region_growing_rev(cloud, config):
                                      f'ransac normal (rn) deviation: {deviation_rn:.2f}°\n'
                                      f'cluster confidence: {cluster_confidence:.2f}\n')
                         plt.tight_layout()
-                        plt.show()
+                        plotpath = f'{config.project.basepath_macos}{config.project.project_path}plot/plot_{plot_count}.png'
+                        plot_count += 1
+                        plt.savefig(plotpath, dpi=300)
+                        plt.close()
 
                     print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_point_ids)}')
 
