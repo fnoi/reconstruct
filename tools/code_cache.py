@@ -147,9 +147,9 @@ def region_growing_rev(cloud, config):
                 floating_points_dict[seed_patch_id] = neighbor_unpatched_point_ids
                 sink_patch_ids.extend(active_patch_ids)
 
-                source_point_ids = list(set(source_point_ids) - set(active_point_ids))
-                source_patch_ids.remove(active_patch_ids)
-                source_patch_ids = list(set(source_patch_ids))
+                # source_point_ids = list(set(source_point_ids) - set(active_point_ids))
+                # source_patch_ids.remove(active_patch_ids)
+                # source_patch_ids = list(set(source_patch_ids))
 
                 cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
                 # plot full cloud and highlight active
