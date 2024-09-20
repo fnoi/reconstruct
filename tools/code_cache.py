@@ -4,6 +4,7 @@ import numpy as np
 import open3d as o3d
 
 from matplotlib import pyplot as plt
+
 from scipy.spatial import KDTree, ConvexHull, Delaunay
 
 import pandas as pd
@@ -195,73 +196,29 @@ def region_growing_rev(cloud, config):
                         inactive_point_ids.extend(point_ids)
                         inactive_patch_ids.append(neighbor_patch)
 
-                    plot_all = False
+                    plot_all = True
                     if plot_all:
                         fig = plt.figure(figsize=(20, 20))
 
-                        # Function to create scatter plot with supernormal vector line
-                        def create_scatter(ax, view_elev, view_azim):
-                            rest_idx = list(set(cloud['id'].to_list()) - set(active_plot) - set(point_ids))
-                            ax.scatter(cloud.loc[active_plot, 'x'], cloud.loc[active_plot, 'y'], cloud.loc[active_plot, 'z'], c='b', s=0.2)
-                            ax.scatter(cloud.loc[point_ids, 'x'], cloud.loc[point_ids, 'y'], cloud.loc[point_ids, 'z'], c=color, s=0.2)
-                            ax.scatter(cloud.loc[rest_idx, 'x'], cloud.loc[rest_idx, 'y'], cloud.loc[rest_idx, 'z'], c='grey', s=0.1, alpha=0.2)
-
-                            # Calculate centroid of active points
-                            centroid = cloud.loc[active_point_ids, ['x', 'y', 'z']].mean().values
-
-                            # Create line representing cluster_sn
-                            end_point = centroid + .5 * cluster_sn
-                            ax.plot([centroid[0], end_point[0]],
-                                    [centroid[1], end_point[1]],
-                                    [centroid[2], end_point[2]],
-                                    color='b', linewidth=2)
-
-                            # Create line representing cluster_rn, dashed
-                            end_point = centroid + .5 * cluster_rn
-                            ax.plot([centroid[0], end_point[0]],
-                                    [centroid[1], end_point[1]],
-                                    [centroid[2], end_point[2]],
-                                    color='b', linewidth=2, linestyle='dashed')
-
-                            # create line representing neighbor_patch_sn
-                            end_point = centroid + .5 * neighbor_patch_sn
-                            ax.plot([centroid[0], end_point[0]],
-                                    [centroid[1], end_point[1]],
-                                    [centroid[2], end_point[2]],
-                                    color=color, linewidth=2)
-
-                            # create line representing neighbor_patch_rn, dashed
-                            end_point = centroid + .5 * neighbor_patch_rn
-                            ax.plot([centroid[0], end_point[0]],
-                                    [centroid[1], end_point[1]],
-                                    [centroid[2], end_point[2]],
-                                    color=color, linewidth=2, linestyle='dashed')
-
-                            # create line for cluster_csn, dotted, purple
-                            end_point = centroid + .5 * neighbor_patch_csn
-                            ax.plot([centroid[0], end_point[0]],
-                                    [centroid[1], end_point[1]],
-                                    [centroid[2], end_point[2]],
-                                    color='orange', linewidth=2, linestyle='dotted')
-
-
-                            ax.view_init(elev=view_elev, azim=view_azim)
-
                         # Subplot 1: Original perspective
                         ax1 = fig.add_subplot(221, projection='3d')
-                        create_scatter(ax1, 20, 45)
+                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
+                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax1, 30, 30)
 
                         # Subplot 2: Top-down view
                         ax2 = fig.add_subplot(222, projection='3d')
-                        create_scatter(ax2, 90, 0)
+                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
+                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax2, 90, 0)
 
                         # Subplot 3: Side view (YZ plane)
                         ax3 = fig.add_subplot(223, projection='3d')
-                        create_scatter(ax3, 0, 0)
+                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
+                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax3, 0, 0)
 
                         # Subplot 4: Front view (XZ plane)
                         ax4 = fig.add_subplot(224, projection='3d')
-                        create_scatter(ax4, 0, 90)
+                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
+                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax4, 0, 90)
 
                         fig.suptitle(f'supernormal with context (csn) deviation: {deviation_sn:.2f}°\n'
                                      f'supernormal (sn) deviation: {deviation_sn_old:.2f}°\n'
@@ -273,3 +230,53 @@ def region_growing_rev(cloud, config):
                     print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_point_ids)}')
 
     return cloud
+
+
+def create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
+                   neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax, view_elev, view_azim):
+    rest_idx = list(set(cloud['id'].to_list()) - set(active_plot) - set(point_ids))
+    ax.scatter(cloud.loc[active_plot, 'x'], cloud.loc[active_plot, 'y'], cloud.loc[active_plot, 'z'], c='b', s=0.2)
+    ax.scatter(cloud.loc[point_ids, 'x'], cloud.loc[point_ids, 'y'], cloud.loc[point_ids, 'z'], c=color, s=0.2)
+    ax.scatter(cloud.loc[rest_idx, 'x'], cloud.loc[rest_idx, 'y'], cloud.loc[rest_idx, 'z'], c='grey', s=0.1, alpha=0.2)
+
+    # Calculate centroid of active points
+    centroid = cloud.loc[active_point_ids, ['x', 'y', 'z']].mean().values
+
+    # Create line representing cluster_sn
+    end_point = centroid + .5 * cluster_sn
+    ax.plot([centroid[0], end_point[0]],
+            [centroid[1], end_point[1]],
+            [centroid[2], end_point[2]],
+            color='b', linewidth=2)
+
+    # Create line representing cluster_rn, dashed
+    end_point = centroid + .5 * cluster_rn
+    ax.plot([centroid[0], end_point[0]],
+            [centroid[1], end_point[1]],
+            [centroid[2], end_point[2]],
+            color='b', linewidth=2, linestyle='dashed')
+
+    # create line representing neighbor_patch_sn
+    end_point = centroid + .5 * neighbor_patch_sn
+    ax.plot([centroid[0], end_point[0]],
+            [centroid[1], end_point[1]],
+            [centroid[2], end_point[2]],
+            color=color, linewidth=2)
+
+    # create line representing neighbor_patch_rn, dashed
+    end_point = centroid + .5 * neighbor_patch_rn
+    ax.plot([centroid[0], end_point[0]],
+            [centroid[1], end_point[1]],
+            [centroid[2], end_point[2]],
+            color=color, linewidth=2, linestyle='dashed')
+
+    # create line for cluster_csn, dotted, purple
+    end_point = centroid + .5 * neighbor_patch_csn
+    ax.plot([centroid[0], end_point[0]],
+            [centroid[1], end_point[1]],
+            [centroid[2], end_point[2]],
+            color='orange', linewidth=2, linestyle='dotted')
+
+    ax.view_init(elev=view_elev, azim=view_azim)
+
+    return ax

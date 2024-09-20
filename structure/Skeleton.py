@@ -109,12 +109,15 @@ class Skeleton:
             self.joints2joint_array()
             self.joints2joint_frame()
 
+            # sort by ascending angle
+            self.joint_frame = self.joint_frame.sort_values(by='angle')
+
             for i, joint in enumerate(self.joints_array):
                 id_bone_1 = int(joint[0])
                 id_bone_2 = int(joint[1])
                 bone_1 = self.bones[id_bone_1]
                 bone_2 = self.bones[id_bone_2]
-                acute_angle = min(joint[10], 180 - joint[10])
+                acute_angle = np.rad2deg(min(joint[10], 180 - joint[10]))  # TODO: which angle?: case considerations?!
 
                 if acute_angle < self.config.skeleton.aggregate_angle_max:
                     # find minimum distance

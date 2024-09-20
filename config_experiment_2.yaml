@@ -48,8 +48,8 @@ skeleton:
   ransac_distance_threshold: 0.0005
   ransac_num_iterations: 50000
   ransac_ransac_n: 3
-  aggregate_distance_max: 0.2
-  aggregate_angle_max: 10
+  aggregate_distance_max: 0.3
+  aggregate_angle_max: 30
 
 skeleton_visual:
   line_length_projection: 0.2
