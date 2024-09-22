@@ -115,7 +115,7 @@ def region_growing_rev(cloud, config):
                 cluster_sn, _s1, _s2, _s3 = supernormal_svd(__normals, full_return=True)
                 cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
 
-                cluster_csn = cloud.loc[seed_point_id, ['csnx', 'csny', 'csnz']].values
+                # cluster_csn = cloud.loc[seed_point_id, ['csnx', 'csny', 'csnz']].values
 
                 if seed_confidence > cluster_confidence:
                     print('seed better')

@@ -86,23 +86,55 @@ def plot_2D_points_bbox(points_array_2D):
     plt.show()
 
 def fitting_fct(points_array_2D):
-    boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
-    bounding_ext_x = abs(boundings[1][0] - boundings[0][0])
-    bounding_ext_y = abs(boundings[1][1] - boundings[0][1])
 
-    # initiate params and define bounds #TODO: consider to initiate from table values from the standard
+
+    boundings = [points_array_2D.min(axis=0), points_array_2D.max(axis=0)]
+
+    extent_x = abs(boundings[1][0] - boundings[0][0])
+    extent_y = abs(boundings[1][1] - boundings[0][1])
+
+    # initiate params and define bounds
     rel_ext = 0.1
-    x0_lims = [boundings[0][0] - rel_ext * bounding_ext_x, boundings[0][0] + rel_ext * bounding_ext_x]
-    y0_lims = [boundings[0][1] - rel_ext * bounding_ext_y, boundings[0][1] + rel_ext * bounding_ext_y]
-    tf_lims = [0.005, 0.02]
-    tw_lims = [0.005, 0.02]
-    bf_lims = [0.1, bounding_ext_x]
-    d_lims = [0.1, bounding_ext_y]
-    lims = [x0_lims, y0_lims, tf_lims, tw_lims, bf_lims, d_lims]
+
+    limits_x_raw = [boundings[0][0], boundings[1][0]]
+    limits_y_raw = [boundings[0][1], boundings[1][1]]
+
+    limits_x_moved = [boundings[0][0] - rel_ext * extent_x, boundings[1][0] + rel_ext * extent_x]
+    limits_y_moved = [boundings[0][1] - rel_ext * extent_y, boundings[1][1] + rel_ext * extent_y]
+
+    tf_lims = [0.002, 0.02]
+    tw_lims = [0.002, 0.02]
+    bf_lims = [0.05, 0.5]
+    d_lims = [0.051, 0.5]
+    lims = [limits_x_moved, limits_y_moved, tf_lims, tw_lims, bf_lims, d_lims]
 
     num_vertices = 6
-    lower_bound = [lim[0] for lim in lims]
-    upper_bound = [lim[1] for lim in lims]
+    bound_lower = [lim[0] for lim in lims]
+    bound_upper = [lim[1] for lim in lims]
+
+    # scatter plot of points, bounding box for lims and lims_raw
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.scatter(points_array_2D[:, 0], points_array_2D[:, 1], s=0.2, color='purple', zorder=1)
+    ax.set_aspect('equal')
+    ax.plot(
+        [limits_x_moved[0], limits_x_moved[1], limits_x_moved[1], limits_x_moved[0], limits_x_moved[0]],
+        [limits_y_moved[0], limits_y_moved[0], limits_y_moved[1], limits_y_moved[1], limits_y_moved[0]],
+        color='blue',
+        alpha=0.25,
+        zorder=5,
+        linewidth=4
+    )
+    ax.plot(
+        [limits_x_raw[0], limits_x_raw[1], limits_x_raw[1], limits_x_raw[0], limits_x_raw[0]],
+        [limits_y_raw[0], limits_y_raw[0], limits_y_raw[1], limits_y_raw[1], limits_y_raw[0]],
+        color='green',
+        alpha=0.25,
+        zorder=5,
+        linewidth=4
+    )
+    plt.show()
+
 
     # x0 = np.min(points_array_2D[:, 0])
     # y0 = np.min(points_array_2D[:, 1])
@@ -142,8 +174,8 @@ def fitting_fct(points_array_2D):
 
         # start writing output to file
         xopt, fopt = pso(func=cost_fct_1,
-                         lb=lower_bound,
-                         ub=upper_bound,
+                         lb=bound_lower,
+                         ub=bound_upper,
                          args=(points_array_2D,),
                          swarmsize=swarm_size,
                          maxiter=maxiter,
