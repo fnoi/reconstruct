@@ -169,100 +169,103 @@ def skew_lines(seg1, seg2):
 
     if np.isclose(dir_1_dot_dir_2, 1) or np.isclose(dir_1_dot_dir_2, -1):
         print('Lines are parallel')
+        return None, None, None, None, 0
 
-    A = np.array([
-        [np.dot(dir_1, dir_1), -dir_1_dot_dir_2],
-        [dir_1_dot_dir_2, -np.dot(dir_2, dir_2)]
-    ])
-
-    B = np.array([
-        np.dot(connect, dir_1),
-        np.dot(connect, dir_2)
-    ])
-
-    t1, t2 = np.linalg.solve(A, B)
-
-    bridgepoint_1 = ptc_1 + t1 * dir_1
-    bridgepoint_2 = ptc_2 + t2 * dir_2
-
-    distance = np.linalg.norm(bridgepoint_1 - bridgepoint_2)
-
-    angle = np.arccos(
-        np.clip(
-            np.dot(dir_1, dir_2) / (np.linalg.norm(dir_1) * np.linalg.norm(dir_2)), -1.0, 1.0
-        )
-    )
-
-    angle_deg = np.rad2deg(angle)
-
-    nearest_point = (bridgepoint_1 + bridgepoint_2) / 2
-
-    within_seg1 = (np.dot(bridgepoint_1 - seg1.line_cog_left, seg1.line_cog_right - seg1.line_cog_left) >= 0 >= np.dot(bridgepoint_1 - seg1.line_cog_right, seg1.line_cog_right - seg1.line_cog_left))
-    within_seg2 = (np.dot(bridgepoint_2 - seg2.line_cog_left, seg2.line_cog_right - seg2.line_cog_left) >= 0 >= np.dot(bridgepoint_2 - seg2.line_cog_right, seg2.line_cog_right - seg2.line_cog_left))
-
-    if within_seg1 and not within_seg2:
-        case = 0
-    elif within_seg2 and not within_seg1:
-        case = 1
-    elif not within_seg1 and not within_seg2:
-        case = 2
     else:
-        case = 3
 
-    debug_plot = False
-    # if distance < 0.3:
-    #     debug_plot = True
-    # if not debug_plot:
-    #     print(f'Rating: {distance}, Case: {case}, Angle: {angle}')
-    if debug_plot:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter3d(
-            x=[seg1.line_cog_left[0], seg1.line_cog_right[0]],
-            y=[seg1.line_cog_left[1], seg1.line_cog_right[1]],
-            z=[seg1.line_cog_left[2], seg1.line_cog_right[2]],
-            mode='lines',
-            line=dict(
-                color='blue',
-                width=3
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=[seg2.line_cog_left[0], seg2.line_cog_right[0]],
-            y=[seg2.line_cog_left[1], seg2.line_cog_right[1]],
-            z=[seg2.line_cog_left[2], seg2.line_cog_right[2]],
-            mode='lines',
-            line=dict(
-                color='red',
-                width=3
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=[bridgepoint_1[0]],
-            y=[bridgepoint_1[1]],
-            z=[bridgepoint_1[2]],
-            mode='markers',
-            marker=dict(
-                size=5,
-                color='green',
-                opacity=1
-            )
-        ))
-        fig.add_trace(go.Scatter3d(
-            x=[bridgepoint_2[0]],
-            y=[bridgepoint_2[1]],
-            z=[bridgepoint_2[2]],
-            mode='markers',
-            marker=dict(
-                size=5,
-                color='violet',
-                opacity=1
-            )
-        ))
-        # title with rating, type of case and angle
-        fig.update_layout(title=f'Rating: {distance}, Case: {case}, Angle: {angle_deg}')
-        fig.show()
+        A = np.array([
+            [np.dot(dir_1, dir_1), -dir_1_dot_dir_2],
+            [dir_1_dot_dir_2, -np.dot(dir_2, dir_2)]
+        ])
 
-    return bridgepoint_1, bridgepoint_2, distance, case, angle_deg
+        B = np.array([
+            np.dot(connect, dir_1),
+            np.dot(connect, dir_2)
+        ])
+
+        t1, t2 = np.linalg.solve(A, B)
+
+        bridgepoint_1 = ptc_1 + t1 * dir_1
+        bridgepoint_2 = ptc_2 + t2 * dir_2
+
+        distance = np.linalg.norm(bridgepoint_1 - bridgepoint_2)
+
+        angle = np.arccos(
+            np.clip(
+                np.dot(dir_1, dir_2) / (np.linalg.norm(dir_1) * np.linalg.norm(dir_2)), -1.0, 1.0
+            )
+        )
+
+        angle_deg = np.rad2deg(angle)
+
+        nearest_point = (bridgepoint_1 + bridgepoint_2) / 2
+
+        within_seg1 = (np.dot(bridgepoint_1 - seg1.line_cog_left, seg1.line_cog_right - seg1.line_cog_left) >= 0 >= np.dot(bridgepoint_1 - seg1.line_cog_right, seg1.line_cog_right - seg1.line_cog_left))
+        within_seg2 = (np.dot(bridgepoint_2 - seg2.line_cog_left, seg2.line_cog_right - seg2.line_cog_left) >= 0 >= np.dot(bridgepoint_2 - seg2.line_cog_right, seg2.line_cog_right - seg2.line_cog_left))
+
+        if within_seg1 and not within_seg2:
+            case = 0
+        elif within_seg2 and not within_seg1:
+            case = 1
+        elif not within_seg1 and not within_seg2:
+            case = 2
+        else:
+            case = 3
+
+        debug_plot = False
+        # if distance < 0.3:
+        #     debug_plot = True
+        # if not debug_plot:
+        #     print(f'Rating: {distance}, Case: {case}, Angle: {angle}')
+        if debug_plot:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter3d(
+                x=[seg1.line_cog_left[0], seg1.line_cog_right[0]],
+                y=[seg1.line_cog_left[1], seg1.line_cog_right[1]],
+                z=[seg1.line_cog_left[2], seg1.line_cog_right[2]],
+                mode='lines',
+                line=dict(
+                    color='blue',
+                    width=3
+                )
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=[seg2.line_cog_left[0], seg2.line_cog_right[0]],
+                y=[seg2.line_cog_left[1], seg2.line_cog_right[1]],
+                z=[seg2.line_cog_left[2], seg2.line_cog_right[2]],
+                mode='lines',
+                line=dict(
+                    color='red',
+                    width=3
+                )
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=[bridgepoint_1[0]],
+                y=[bridgepoint_1[1]],
+                z=[bridgepoint_1[2]],
+                mode='markers',
+                marker=dict(
+                    size=5,
+                    color='green',
+                    opacity=1
+                )
+            ))
+            fig.add_trace(go.Scatter3d(
+                x=[bridgepoint_2[0]],
+                y=[bridgepoint_2[1]],
+                z=[bridgepoint_2[2]],
+                mode='markers',
+                marker=dict(
+                    size=5,
+                    color='violet',
+                    opacity=1
+                )
+            ))
+            # title with rating, type of case and angle
+            fig.update_layout(title=f'Rating: {distance}, Case: {case}, Angle: {angle_deg}')
+            fig.show()
+
+        return bridgepoint_1, bridgepoint_2, distance, case, angle_deg
 
 
 def warped_vectors_intersection(seg1, seg2):

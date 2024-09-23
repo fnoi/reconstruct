@@ -1,0 +1,157 @@
+import FreeCAD as App
+import FreeCADGui as Gui
+import Part
+import Arch
+import Draft
+import importIFC
+import json
+import numpy as np
+import itertools
+import BOPTools.JoinFeatures
+
+# Activate BIM workbench
+Gui.activateWorkbench("BIMWorkbench")
+
+# Import BIM-specific modules
+import BimIfcElements
+
+def check_intersection(object_1, object_2):
+    """check for intersection between two objects in FreeCAD"""
+    shape_1 = object_1.Shape
+    shape_2 = object_2.Shape
+
+    # check for intersection
+    common_shape = shape_1.common(shape_2)
+
+    if common_shape.Volume > 1e-6 and common_shape.Area > 1e-6 and common_shape.Length > 1e-6:
+        return True
+    else:
+        return False
+
+# Close all open documents
+for doc in App.listDocuments().keys():
+    App.closeDocument(doc)
+
+# Create a new document
+doc = App.newDocument("IFCProject")
+Gui.ActiveDocument = Gui.getDocument("IFCProject")
+
+# Create IFC project
+ifc_project = BimIfcElements.makeProject()
+ifc_project.Label = "My IFC Project"
+
+# Create IFC site
+ifc_site = BimIfcElements.makeSite()
+ifc_site.Label = "My Site"
+
+# Create IFC building
+ifc_building = BimIfcElements.makeBuilding()
+ifc_building.Label = "My Building"
+
+# Load configuration and skeleton data
+path_local = '/Users/fnoic/PycharmProjects/reconstruct/'
+path_config = 'config_reconstruct_a.json'
+config = json.load(open(path_local + path_config, 'r'))
+
+with open(path_local + config['path_skeleton'], 'rb') as f:
+    skeleton_dict = json.load(f)
+
+cs_area = {}
+beams = []
+
+for bone_flag in skeleton_dict.keys():
+    bone_id = int(bone_flag.split('_')[1])
+    bone = skeleton_dict[bone_flag]
+    beam_verts = np.asarray(bone['beam_verts'])
+
+    area_x = beam_verts[6, 0] - beam_verts[0, 0]
+    area_y = beam_verts[6, 1] - beam_verts[0, 1]
+    area = area_x * area_y
+    cs_area[bone_id] = area
+
+    # Center vertices around origin
+    delta_x = beam_verts[0, 0] + (np.max(beam_verts[:, 0] - np.min(beam_verts[:, 0])) / 2)
+    delta_y = beam_verts[0, 1] + (np.max(beam_verts[:, 1] - np.min(beam_verts[:, 1])) / 2)
+    beam_verts[:, 0] -= delta_x
+    beam_verts[:, 1] -= delta_y
+    beam_verts = np.hstack((beam_verts, np.zeros((beam_verts.shape[0], 1))))
+
+    # Calculate rotation matrix
+    rot_mat = np.asarray(bone['rot_mat'])
+    z_angle_add = bone['angle_xy']
+    rot_mat_z = np.asarray([
+        [np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+        [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+        [0, 0, 1]
+    ])
+    rot_mat = np.dot(rot_mat.T, rot_mat_z)
+
+    # Create placement
+    pl = App.Placement()
+    pl.Base = App.Vector(bone['start'][0], bone['start'][1], bone['start'][2])
+    pl.Rotation = App.Rotation(rot_mat[0][0], rot_mat[0][1], rot_mat[0][2],
+                               rot_mat[1][0], rot_mat[1][1], rot_mat[1][2],
+                               rot_mat[2][0], rot_mat[2][1], rot_mat[2][2])
+
+    # Create beam profile
+    profile = Draft.makeWire([App.Vector(v[0], v[1], v[2]) for v in beam_verts], closed=True)
+    profile.Placement = pl
+
+    # Create beam
+    vector = App.Vector(bone['end'][0] - bone['start'][0],
+                        bone['end'][1] - bone['start'][1],
+                        bone['end'][2] - bone['start'][2])
+    beam = BimIfcElements.makeStructure(profile, length=vector.Length)
+    beam.Placement = pl
+    beam.IfcType = "IfcBeam"
+    beam.Label = f"Beam_{bone_id}"
+
+    # Add beam to building
+    ifc_building.addObject(beam)
+    beams.append(beam)
+
+doc.recompute()
+
+# Join intersecting beams
+connection_candidates = list(cs_area.keys())
+connection_candidates_sorted = sorted(connection_candidates, key=lambda x: cs_area[x], reverse=True)
+connection_candidates_paired = list(itertools.combinations(connection_candidates_sorted, 2))
+connection_mask = np.zeros(len(connection_candidates_paired), dtype=bool)
+
+for i, connection in enumerate(connection_candidates_paired):
+    if check_intersection(doc.getObject(f"Beam_{connection[0]}"), doc.getObject(f"Beam_{connection[1]}")):
+        connection_mask[i] = True
+
+connection_candidates_paired = [connection_candidates_paired[i] for i in range(len(connection_candidates_paired)) if connection_mask[i]]
+
+compound_key = 0
+for connection_candidate in connection_candidates_paired:
+    compound_key += 1
+    name_1 = f"Beam_{connection_candidate[0]}"
+    name_2 = f"Beam_{connection_candidate[1]}"
+    obj_1 = doc.getObject(name_1)
+    obj_2 = doc.getObject(name_2)
+
+    # Create compound
+    compound = BOPTools.JoinFeatures.makeConnect(name=f"Compound_{compound_key}")
+    compound.Objects = [obj_1, obj_2]
+    compound.Proxy.execute(compound)
+    compound.purgeTouched()
+
+    # Set IFC type for the compound
+    compound.IfcType = "IfcBeam"
+
+    # Add compound to building and remove individual beams
+    ifc_building.addObject(compound)
+    ifc_building.removeObject(obj_1)
+    ifc_building.removeObject(obj_2)
+
+doc.recompute()
+
+# Export as IFC
+objects_to_export = [ifc_project, ifc_site, ifc_building]
+importIFC.export(objects_to_export, path_local + config['export_filename'] + '.ifc')
+
+print("IFC project created and exported successfully.")
+Gui.SendMsgToActiveView("ViewFit")
+Gui.activeDocument().activeView().viewAxonometric()

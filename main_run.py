@@ -35,7 +35,7 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 7
     single_step = False
     ##########
     ##########
@@ -226,8 +226,6 @@ if __name__ == '__main__':
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
 
-        raise ValueError('stop here, single step')
-
         skeleton.cache_pickle(config.project.parking_path)
         if single_step:
             raise ValueError('stop here, single step')
@@ -237,7 +235,7 @@ if __name__ == '__main__':
         print('\n- skeleton bones join on passing')
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         for bone in skeleton.bones:
-            if not bone.h_beam_verts:
+            if bone.h_beam_verts is None:
                 raise ValueError('no cross-sections available, stop here')
         skeleton.plot_cog_skeleton()
         skeleton.join_on_passing_v2()
