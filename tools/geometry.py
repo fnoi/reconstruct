@@ -193,6 +193,8 @@ def skew_lines(seg1, seg2):
         )
     )
 
+    angle_deg = np.rad2deg(angle)
+
     nearest_point = (bridgepoint_1 + bridgepoint_2) / 2
 
     within_seg1 = (np.dot(bridgepoint_1 - seg1.line_cog_left, seg1.line_cog_right - seg1.line_cog_left) >= 0 >= np.dot(bridgepoint_1 - seg1.line_cog_right, seg1.line_cog_right - seg1.line_cog_left))
@@ -257,10 +259,10 @@ def skew_lines(seg1, seg2):
             )
         ))
         # title with rating, type of case and angle
-        fig.update_layout(title=f'Rating: {distance}, Case: {case}, Angle: {angle}')
+        fig.update_layout(title=f'Rating: {distance}, Case: {case}, Angle: {angle_deg}')
         fig.show()
 
-    return bridgepoint_1, bridgepoint_2, distance, case, angle
+    return bridgepoint_1, bridgepoint_2, distance, case, angle_deg
 
 
 def warped_vectors_intersection(seg1, seg2):

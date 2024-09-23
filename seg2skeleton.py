@@ -123,8 +123,8 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
 
     added = 0
     for point_id in tqdm(nonseg_point_ids, desc='allocating non-segmented points', total=len(nonseg_point_ids)):
-        # if added == 100:  # TODO: release breaks for full test!
-        #     break
+        if added == 100:  # TODO: release breaks for full test!
+            break
         ranged_segments = point_to_hull_dict(point_id, cloud, segment_hulls, config, step='single')
         point_normal = cloud.loc[point_id, ['nx', 'ny', 'nz']].values
         if len(ranged_segments) != 0:
