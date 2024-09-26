@@ -56,6 +56,7 @@ class Skeleton:
                 'start': bone.line_cog_left.tolist(),
                 'end': bone.line_cog_right.tolist(),
                 'beam_verts': bone.h_beam_verts.tolist(),
+                'beam_params': bone.h_beam_params,
                 'rot_mat': bone.mat_rotation_xy.tolist(),
                 'angle_xy': bone.angle_2D
             }
