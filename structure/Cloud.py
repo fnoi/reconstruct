@@ -3,6 +3,7 @@ import itertools
 import os
 import time
 
+from tools.fitting_nsga import solve_w_nsga
 from tools.metrics import huber_loss
 
 try:
@@ -377,12 +378,18 @@ class Segment(object):
         return
 
     def fit_cs_rev(self):
-        points_after_sampling = 50  # big impact, consider to make it a parameter
+        points_after_sampling = 200  # big impact, consider to make it a parameter
         grid_resolution = 0.01
-        plot_2D_points_bbox(self.points_2D)
+        # plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
         self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
-        plot_2D_points_bbox(self.points_2D_fitting)
+        # plot_2D_points_bbox(self.points_2D_fitting)
+
+        solve_me = solve_w_nsga(self.points_2D_fitting)
+
+        raise ValueError("This is a test exception")
+
+
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
         fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 
@@ -392,18 +399,18 @@ class Segment(object):
 
         self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
 
-        points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
-        # find left and right points
-        ref_x = -99999999
-        ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
-        ref_pt = self.cog_3D + ref_t * self.line_raw_dir
-        vecs = points_on_line - ref_pt
-        dists = np.linalg.norm(vecs, axis=1)
-        l_ind = np.argmin(dists)
-        r_ind = np.argmax(dists)
-        self.line_cog_left = points_on_line[l_ind]
-        self.line_cog_right = points_on_line[r_ind]
-        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+        # points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
+        # # find left and right points
+        # ref_x = -99999999
+        # ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
+        # ref_pt = self.cog_3D + ref_t * self.line_raw_dir
+        # vecs = points_on_line - ref_pt
+        # dists = np.linalg.norm(vecs, axis=1)
+        # l_ind = np.argmin(dists)
+        # r_ind = np.argmax(dists)
+        # self.line_cog_left = points_on_line[l_ind]
+        # self.line_cog_right = points_on_line[r_ind]
+        # self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
 
     def downsample_dbscan_rand(self, points_after_sampling):
