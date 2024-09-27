@@ -1,4 +1,6 @@
 import bpy
+import bonsai.tool as tool
+import ifcopenshell
 import json
 
 
@@ -14,65 +16,73 @@ def data_loader():
 
     return skeleton_dict, config
 
+def project_setup():
+    bpy.ops.bim.create_project()
+
+    model = tool.Ifc.get()
+    # ifcopenshell.api.root.create_entity(model, ifc_class="IfcProject")
+    # ifcopenshell.api.unit.assign_unit(model)
+
+    return model
+
+def profile_def(skeleton_dict, model, config):
+    for bone_id, bone in skeleton_dict.items():
+        params = bone['beam_params']
+        print(bone_id)
+
+        profile = model.create_entity(
+            "IfcIShapeProfileDef",
+            ProfileName=params['label'], ProfileType="AREA",
+            OverallWidth=params['bf'], OverallDepth=params['d'],
+            WebThickness=params['tw'], FlangeThickness=params['tf'],
+            FilletRadius=0.005  # default value
+        )  # can we track naming?
+
+        profile_id = profile.id()
+        bone['profile_id'] = profile_id
+
+
+def beam_placement(skeleton_dict, model, config):
+    for bone_id, bone in skeleton_dict.items():
+        profile_name = bone['beam_params']['label']
+        profile_id = bone['profile_id']
+
+        bpy.ops.bim.add_type()
+        bpy.ops.bim.add_default_type(ifc_element_type="IfcBeamType")
+        bpy.ops.bim.add_constr_type_instance()
+
+        # Get the newly created object and set its name
+        new_obj = bpy.context.active_object
+        # split the int from the string
+        bone_id_int = int(bone_id.split('_')[1])
+        new_obj.name = f"Beam_{bone_id_int}"
+
+        # Update the profile
+        bpy.ops.bim.enable_editing_assigned_material()
+        bpy.ops.bim.enable_editing_material_set_item(material_set_item=100)
+        bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
+        bpy.ops.bim.edit_material_set_item(material_set_item=100)
+        bpy.ops.bim.disable_editing_material_set_item()
+        bpy.ops.bim.disable_editing_assigned_material(obj=new_obj.name)
+
+        print(f'fyi: this should be cross section profile {profile_name} with id {profile_id}')
+
+
+        # perform transformation, if necessary by translating the rotation matrix to displacement values and euler angles
+
+
+        # raise ValueError("This is a test exception")
 
 def blender_beams():
-    skeleton_dict, config = data_loader()
-    print(skeleton_dict['bone_0']['beam_params'])
-    raise ValueError("This is a test exception")
+    skeleton, config = data_loader()
+    # set up ifc project
+    model = project_setup()
 
+    # define required profiles
+    profile_def(skeleton, model, config)
+    # create and place beams
+    beam_placement(skeleton, model, config)
 
-
-    bpy.ops.bim.create_project()
-    bpy.ops.bim.set_tab(tab="OBJECT")
-
-
-
-
-    bpy.ops.bim.load_profiles()
-    bpy.context.scene.BIMProfileProperties.profile_classes = 'IfcIShapeProfileDef'
-    bpy.ops.bim.enable_editing_profile(profile=66)
-    bpy.ops.bim.enable_editing_profile()
-    bpy.context.scene.BIMProfileProperties.profile_attributes[1].string_value = "dummy_profile"
-    bpy.ops.bim.enable_editing_profile(profile=0)
-    bpy.ops.bim.enable_editing_profile(profile=1)
-    bpy.context.scene.BIMProfileProperties.profile_attributes[1].string_value = "dummy_profile"
-    bpy.context.scene.BIMProfileProperties.profile_attributes[2].float_value = 0.2
-    bpy.context.scene.BIMProfileProperties.profile_attributes[3].float_value = 0.02
-    bpy.context.scene.BIMProfileProperties.profile_attributes[4].float_value = 0.02
-    bpy.ops.bim.disable_editing_arbitrary_profile()
-    bpy.ops.bim.disable_editing_profile()
-    bpy.context.scene.BIMProfileProperties.active_profile_index = 0
-    bpy.context.scene.BIMModelProperties.type_class = 'IfcBeamType'
-    bpy.ops.bim.enable_add_type()
-
-    # store as ifc
-    export_name = "/Users/fnoic/Downloads/scripting_ifc_test_0.ifc"
-    bpy.ops.bim.save_project(filepath=export_name, should_save_as=False, save_as_invoked=True)
-
-
-
-
-    bpy.context.scene.BIMProjectProperties.template_file = 'IFC4 Demo Template.ifc'
-    bpy.ops.bim.select_library_file(
-        filepath="/Users/fnoic/Library/Application Support/Blender/4.2/extensions/.local/lib/python3.11/site-packages/bonsai/bim/data/templates/projects/IFC4 Demo Template.ifc")
-    bpy.ops.bim.load_type_thumbnails(ifc_class="IfcBeamType", limit=9, offset=0)
-    bpy.ops.bim.create_project()
-    bpy.ops.outliner.item_activate(deselect_all=True)
-    # bpy.context. = False
-    # bpy.context. = True
-    bpy.ops.bim.load_profiles()
-    bpy.ops.bim.edit_profiles()
-    bpy.context.scene.BIMProfileProperties.profile_attributes[1].string_value = "meins"
-    bpy.context.scene.BIMProfileProperties.profile_attributes[2].float_value = 0.5
-    bpy.context.scene.BIMProfileProperties.profile_attributes[3].float_value = 0.2
-    bpy.context.scene.BIMProfileProperties.profile_attributes[4].float_value = 0.01
-    bpy.context.scene.BIMProfileProperties.profile_attributes[5].float_value = 0.005
-    bpy.context.scene.BIMProfileProperties.profile_attributes[6].float_value = 0.01
-    bpy.context.scene.BIMProfileProperties.profile_attributes[7].float_value = 0.01
-    bpy.context.scene.BIMProfileProperties.profile_attributes[8].float_value = 0.01
-    bpy.ops.bim.disable_editing_arbitrary_profile()
-    bpy.ops.bim.disable_editing_profile()
-    bpy.ops.bim.load_profiles()
 
     raise ValueError("This is a test exception")
 
