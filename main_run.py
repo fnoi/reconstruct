@@ -270,3 +270,10 @@ if __name__ == '__main__':
             print("An error occurred while running the Blender script:")
             print(e.stderr)
 
+    if cache_flag <= 9:
+        print(f' - model evaluation')
+        # load skeleton
+        skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
+
+        model_evaluation(skeleton, somethin)
+
