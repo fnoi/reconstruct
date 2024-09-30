@@ -1,3 +1,5 @@
+import subprocess
+
 import os
 import pathlib
 
@@ -35,7 +37,7 @@ if __name__ == '__main__':
     # ((8: model generation))
     ##########
     ##########
-    cache_flag = 6
+    cache_flag = 8
     single_step = True
     ##########
     ##########
@@ -246,7 +248,25 @@ if __name__ == '__main__':
         if single_step:
             raise ValueError('stop here, single step')
 
-    # if cache_flag <= 6:
-    #     print('\n- collision-free reconstruction with FreeCAD')
-    #     skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
-    #     a = 0
+
+    if cache_flag <= 8:
+        print(f' - model generation (blender)')
+        blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
+        # blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
+        script_path = os.path.abspath("/Users/fnoic/PycharmProjects/reconstruct/tools/blender/blender_profiles.py")
+
+        command = [
+            blender_path,
+            "--background",
+            "--python",
+            script_path
+        ]
+
+        try:
+            result = subprocess.run(command, check=True, capture_output=True, text=True)
+            print("Blender script output:")
+            print(result.stdout)
+        except subprocess.CalledProcessError as e:
+            print("An error occurred while running the Blender script:")
+            print(e.stderr)
+
