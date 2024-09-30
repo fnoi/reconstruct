@@ -63,7 +63,7 @@ def solve_w_nsga(points):
     toolbox.register("individual", create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register("evaluate", fitness_function_2d_2, point_cloud=points)
+    toolbox.register("evaluate", fast_fitness, point_cloud=points)
     toolbox.register("mate", tools.cxTwoPoint)
     toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=parameter_set, x_range=x_range, y_range=y_range)
     toolbox.register("select", tools.selTournament, tournsize=3)
@@ -157,11 +157,53 @@ def fitness_function_2d_2(individual, point_cloud):
         # Check if the point is within the threshold distance for any plane
         # if any(distance_to_edge(point, edge) <= threshold for edge in edges):
         #     count_within_threshold += 1
-        aggregated_distance += min(distance_to_edge(point, edge) for edge in edges)
+        aggregated_distance += min(distance_to_edge(point, edge) ** 2 for edge in edges)
 
     return aggregated_distance,
 
     # return -count_within_threshold,
+
+
+def fast_fitness(individual, point_cloud):
+    """efficient distance computation, goal is to enable eval without prior down sampling"""
+    n_points = len(point_cloud)
+    n_vertices = 12 # hardcode for h-beam
+
+    verts = params2verts_rev(individual)
+    edge_starts = verts
+    edge_ends = np.roll(verts, -1, axis=0)
+
+    distances = np.inf * np.ones(n_points)
+
+    for start, end in zip(edge_starts, edge_ends):
+        edge_dist = point_segment_distance(point_cloud, start, end)
+        distances = np.minimum(distances, edge_dist)
+
+    return np.sum(distances),
+
+
+
+def point_segment_distance(points, edge_start, edge_end):
+    edge_vec = edge_end - edge_start
+    edge_len_sq = np.sum(edge_vec ** 2)
+
+    if edge_len_sq == 0:
+        return np.linalg.norm(points - edge_start, axis=1)
+
+    t = np.sum((points - edge_start) * edge_vec, axis=1) / edge_len_sq
+    t = np.clip(t, 0, 1)
+
+    projection = edge_start + t[:, None] * edge_vec
+
+    return np.linalg.norm(points - projection, axis=1)
+
+
+
+    a = 0
+
+
+
+
 
 
 

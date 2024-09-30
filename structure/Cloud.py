@@ -382,10 +382,10 @@ class Segment(object):
         grid_resolution = 0.01
         # plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
-        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
+        # self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
         # plot_2D_points_bbox(self.points_2D_fitting)
 
-        solve_me = solve_w_nsga(self.points_2D_fitting)
+        solve_me = solve_w_nsga(self.points_2D)
 
         raise ValueError("This is a test exception")
 

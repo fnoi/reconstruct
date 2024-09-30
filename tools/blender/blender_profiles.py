@@ -237,11 +237,54 @@ def beam_placement(bone, bone_id, model):
     return obj
 
 
+def triangulate_object(obj):
+    # Triangulate the mesh
+    me = obj.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method='BEAUTY', ngon_method='BEAUTY')
+    bm.to_mesh(me)
+    me.update()
+    bm.free()
+
+
+def export_beam_to_obj(obj, export_folder):
+    # Triangulate the mesh
+    triangulate_object(obj)
+
+    # Export the object as OBJ
+    obj_file_path = os.path.join(export_folder, f"{obj.name}.obj")
+
+    # Create a temporary mesh for exporting
+    temp_mesh = obj.data.copy()
+    temp_mesh.transform(obj.matrix_world)
+
+    # Write OBJ file
+    with open(obj_file_path, 'w') as f:
+        f.write(f"# OBJ file: {obj.name}\n")
+        for v in temp_mesh.vertices:
+            f.write(f"v {v.co.x:.6f} {v.co.y:.6f} {v.co.z:.6f}\n")
+        for p in temp_mesh.polygons:
+            f.write(f"f")
+            for idx in p.vertices:
+                f.write(f" {idx + 1}")
+            f.write("\n")
+
+    # Remove the temporary mesh
+    bpy.data.meshes.remove(temp_mesh)
+
+    print(f"Exported {obj.name} to {obj_file_path}")
+
+
 def export_to_ifc(model):
     # Create timestamp for unique filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"beam_project_{timestamp}.ifc"
-    filepath = os.path.join("/Users/fnoic/Downloads", filename)
+    filename = f"beam_project_{timestamp}"
+    filepath = os.path.join("/Users/fnoic/Downloads", filename + ".ifc")
+
+    # Create folder for OBJ files
+    obj_folder = os.path.join("/Users/fnoic/Downloads", filename)
+    os.makedirs(obj_folder, exist_ok=True)
 
     # Create a new IFC file
     ifc_file = ifcopenshell.file(schema="IFC4")
@@ -352,6 +395,11 @@ def export_to_ifc(model):
     # Write the IFC file
     ifc_file.write(filepath)
     print(f"IFC file exported to: {filepath}")
+
+    # Export individual OBJ files for each beam
+    for obj in bpy.data.objects:
+        if obj.name.startswith("Beam_"):
+            export_beam_to_obj(obj, obj_folder)
 
 
 def blender_beams():
