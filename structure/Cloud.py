@@ -382,16 +382,25 @@ class Segment(object):
         grid_resolution = 0.01
         # plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
-        # self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
+        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
         # plot_2D_points_bbox(self.points_2D_fitting)
 
-        solve_me = solve_w_nsga(self.points_2D)
+        # timer = time.time()
+        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting)
+        # print(f'elapsed time: {time.time() - timer:.3f}')
+        # timer = time.time()
 
-        raise ValueError("This is a test exception")
+
+        # print(f' working on {self.name}, full point cloud with {self.points_2D.shape[0]} points')
+        # solve_me = solve_w_nsga(self.points_2D)
+
+        # print(f'elapsed time: {time.time() - timer:.3f}')
+
+        # raise ValueError("This is a test exception")
 
 
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
-        fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
+        # self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
+        # fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2

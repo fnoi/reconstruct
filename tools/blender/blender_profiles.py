@@ -401,6 +401,7 @@ def export_to_ifc(model):
         if obj.name.startswith("Beam_"):
             export_beam_to_obj(obj, obj_folder)
 
+    return filepath
 
 def blender_beams():
     # load data
@@ -414,8 +415,11 @@ def blender_beams():
 
     print("All beams created successfully.")
 
-    export_to_ifc(model)
+    filepath = export_to_ifc(model)
 
+    # write filepath to a txt file
+    with open("/Users/fnoic/Downloads/exported_ifc.txt", "w") as f:
+        f.write(filepath)
 
 
 if __name__ == "__main__":

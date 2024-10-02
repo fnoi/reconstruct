@@ -3,6 +3,7 @@ project:
   basepath_macos: /Users/fnoic/
   project_path: PycharmProjects/reconstruct/
   parking_path: data/parking/
+  experiment_path: data/experiment/
 
 data:
   cloud_path: /data/experiment/initial_1.txt

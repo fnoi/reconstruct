@@ -18,6 +18,7 @@ from tools.code_cache import region_growing_rev
 from tools.IO import cache_io, config_io
 from tools.local import calculate_supernormals_rev, ransac_patches, patch_context_supernormals
 from tools.metrics import calculate_metrics, supernormal_evaluation, calculate_purity
+from tools.model_eval import model_evaluation
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_experiment_2.yaml')
@@ -32,13 +33,15 @@ if __name__ == '__main__':
     # 3: region growing
     # 4: skeleton initiation
     # 5: skeleton aggregation
-    # 6: cross-section fitting
+    # 6: cross-sections
     # 7: skeleton refinement
-    # ((8: model generation))
+    # 8: model generation
+    # 9: model evaluation
+
     ##########
     ##########
-    cache_flag = 8
-    single_step = True
+    cache_flag = 5
+    single_step = False
     ##########
     ##########
 
@@ -275,5 +278,5 @@ if __name__ == '__main__':
         # load skeleton
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
 
-        model_evaluation(skeleton, somethin)
+        model_evaluation(skeleton)
 

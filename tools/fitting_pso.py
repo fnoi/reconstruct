@@ -58,6 +58,8 @@ def cs_plot(vertices=None, points=None):
     if vertices is not None:
         for i in range(11):
             ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]])
+            # plot vertex id as text
+            ax.text(vertices[i][0], vertices[i][1], str(i))
         ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
     if points is not None:
         ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
