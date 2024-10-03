@@ -206,22 +206,18 @@ def point_segment_distance(points, edge_start, edge_end):
 
 def cheap_cost(solution_params, data_points, data_frame):
     data_points = np.array(data_points)
-    # Convert solution parameters to vertices and edges
+
     params = data_frame.iloc[solution_params[0]]
     params = params[['tw', 'tf', 'bf', 'd']].values.tolist()
     solution_params = [solution_params[1], solution_params[2]] + params
     solution_verts = params2verts(solution_params)
     solution_edges = verts2edges(solution_verts)
 
-    # Calculate distances from all points to all edges
     edge_distances = np.array([point_segment_distance(data_points, edge[0], edge[1])
                                for edge in solution_edges])
 
-    # Find the closest edge for each point
     closest_edge_indices = np.argmin(edge_distances, axis=0)
     min_distances = np.min(edge_distances, axis=0)
-
-    # calculate log of min_distances
 
     return np.sum(np.log(min_distances)),
 

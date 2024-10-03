@@ -40,8 +40,8 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 5
-    single_step = False
+    cache_flag = 6
+    single_step = True
     ##########
     ##########
 
@@ -194,6 +194,7 @@ if __name__ == '__main__':
         print('\n- skeleton segment aggregation, metrics revised')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
+        skeleton.update_bones()
 
         metrics_report = True
         if metrics_report:
@@ -201,6 +202,7 @@ if __name__ == '__main__':
                 cloud = pd.read_pickle(f)
             miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
 
+        skeleton.cache_pickle(config.project.parking_path)
         skeleton.plot_cog_skeleton(headline='skeleton aggregation')
         if single_step:
             raise ValueError('stop here, single step')
