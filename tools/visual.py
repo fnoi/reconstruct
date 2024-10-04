@@ -1,5 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize
 
 
 def vis_segment_planes_3D(segment, point, planes, proj_plane):
@@ -115,3 +118,141 @@ def segment_projection_2D(points, lines, extra_point=None, ransac_highlight=Fals
 
     fig.show()
 
+
+def mesh_to_plotly(mesh):
+    # Extract triangle indices and vertices
+    triangle_ids = np.asarray(mesh.triangles)
+    vertices = np.asarray(mesh.vertices)
+
+    # Initialize lists for Plotly's Mesh3d
+    i, j, k = [], [], []
+
+    x = list(vertices[:, 0])
+    y = list(vertices[:, 1])
+    z = list(vertices[:, 2])
+
+    # Initialize set to keep track of unique edges
+    edges = set()
+    edges_vertices = []
+
+    x_e, y_e, z_e = [], [], []
+
+    for triangle in triangle_ids:
+        # define vertex coordinates
+        i.append(triangle[0])
+        j.append(triangle[1])
+        k.append(triangle[2])
+
+        if len(set(triangle)) != 3:
+            a = 0
+            continue
+
+        # Add unique edges
+        for edge in [(triangle[0], triangle[1]), (triangle[1], triangle[2]), (triangle[2], triangle[0])]:
+            if edge[0] == edge[1]:
+                continue
+            else:
+                edge = tuple(sorted(edge))  # Ensure consistent ordering
+                if edge not in edges:
+                    edges.add(edge)
+                    edges_vertices.append((vertices[edge[0]], vertices[edge[1]]))
+
+                    x_e.extend([vertices[edge[0]][0], vertices[edge[1]][0], None])
+                    y_e.extend([vertices[edge[0]][1], vertices[edge[1]][1], None])
+                    z_e.extend([vertices[edge[0]][2], vertices[edge[1]][2], None])
+
+    return i, j, k, x, y, z, x_e, y_e, z_e
+
+
+
+
+
+
+
+def mesh_points_cc(points, distances, mesh, ortho=False):
+    i, j, k, x, y, z, x_edge, y_edge, z_edge = mesh_to_plotly(mesh)
+    # mesh is o3d mesh!
+    mesh_np = np.asarray(mesh.vertices)
+    # plot mesh semi transparent with edges in plotly
+    fig = go.Figure()
+    fig.add_trace(go.Mesh3d(    # TODO: make robust for separate objs and add edges option
+        x=x,
+        y=y,
+        z=z,
+        opacity=0.5,
+        color='grey',
+        i=i,
+        j=j,
+        k=k)
+    )
+    # plot edges
+    fig.add_trace(go.Scatter3d(
+        x=x_edge,
+        y=y_edge,
+        z=z_edge,
+        mode='lines',
+        line=dict(color='black', width=1)
+    ))
+
+    # scatter points in 3D, color by distance
+    fig.add_trace(go.Scatter3d(
+        x=points[:, 0],
+        y=points[:, 1],
+        z=points[:, 2],
+        mode='markers',
+        marker=dict(
+            size=2,
+            color=distances,
+            colorscale='Viridis'
+        )
+    ))
+    # equal aspect ratio
+    fig.update_layout(scene=dict(aspectmode='data'))
+    # perspective
+    if ortho:
+        fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
+
+    fig.show()
+
+
+def dist_hist(distances, bone_id):
+    # plot histogram
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.hist(distances, bins=100)
+    ax.set_title(f"Beam {bone_id}")
+    ax.set_xlabel("Distance")
+    ax.set_ylabel("Frequency")
+    plt.show()
+
+
+def dist_hist_color(distances, bone_id):
+    # Create the figure and axis
+    fig, ax = plt.subplots()
+
+    # Create the histogram
+    n, bins, patches = ax.hist(distances, bins=100) #, edgecolor='black')
+
+    # Create a normalization object for the color mapping
+    norm = Normalize(vmin=min(distances), vmax=max(distances))
+
+    # Create a ScalarMappable object for the colorbar
+    sm = ScalarMappable(cmap='viridis', norm=norm)
+    sm.set_array([])
+
+    # Color each bar according to its central value
+    bin_centers = 0.5 * (bins[:-1] + bins[1:])
+    for count, patch, center in zip(n, patches, bin_centers):
+        color = sm.cmap(norm(center))
+        patch.set_facecolor(color)
+
+    # Set labels and title
+    ax.set_title(f"Beam {bone_id}")
+    ax.set_xlabel("Distance")
+    ax.set_ylabel("Frequency")
+
+    # Add colorbar
+    cbar = fig.colorbar(sm, ax=ax)
+    cbar.set_label('Distance')
+
+    plt.show()
