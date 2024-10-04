@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 9
+    cache_flag = 6
     single_step = False
     ##########
     ##########
@@ -227,6 +227,7 @@ if __name__ == '__main__':
 
             try:
                 bone.fit_cs_rev()
+                raise ValueError('stop here')
                 bone.cs_lookup()
             except ValueError as e:
                 print(f'error: {e}')

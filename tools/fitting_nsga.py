@@ -5,13 +5,16 @@ from typing import final
 
 import deap
 import numpy as np
+import plotly.graph_objects as go
 from deap import creator, base, tools, algorithms
 
 from functools import partial
 
 from matplotlib import pyplot as plt
 
-from scipy.spatial import cKDTree
+from scipy.interpolate import splprep, splev
+
+from scipy.spatial import cKDTree, Delaunay
 from scipy.spatial.distance import cdist
 
 from tools.fitting_1 import params2verts, params2verts_rev, verts2edges
@@ -48,8 +51,9 @@ def solve_w_nsga(points):
     points = [row.tolist() for row in points]
 
     ###########
-    creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-    creator.create("Individual", list, fitness=creator.FitnessMin)
+    # creator.create("FitnessMin", base.Fitness, weights=(-1.0,))                 # log_distance, active_edge_length_relative, activation_distance
+    creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0)) # minimize log distance, maximize relative active edge length, minimize edge activation distance
+    creator.create("Individual", list, fitness=creator.FitnessMulti)
 
     toolbox = base.Toolbox()
 
@@ -69,14 +73,14 @@ def solve_w_nsga(points):
     toolbox.register("individual", create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register("evaluate", cheap_cost, data_points=points, data_frame=data)
+    toolbox.register("evaluate", cost_combined, data_points=points, data_frame=data)
     toolbox.register("mate", tools.cxTwoPoint)
     toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=parameter_set, x_range=x_range, y_range=y_range)
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
     toolbox.register("select", tools.selNSGA2)
 
-    population = toolbox.population(n=4000)
+    population = toolbox.population(n=500)
     hof = tools.HallOfFame(1)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -87,7 +91,7 @@ def solve_w_nsga(points):
 
     final_pop, log = algorithms.eaMuPlusLambda(
         population, toolbox,
-        mu=50, lambda_=400, cxpb=0.5, mutpb=0.2,
+        mu=50, lambda_=500, cxpb=0.5, mutpb=0.2,
         ngen=10, stats=stats, halloffame=hof, verbose=True
     )
 
@@ -117,8 +121,13 @@ def solve_w_nsga(points):
 
     cs_plot(final_verts, points_array)
 
+    pareto_plot = True
+    if pareto_plot:
+        fig = plot_all_solutions_and_pareto_front(final_pop, hof, ["Log Distance", "Active Edge Length", "Activation Distance"])
+        fig.show()
+
     # delete Individual and FitnessMin
-    del creator.FitnessMin
+    del creator.FitnessMulti
     del creator.Individual
 
     # should return h_beam_params, h_beam_verts and final cost
@@ -126,9 +135,9 @@ def solve_w_nsga(points):
     h_beam_verts = final_verts
     h_beam_cost = final_pop[0].fitness.values[0]
 
-    return h_beam_params, h_beam_verts, h_beam_cost
+    raise ValueError("This is a test exception")
 
-    # raise ValueError("This is a test exception")
+    return h_beam_params, h_beam_verts, h_beam_cost
 
 ###########
 
@@ -204,7 +213,7 @@ def point_segment_distance(points, edge_start, edge_end):
     return np.linalg.norm(points - projection, axis=1)
 
 
-def cheap_cost(solution_params, data_points, data_frame):
+def cost_log_distance(solution_params, data_points, data_frame):
     data_points = np.array(data_points)
 
     params = data_frame.iloc[solution_params[0]]
@@ -216,10 +225,67 @@ def cheap_cost(solution_params, data_points, data_frame):
     edge_distances = np.array([point_segment_distance(data_points, edge[0], edge[1])
                                for edge in solution_edges])
 
-    closest_edge_indices = np.argmin(edge_distances, axis=0)
     min_distances = np.min(edge_distances, axis=0)
 
     return np.sum(np.log(min_distances)),
+
+
+def cost_combined(solution_params, data_points, data_frame):
+    data_points = np.array(data_points)
+
+    params = data_frame.iloc[solution_params[0]]
+    params = params[['tw', 'tf', 'bf', 'd']].values.tolist()
+    solution_params = [solution_params[1], solution_params[2]] + params
+    solution_verts = params2verts(solution_params)
+    solution_edges = verts2edges(solution_verts)
+
+    edge_lengths = np.linalg.norm(solution_edges[:, 1] - solution_edges[:, 0], axis=1)
+    edge_length_total = np.sum(edge_lengths)
+
+    edge_distances = np.array([point_segment_distance(data_points, edge[0], edge[1])
+                                 for edge in solution_edges])
+
+    best_edge_per_point = np.argmin(edge_distances, axis=0)
+    min_distances_per_point = np.min(edge_distances, axis=0)
+    log_distance = np.sum(np.log(min_distances_per_point))
+
+    edge_activity = np.zeros(len(solution_edges))
+    edge_activation_dist = np.zeros(len(solution_edges))
+
+    for edge in range(len(solution_edges)):
+        if edge in best_edge_per_point:
+            edge_activity[edge] = 1
+    edge_activity_log = copy.deepcopy(edge_activity)
+
+    for edge in range(len(solution_edges)):
+        if edge_activity_log[edge] == 1:
+            neighbor_low = edge - 1 if edge - 1 >= 0 else len(solution_edges) - 1
+            neighbor_high = edge + 1 if edge + 1 < len(solution_edges) else 0
+            active_low = edge_activity_log[neighbor_low] == 0
+            active_high = edge_activity_log[neighbor_high] == 0
+            if active_low or active_high:
+                edge_activity[edge] = 0
+                if active_low:
+                    dist_low = np.min(edge_distances[neighbor_low])
+                else:
+                    dist_low = np.inf
+                if active_high:
+                    dist_high = np.min(edge_distances[neighbor_high])
+                else:
+                    dist_high = np.inf
+
+                if dist_low < dist_high:
+                    edge_activation_dist[edge] = dist_low
+                else:
+                    edge_activation_dist[edge] = dist_high
+            else:
+                continue
+
+    active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
+    activation_distance = np.sum(edge_activation_dist)
+
+    return log_distance, active_edge_length_relative, activation_distance
+
 
 
 def efficient_cost_function(solution_params, data_points, data_frame, edge_penalty=100):
@@ -335,6 +401,77 @@ def custom_mutate(individual, indpb, parameter_set, x_range, y_range):
         individual[2] = random.uniform(*y_range)
 
     return individual,
+
+
+def plot_all_solutions_and_pareto_front(population, hof, objective_names):
+    """
+    Plot all solutions and highlight the Pareto front using Plotly.
+
+    Parameters:
+    population (list): List of all individuals in the population
+    hof (deap.tools.ParetoFront): Hall of Fame object containing non-dominated solutions
+    objective_names (list): List of strings with names for each objective
+
+    Returns:
+    plotly.graph_objs._figure.Figure: The created Plotly figure
+    """
+    # Extract fitness values for all solutions
+    all_fitness_values = np.array([ind.fitness.values for ind in population])
+
+    # Extract fitness values for Pareto front
+    pareto_fitness_values = np.array([ind.fitness.values for ind in hof])
+
+    # Create the scatter plot for all solutions
+    fig = go.Figure(data=go.Scatter3d(
+        x=all_fitness_values[:, 0],
+        y=all_fitness_values[:, 1],
+        z=all_fitness_values[:, 2],
+        mode='markers',
+        marker=dict(
+            size=3,
+            color=all_fitness_values[:, 2],  # Color by the third objective
+            colorscale='Viridis',
+            opacity=0.6
+        ),
+        text=[f"Solution {i}" for i in range(len(population))],
+        hoverinfo='text',
+        name='All Solutions'
+    ))
+
+    # Add Pareto front solutions
+    fig.add_trace(go.Scatter3d(
+        x=pareto_fitness_values[:, 0],
+        y=pareto_fitness_values[:, 1],
+        z=pareto_fitness_values[:, 2],
+        mode='markers',
+        marker=dict(
+            size=6,
+            color=pareto_fitness_values[:, 2],  # Color by the third objective
+            colorscale='Viridis',
+            opacity=1,
+            symbol='diamond'
+        ),
+        text=[f"Pareto Solution {i}" for i in range(len(hof))],
+        hoverinfo='text',
+        name='Pareto Front'
+    ))
+
+    # Update the layout
+    fig.update_layout(
+        title='3D Visualization of All Solutions and Pareto Front',
+        scene=dict(
+            xaxis_title=objective_names[0],
+            yaxis_title=objective_names[1],
+            zaxis_title=objective_names[2],
+        ),
+        width=900,
+        height=800,
+        margin=dict(r=20, b=10, l=10, t=40)
+    )
+
+    return fig
+
+
 
 if __name__ == "__main__":
     dummy_individual = [0.02, 0.02, 0.2, 0.2, 0.5, 0.5]
