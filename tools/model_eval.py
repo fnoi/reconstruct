@@ -66,8 +66,12 @@ def model_evaluation(skeleton):
                     dist_hist_color(distances_np, bone_id)
                     mesh_points_cc(points, distances_np, mesh, ortho=True)
 
+                    print(f'beam {bone_id}: mean distance: {np.mean(distances_np)}, median distance: {np.median(distances_np)}')
+
     # complete model and complete point cloud
     collected_mesh = o3d.io.read_triangle_mesh(path_obj + '.obj')
     collected_distances = compute_point_cloud_to_mesh_distance(collected_points, collected_mesh)
     dist_hist_color(collected_distances, "complete")
     mesh_points_cc(collected_points, collected_distances, collected_mesh, ortho=True)
+
+    print(f'complete model: mean distance: {np.mean(collected_distances)}, median distance: {np.median(collected_distances)}')
