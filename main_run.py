@@ -40,8 +40,8 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
-    single_step = True
+    cache_flag = 8
+    single_step = False
     ##########
     ##########
 

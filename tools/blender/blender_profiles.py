@@ -403,6 +403,67 @@ def export_to_ifc(model):
 
     return filepath
 
+
+import bpy
+import os
+
+
+def triangulate_object(obj):
+    # Ensure the object is in edit mode
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Triangulate
+    bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
+
+    # Return to object mode
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def export_all_meshes_to_obj(export_file_path):
+    # Ensure the file path ends with .obj
+    if not export_file_path.lower().endswith('.obj'):
+        export_file_path = export_file_path[:-4] + '.obj'
+
+    # Open the OBJ file for writing
+    with open(export_file_path, 'w') as f:
+        f.write(f"# OBJ file: All Meshes\n")
+
+        vertex_offset = 1  # OBJ files use 1-based indexing
+
+        for obj in bpy.context.scene.objects:
+            if obj.type == 'MESH':
+                # Triangulate the mesh
+                triangulate_object(obj)
+
+                # Create a temporary mesh for exporting
+                temp_mesh = obj.data.copy()
+                temp_mesh.transform(obj.matrix_world)
+
+                # Write object name
+                f.write(f"o {obj.name}\n")
+
+                # Write vertices
+                for v in temp_mesh.vertices:
+                    f.write(f"v {v.co.x:.6f} {v.co.y:.6f} {v.co.z:.6f}\n")
+
+                # Write faces
+                for p in temp_mesh.polygons:
+                    f.write(f"f")
+                    for idx in p.vertices:
+                        f.write(f" {idx + vertex_offset}")
+                    f.write("\n")
+
+                # Update vertex offset for the next object
+                vertex_offset += len(temp_mesh.vertices)
+
+                # Remove the temporary mesh
+                bpy.data.meshes.remove(temp_mesh)
+
+    print(f"Exported all mesh objects to {export_file_path}")
+
+
 def blender_beams():
     # load data
     skeleton, config = data_loader()
@@ -416,6 +477,7 @@ def blender_beams():
     print("All beams created successfully.")
 
     filepath = export_to_ifc(model)
+    export_all_meshes_to_obj(filepath)
 
     # write filepath to a txt file
     with open("/Users/fnoic/Downloads/exported_ifc.txt", "w") as f:
