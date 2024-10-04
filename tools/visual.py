@@ -164,11 +164,6 @@ def mesh_to_plotly(mesh):
     return i, j, k, x, y, z, x_e, y_e, z_e
 
 
-
-
-
-
-
 def mesh_points_cc(points, distances, mesh, ortho=False):
     i, j, k, x, y, z, x_edge, y_edge, z_edge = mesh_to_plotly(mesh)
     # mesh is o3d mesh!
@@ -211,6 +206,9 @@ def mesh_points_cc(points, distances, mesh, ortho=False):
     # perspective
     if ortho:
         fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
+
+    # no axes, no grid
+    fig.update_layout(scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False)))
 
     fig.show()
 
