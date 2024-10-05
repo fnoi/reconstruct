@@ -37,10 +37,12 @@ def setup_lims_placement(points):
     return limits_x_moved, limits_y_moved
 
 
-def solve_w_nsga(points):
+def solve_w_nsga(points, config):
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
         data = pickle.load(f)
     data = data.dropna()
+    # load config
+
 
     # setup complete input data for solution finding // sequence is tw, tf, bf, d
     parameter_set = data[['tw', 'tf', 'bf', 'd']].values.tolist()
@@ -80,7 +82,7 @@ def solve_w_nsga(points):
 
     toolbox.register("select", tools.selNSGA2)
 
-    population = toolbox.population(n=500)
+    population = toolbox.population(n=config.cs_fit.n_pop)
     hof = tools.HallOfFame(1)
 
     stats = tools.Statistics(lambda ind: ind.fitness.values)
@@ -89,10 +91,10 @@ def solve_w_nsga(points):
     stats.register("min", np.min, axis=0)
     stats.register("max", np.max, axis=0)
 
-    final_pop, log = algorithms.eaMuPlusLambda(
+    final_pop, log, all_individuals = eaMuPlusLambda_history(
         population, toolbox,
-        mu=50, lambda_=500, cxpb=0.5, mutpb=0.2,
-        ngen=10, stats=stats, halloffame=hof, verbose=True
+        mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
+        ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
     )
 
     # Save final population
@@ -106,7 +108,7 @@ def solve_w_nsga(points):
             f.write(str(record) + '\n')
 
     # Extract the Pareto front
-    pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
+    pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=False)
 
     # Save the Pareto front to a text file
     with open('pareto_front.txt', 'w') as f:
@@ -123,7 +125,7 @@ def solve_w_nsga(points):
 
     pareto_plot = True
     if pareto_plot:
-        fig = plot_all_solutions_and_pareto_front(final_pop, hof, ["Log Distance", "Active Edge Length", "Activation Distance"])
+        fig = plot_all_generations_hof_and_pareto_front(all_individuals, hof, ["Log Distance", "Active Edge Length", "Activation Distance"])
         fig.show()
 
     # delete Individual and FitnessMin
@@ -247,7 +249,7 @@ def cost_combined(solution_params, data_points, data_frame):
 
     best_edge_per_point = np.argmin(edge_distances, axis=0)
     min_distances_per_point = np.min(edge_distances, axis=0)
-    log_distance = np.sum(np.log(min_distances_per_point))
+    log_distance = np.sum(np.log(min_distances_per_point)) / len(data_points)
 
     edge_activity = np.zeros(len(solution_edges))
     edge_activation_dist = np.zeros(len(solution_edges))
@@ -403,23 +405,30 @@ def custom_mutate(individual, indpb, parameter_set, x_range, y_range):
     return individual,
 
 
-def plot_all_solutions_and_pareto_front(population, hof, objective_names):
+
+def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_names, plot_pareto_surface=True):
     """
-    Plot all solutions and highlight the Pareto front using Plotly.
+    Plot all solutions from all generations, highlight the Hall of Fame,
+    show the true Pareto front, and optionally plot a Pareto surface using Plotly.
 
     Parameters:
-    population (list): List of all individuals in the population
-    hof (deap.tools.ParetoFront): Hall of Fame object containing non-dominated solutions
+    all_individuals (list): List of all individuals from all generations
+    hof (deap.tools.HallOfFame): Hall of Fame object
     objective_names (list): List of strings with names for each objective
+    plot_pareto_surface (bool): If True, plot a semi-transparent Pareto surface
 
     Returns:
     plotly.graph_objs._figure.Figure: The created Plotly figure
     """
     # Extract fitness values for all solutions
-    all_fitness_values = np.array([ind.fitness.values for ind in population])
+    all_fitness_values = np.array([ind.fitness.values for ind in all_individuals])
 
-    # Extract fitness values for Pareto front
-    pareto_fitness_values = np.array([ind.fitness.values for ind in hof])
+    # Extract fitness values for Hall of Fame
+    hof_fitness_values = np.array([ind.fitness.values for ind in hof])
+
+    # Extract the true Pareto front
+    pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)[0]
+    pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front])
 
     # Create the scatter plot for all solutions
     fig = go.Figure(data=go.Scatter3d(
@@ -428,48 +437,152 @@ def plot_all_solutions_and_pareto_front(population, hof, objective_names):
         z=all_fitness_values[:, 2],
         mode='markers',
         marker=dict(
-            size=3,
+            size=2,
             color=all_fitness_values[:, 2],  # Color by the third objective
             colorscale='Viridis',
-            opacity=0.6
+            opacity=0.6,
+            colorbar=dict(title="Fitness (Obj 3)")
         ),
-        text=[f"Solution {i}" for i in range(len(population))],
+        text=[f"Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, v in enumerate(all_fitness_values)],
         hoverinfo='text',
         name='All Solutions'
     ))
 
-    # Add Pareto front solutions
+    # Add Hall of Fame solutions
+    fig.add_trace(go.Scatter3d(
+        x=hof_fitness_values[:, 0],
+        y=hof_fitness_values[:, 1],
+        z=hof_fitness_values[:, 2],
+        mode='markers',
+        marker=dict(
+            size=5,
+            color='yellow',
+            symbol='diamond',
+            line=dict(color='black', width=1)
+        ),
+        text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, v in enumerate(hof_fitness_values)],
+        hoverinfo='text',
+        name='Hall of Fame'
+    ))
+
+    # Add true Pareto front solutions
     fig.add_trace(go.Scatter3d(
         x=pareto_fitness_values[:, 0],
         y=pareto_fitness_values[:, 1],
         z=pareto_fitness_values[:, 2],
         mode='markers',
         marker=dict(
-            size=6,
-            color=pareto_fitness_values[:, 2],  # Color by the third objective
-            colorscale='Viridis',
-            opacity=1,
-            symbol='diamond'
+            size=5,
+            color='red',
+            symbol='circle',
+            line=dict(color='black', width=1)
         ),
-        text=[f"Pareto Solution {i}" for i in range(len(hof))],
+        text=[f"Pareto Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, v in enumerate(pareto_fitness_values)],
         hoverinfo='text',
-        name='Pareto Front'
+        name='True Pareto Front'
     ))
+
+    # Add Pareto surface if requested
+    if plot_pareto_surface and len(pareto_fitness_values) > 3:
+        # Create a triangulation of the Pareto front points
+        tri = Delaunay(pareto_fitness_values[:, :2])
+
+        # Create the mesh for the surface
+        xx, yy = np.meshgrid(np.linspace(pareto_fitness_values[:, 0].min(), pareto_fitness_values[:, 0].max(), 100),
+                             np.linspace(pareto_fitness_values[:, 1].min(), pareto_fitness_values[:, 1].max(), 100))
+        zz = np.zeros(xx.shape)
+
+        # Interpolate z values
+        for i in range(xx.shape[0]):
+            for j in range(xx.shape[1]):
+                point = [xx[i, j], yy[i, j]]
+                simplex = tri.find_simplex(point)
+                if simplex != -1:
+                    b = tri.transform[simplex, :2].dot(point - tri.transform[simplex, 2])
+                    bary = np.c_[b, 1 - b.sum(axis=-1)]
+                    zz[i, j] = np.dot(bary, pareto_fitness_values[tri.simplices[simplex], 2])
+                else:
+                    zz[i, j] = np.nan
+
+        # Add the surface to the plot
+        fig.add_trace(go.Surface(
+            x=xx,
+            y=yy,
+            z=zz,
+            colorscale='Reds',
+            opacity=0.6,
+            name='Pareto Surface'
+        ))
 
     # Update the layout
     fig.update_layout(
-        title='3D Visualization of All Solutions and Pareto Front',
+        title='3D Visualization of All Solutions, Hall of Fame, and Pareto Front',
         scene=dict(
             xaxis_title=objective_names[0],
             yaxis_title=objective_names[1],
             zaxis_title=objective_names[2],
         ),
-        width=900,
+        width=1000,
         height=800,
         margin=dict(r=20, b=10, l=10, t=40)
     )
 
     return fig
+
+
+
+def eaMuPlusLambda_history(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, stats=None,
+                           halloffame=None, verbose=__debug__):
+    logbook = tools.Logbook()
+    logbook.header = ['gen', 'nevals'] + (stats.fields if stats else [])
+
+    # Evaluate the individuals with an invalid fitness
+    invalid_ind = [ind for ind in population if not ind.fitness.valid]
+    fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+    for ind, fit in zip(invalid_ind, fitnesses):
+        ind.fitness.values = fit
+
+    if halloffame is not None:
+        halloffame.update(population)
+
+    record = stats.compile(population) if stats else {}
+    logbook.record(gen=0, nevals=len(invalid_ind), **record)
+    if verbose:
+        print(logbook.stream)
+
+    # Begin the generational process
+    all_individuals = population[:]  # Store initial population
+
+    for gen in range(1, ngen + 1):
+        # Vary the population
+        offspring = algorithms.varOr(population, toolbox, lambda_, cxpb, mutpb)
+
+        # Evaluate the individuals with an invalid fitness
+        invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+        fitnesses = toolbox.map(toolbox.evaluate, invalid_ind)
+        for ind, fit in zip(invalid_ind, fitnesses):
+            ind.fitness.values = fit
+
+        # Update the hall of fame with the generated individuals
+        if halloffame is not None:
+            halloffame.update(offspring)
+
+        # Select the next generation population
+        population[:] = toolbox.select(population + offspring, mu)
+
+        # Store all individuals from this generation
+        all_individuals.extend(offspring)
+
+        # Update the statistics with the new population
+        record = stats.compile(population) if stats else {}
+        logbook.record(gen=gen, nevals=len(invalid_ind), **record)
+        if verbose:
+            print(logbook.stream)
+
+    return population, logbook, all_individuals
 
 
 

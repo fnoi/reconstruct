@@ -55,3 +55,10 @@ skeleton:
 
 skeleton_visual:
   line_length_projection: 0.2
+
+cs_fit:
+  n_downsample: 1000
+  n_pop: 800
+  n_lambda: 800
+  n_mu: 800
+  n_gen: 50

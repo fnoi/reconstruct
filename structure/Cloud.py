@@ -377,8 +377,8 @@ class Segment(object):
                         f'l 1 4')
         return
 
-    def fit_cs_rev(self):
-        points_after_sampling = 200  # big impact, consider to make it a parameter
+    def fit_cs_rev(self, config=None):
+        points_after_sampling = config.cs_fit.n_downsample
         grid_resolution = 0.01
         # plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
@@ -386,7 +386,7 @@ class Segment(object):
         # plot_2D_points_bbox(self.points_2D_fitting)
 
         # timer = time.time()
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting)
+        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting, config)
         # print(f'elapsed time: {time.time() - timer:.3f}')
         # timer = time.time()
 
