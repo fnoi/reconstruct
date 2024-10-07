@@ -404,10 +404,6 @@ def export_to_ifc(model):
     return filepath
 
 
-import bpy
-import os
-
-
 def triangulate_object(obj):
     # Ensure the object is in edit mode
     bpy.context.view_layer.objects.active = obj

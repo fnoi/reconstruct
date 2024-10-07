@@ -1,6 +1,7 @@
 import copy
 import pickle
 import random
+import warnings
 from typing import final
 
 import deap
@@ -123,9 +124,14 @@ def solve_w_nsga(points, config):
 
     cs_plot(final_verts, points_array)
 
+    all_individuals_with_gen = [(ind, gen) for gen, pop in enumerate(all_individuals) for ind in pop]
+
     pareto_plot = True
     if pareto_plot:
-        fig = plot_all_generations_hof_and_pareto_front(all_individuals, hof, ["Log Distance", "Active Edge Length", "Activation Distance"])
+        fig = plot_all_generations_hof_and_pareto_front(all_individuals_with_gen,
+                                                        hof,
+                                                        ["Log Distance", "Active Edge Length", "Activation Distance"],
+                                                        plot_pareto_surface=True)
         fig.show()
 
     # delete Individual and FitnessMin
@@ -249,7 +255,7 @@ def cost_combined(solution_params, data_points, data_frame):
 
     best_edge_per_point = np.argmin(edge_distances, axis=0)
     min_distances_per_point = np.min(edge_distances, axis=0)
-    log_distance = np.sum(np.log(min_distances_per_point)) / len(data_points)
+    log_distance = np.mean(np.log(min_distances_per_point))
 
     edge_activity = np.zeros(len(solution_edges))
     edge_activation_dist = np.zeros(len(solution_edges))
@@ -405,14 +411,14 @@ def custom_mutate(individual, indpb, parameter_set, x_range, y_range):
     return individual,
 
 
-
-def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_names, plot_pareto_surface=True):
+def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_names, plot_pareto_surface=False):
     """
     Plot all solutions from all generations, highlight the Hall of Fame,
     show the true Pareto front, and optionally plot a Pareto surface using Plotly.
+    Color-code the solutions by generation.
 
     Parameters:
-    all_individuals (list): List of all individuals from all generations
+    all_individuals (list): List of tuples (individual, generation) for all individuals from all generations
     hof (deap.tools.HallOfFame): Hall of Fame object
     objective_names (list): List of strings with names for each objective
     plot_pareto_surface (bool): If True, plot a semi-transparent Pareto surface
@@ -420,15 +426,31 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_na
     Returns:
     plotly.graph_objs._figure.Figure: The created Plotly figure
     """
-    # Extract fitness values for all solutions
-    all_fitness_values = np.array([ind.fitness.values for ind in all_individuals])
+    # Extract fitness values and generations for all solutions
+    all_fitness_values = np.array([ind.fitness.values for ind, _ in all_individuals])
+    generations = np.array([gen for _, gen in all_individuals])
 
     # Extract fitness values for Hall of Fame
     hof_fitness_values = np.array([ind.fitness.values for ind in hof])
 
     # Extract the true Pareto front
-    pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)[0]
-    pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front])
+    pareto_front = tools.sortNondominated([ind for ind, _ in all_individuals], len(all_individuals), first_front_only=True)[0]
+
+    # Data cleaning and validation for Pareto front
+    pareto_fitness_values = []
+    for ind in pareto_front:
+        if hasattr(ind, 'fitness') and hasattr(ind.fitness, 'values'):
+            values = ind.fitness.values
+            if len(values) == 3:
+                pareto_fitness_values.append(values)
+            else:
+                print(f"Skipping individual with incorrect number of fitness values: {values}")
+        else:
+            print(f"Skipping individual without proper fitness attribute: {ind}")
+
+    pareto_fitness_values = np.array(pareto_fitness_values)
+
+    print(f"Shape of cleaned Pareto front array: {pareto_fitness_values.shape}")
 
     # Create the scatter plot for all solutions
     fig = go.Figure(data=go.Scatter3d(
@@ -438,13 +460,13 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_na
         mode='markers',
         marker=dict(
             size=2,
-            color=all_fitness_values[:, 2],  # Color by the third objective
+            color=generations,  # Color by generation
             colorscale='Viridis',
             opacity=0.6,
-            colorbar=dict(title="Fitness (Obj 3)")
+            colorbar=dict(title="Generation")
         ),
-        text=[f"Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
-              for i, v in enumerate(all_fitness_values)],
+        text=[f"Solution {i}<br>Generation: {gen}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, (v, gen) in enumerate(zip(all_fitness_values, generations))],
         hoverinfo='text',
         name='All Solutions'
     ))
@@ -486,36 +508,49 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_na
     ))
 
     # Add Pareto surface if requested
-    if plot_pareto_surface and len(pareto_fitness_values) > 3:
-        # Create a triangulation of the Pareto front points
-        tri = Delaunay(pareto_fitness_values[:, :2])
+    if plot_pareto_surface:
+        try:
+            if len(pareto_fitness_values) < 4:
+                raise ValueError(f"Not enough Pareto front points to create a surface (minimum 4 required, got {len(pareto_fitness_values)}).")
 
-        # Create the mesh for the surface
-        xx, yy = np.meshgrid(np.linspace(pareto_fitness_values[:, 0].min(), pareto_fitness_values[:, 0].max(), 100),
-                             np.linspace(pareto_fitness_values[:, 1].min(), pareto_fitness_values[:, 1].max(), 100))
-        zz = np.zeros(xx.shape)
+            # Create a triangulation of the Pareto front points
+            tri = Delaunay(pareto_fitness_values[:, :2])
 
-        # Interpolate z values
-        for i in range(xx.shape[0]):
-            for j in range(xx.shape[1]):
-                point = [xx[i, j], yy[i, j]]
-                simplex = tri.find_simplex(point)
-                if simplex != -1:
-                    b = tri.transform[simplex, :2].dot(point - tri.transform[simplex, 2])
-                    bary = np.c_[b, 1 - b.sum(axis=-1)]
-                    zz[i, j] = np.dot(bary, pareto_fitness_values[tri.simplices[simplex], 2])
-                else:
-                    zz[i, j] = np.nan
+            # Create the mesh for the surface
+            xx, yy = np.meshgrid(np.linspace(pareto_fitness_values[:, 0].min(), pareto_fitness_values[:, 0].max(), 50),
+                                 np.linspace(pareto_fitness_values[:, 1].min(), pareto_fitness_values[:, 1].max(), 50))
+            zz = np.zeros(xx.shape)
 
-        # Add the surface to the plot
-        fig.add_trace(go.Surface(
-            x=xx,
-            y=yy,
-            z=zz,
-            colorscale='Reds',
-            opacity=0.6,
-            name='Pareto Surface'
-        ))
+            # Interpolate z values
+            for i in range(xx.shape[0]):
+                for j in range(xx.shape[1]):
+                    point = [xx[i, j], yy[i, j]]
+                    simplex = tri.find_simplex(point)
+                    if simplex != -1:
+                        b = tri.transform[simplex, :2].dot(point - tri.transform[simplex, 2])
+                        bary = np.c_[b, 1 - b.sum(axis=-1)]
+                        zz[i, j] = np.dot(bary, pareto_fitness_values[tri.simplices[simplex], 2])
+                    else:
+                        zz[i, j] = np.nan
+
+            # Check if we have valid z values
+            if np.isnan(zz).all():
+                raise ValueError("All interpolated Z values are NaN. Cannot create surface.")
+
+            # Add the surface to the plot
+            fig.add_trace(go.Surface(
+                x=xx,
+                y=yy,
+                z=zz,
+                colorscale='Reds',
+                opacity=0.6,
+                name='Pareto Surface'
+            ))
+            print("Pareto surface added successfully.")
+        except Exception as e:
+            warnings.warn(f"Failed to create Pareto surface: {str(e)}")
+            print(f"Number of Pareto front points: {len(pareto_fitness_values)}")
+            print(f"First few Pareto front points: {pareto_fitness_values[:5]}")
 
     # Update the layout
     fig.update_layout(
@@ -531,7 +566,6 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, objective_na
     )
 
     return fig
-
 
 
 def eaMuPlusLambda_history(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, stats=None,
