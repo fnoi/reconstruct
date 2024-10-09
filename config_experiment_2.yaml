@@ -57,8 +57,8 @@ skeleton_visual:
   line_length_projection: 0.2
 
 cs_fit:
-  n_downsample: 2000
+  n_downsample: 200
   n_pop: 500
   n_lambda: 500
   n_mu: 500
-  n_gen: 100
+  n_gen: 50

@@ -84,6 +84,9 @@ def add_beam(profile_name, profile_dict):
     # bpy.ops.bim.add_constr_type_instance()
 
 
+
+
+
 def retrieve_relating_type_id(typename):
     for obj in bpy.context.scene.objects:
         if obj.BIMObjectProperties.ifc_definition_id:
@@ -146,6 +149,7 @@ def blender_beams(query_profile_dict):
 
             bpy.context.scene.BIMModelProperties.extrusion_depth = query_profile_dict[element.name]['length']
             target_type = retrieve_relating_type_id(f'IfcBeamType/beamprofiletype_{element.name}')
+            print(f'target_type: {target_type}')
             bpy.ops.bim.add_constr_type_instance(relating_type_id=target_type, from_invoke=True)
             new_object = bpy.context.active_object
             new_object.name = f'beam_{beam_counter}_{element.name}'
@@ -156,6 +160,11 @@ def blender_beams(query_profile_dict):
             new_object.select_set(True)
 
             # then change the profile
+            # bpy.ops.bim.enable_editing_assigned_material()
+            # bpy.context.scene.BIMMaterialProperties.profiles = target_type
+            # bpy.ops.bim.disable_editing_material_set_item(obj=
+
+
             # print(bpy.context.scene.BIMModelProperties.relating_type_id)
 
             # another one
