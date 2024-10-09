@@ -51,7 +51,7 @@ def min_distance_to_polygon(points, vertices, active_edges=False):
         return min_distances
 
 
-def cs_plot(vertices=None, points=None):
+def cs_plot(vertices=None, points=None, headline=None):
     # plot lines in 2D iterate 0 - 11 and 0
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -63,6 +63,8 @@ def cs_plot(vertices=None, points=None):
         ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]])
     if points is not None:
         ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+    if headline is not None:
+        ax.set_title(headline)
     ax.set_aspect('equal')
     plt.show()
 

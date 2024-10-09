@@ -41,7 +41,7 @@ if __name__ == '__main__':
     ##########
     ##########
     cache_flag = 6
-    single_step = False
+    single_step = True
     ##########
     ##########
 
@@ -211,7 +211,7 @@ if __name__ == '__main__':
         print('\n- fit cross-sections, lookup cross-sections')
         # fit cross-sections
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
-        for bone in skeleton.bones[0:1]:
+        for bone in skeleton.bones:
             # export_3D = f'{config.project.parking_path}/YP/{bone.name}_dump_3D.txt'
             # export_2D = f'{config.project.parking_path}/YP/{bone.name}_dump_2D.txt'
             # # export_orientation = f'{config.project.parking_path}/bone_{bone.id}_dump_orientation.txt'
@@ -227,8 +227,8 @@ if __name__ == '__main__':
 
             try:
                 bone.fit_cs_rev(config)
-                raise ValueError('stop here')
-                bone.cs_lookup()
+                # raise ValueError('stop here')
+                # bone.cs_lookup()
             except ValueError as e:
                 print(f'error: {e}')
                 bone.h_beam_params = False

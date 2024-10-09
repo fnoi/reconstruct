@@ -37,7 +37,7 @@ def setup_lims_placement(points):
     return limits_x_moved, limits_y_moved
 
 
-def solve_w_nsga(points, config):
+def solve_w_nsga(points, config, all_points):
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
         data = pickle.load(f)
     data = data.dropna()
@@ -80,7 +80,9 @@ def solve_w_nsga(points, config):
     toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=parameter_set, x_range=x_range, y_range=y_range)
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
-    toolbox.register("select", tools.selNSGA2)
+    # toolbox.register("select", tools.selNSGA2)
+    ref_points = tools.uniform_reference_points(nobj=3, p=12)
+    toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
     population = toolbox.population(n=config.cs_fit.n_pop)
     hof = tools.HallOfFame(1)
@@ -108,6 +110,7 @@ def solve_w_nsga(points, config):
             f.write(str(record) + '\n')
 
     # Extract the Pareto front # final pop or all??
+
     pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
 
     # Save the Pareto front to a text file
@@ -115,13 +118,7 @@ def solve_w_nsga(points, config):
         for ind in pareto_front[0]:  # pareto_front[0] contains the first front, the actual Pareto front
             f.write(str(ind) + " Fitness: " + str(ind.fitness.values) + '\n')
 
-    final_params = final_pop[0]
-    final_params = final_params[1:] + list(data.iloc[final_params[0]][['tw', 'tf', 'bf', 'd']].values)
 
-    final_verts = params2verts(final_params)
-    # final_verts = params2verts_rev(final_params)
-
-    cs_plot(final_verts, points_array)
 
     pareto_plot = True
     if pareto_plot:
@@ -133,16 +130,48 @@ def solve_w_nsga(points, config):
                                                         )
         fig.show()
 
+    # identify unique entries in pareto_front[0]
+    pareto_front_unique = list(map(list, set(map(tuple,pareto_front[0]))))
+    pareto_track = []
+    for _pareto_iter, _pareto_solution in enumerate(pareto_front_unique):
+        _params = _pareto_solution[1:] + parameter_set[_pareto_solution[0]]
+        _verts = params2verts(_params)
+        # count polygon inliers
+        _edges = verts2edges(_verts)
+        _distances = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in _edges])
+        __distances = np.array([point_segment_distance(all_points, edge[0], edge[1]) for edge in _edges])
+        _inliers = np.sum(np.min(_distances, axis=0) < config.cs_fit.inlier_thresh)
+        __inliers = np.sum(np.min(__distances, axis=0) < config.cs_fit.inlier_thresh)
+        # pareto_track.append([_pareto_solution, _inliers])
+        pareto_track.append([_pareto_solution, __inliers])
+
+        # cs_plot(_verts, points_array, headline=f'Pareto Solution {_pareto_iter} - Inliers: {_inliers}')
+
+    # identify max inliers in pareto_track
+    pareto_track = sorted(pareto_track, key=lambda x: x[1], reverse=True)
+    best_solution = pareto_track[0][0]
+    relative_inliers = pareto_track[0][1] / len(all_points)
+    best_params = best_solution[1:] + parameter_set[best_solution[0]]
+    best_verts = params2verts(best_params)
+    # cs_plot(best_verts, points_array, headline=f'Best Solution: {pareto_track[0][1]} Inliers')
+    cs_plot(best_verts, all_points, headline=f'Best Solution: {pareto_track[0][1]} Inliers, relative: {relative_inliers}')
+
+
+
+
     # delete Individual and FitnessMin
     del creator.FitnessMulti
     del creator.Individual
 
-    # should return h_beam_params, h_beam_verts and final cost
-    h_beam_params = final_params
-    h_beam_verts = final_verts
-    h_beam_cost = final_pop[0].fitness.values[0]
 
-    raise ValueError("This is a test exception")
+
+
+    # should return h_beam_params, h_beam_verts and final cost
+    h_beam_params = parameter_set[best_solution[0]]
+    h_beam_verts = best_verts
+    h_beam_cost = pareto_track[0][1]
+
+    # raise ValueError("This is a test exception")
 
     return h_beam_params, h_beam_verts, h_beam_cost
 
@@ -177,32 +206,9 @@ def distance_to_lines(points, line):
         # Return the actual distance if within extents and within threshold
         return point_distance
 
+
 def distance_to_edge(point, edge):
     return distance_to_lines(point, {"start": edge[0], "end": edge[1]})
-
-def fitness_function_2d_2(individual, data_points, data_frame):
-    # web_thickness, flange_thickness, width, height, x_offset, y_offset = individual
-    row_id, x_offset, y_offset = individual
-    params = data_frame.iloc[row_id]
-    params = params[['tw', 'tf', 'bf', 'd']].values.tolist()
-    individual = [x_offset, y_offset] + params
-    verts = params2verts(individual)
-    # verts = params2verts_rev(individual)
-    edges = verts2edges(verts)
-
-    count_within_threshold = 0
-    aggregated_distance = 0
-
-    threshold = 0.002
-    for point in data_points:
-        # Check if the point is within the threshold distance for any plane
-        # if any(distance_to_edge(point, edge) <= threshold for edge in edges):
-        #     count_within_threshold += 1
-        aggregated_distance += min(distance_to_edge(point, edge) ** 2 for edge in edges)
-
-    return aggregated_distance,
-
-    # return -count_within_threshold,
 
 
 def point_segment_distance(points, edge_start, edge_end):
@@ -595,8 +601,7 @@ if __name__ == "__main__":
     dummy_individual = [0.02, 0.02, 0.2, 0.2, 0.5, 0.5]
     with open('/Users/fnoic/Library/CloudStorage/OneDrive-TUM/temp/beam_2_dump_2D.txt', 'rb') as f:
         data = np.loadtxt(f)
-    fitness = fitness_function_2d_2(dummy_individual, data)
-    fitness = efficient_cost_function(dummy_individual, data)
+    fitness = efficient_cost_function(dummy_individual, data, data)
     print(fitness)
 
     a = 0

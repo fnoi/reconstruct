@@ -386,7 +386,7 @@ class Segment(object):
         # plot_2D_points_bbox(self.points_2D_fitting)
 
         # timer = time.time()
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting, config)
+        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
         # print(f'elapsed time: {time.time() - timer:.3f}')
         # timer = time.time()
 
