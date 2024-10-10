@@ -10,9 +10,40 @@ def get_attribute_value(attr_value):
     else:
         return attr_value
 
+
+def assign_material_and_create_instance(profile_type_name, element_name):
+    objectname = f'IfcBeamType/{profile_type_name}'
+
+    if objectname not in bpy.data.objects:
+        print(f"Error: Object {objectname} not found. Skipping material assignment and instance creation.")
+        return
+
+    obj = bpy.data.objects[objectname]
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+
+    # Enable editing of assigned material
+    bpy.ops.bim.enable_editing_assigned_material()
+
+    # Attempt to set the profile using the element name
+    bpy.context.scene.BIMMaterialProperties.active_profile_set = element_name
+
+    # Edit the material set
+    bpy.ops.bim.edit_material_set()
+
+    # Find the correct type ID
+    relating_type = obj.BIMObjectProperties.relating_type
+    if relating_type:
+        bpy.context.scene.BIMModelProperties.relating_type_id = str(relating_type)
+        bpy.ops.bim.add_constr_type_instance()
+    else:
+        print(f"Error: No relating type found for {objectname}")
+
+    bpy.ops.bim.load_type_thumbnails(ifc_class="IfcBeamType")
+    bpy.ops.bim.disable_editing_assigned_material(obj=objectname)
+
+
 def blender_beams(query_profile_dict):
-    # bpy.ops.bim.create_project()
-    # bpy.ops.bim.new_project() # causes crash for some reason, for now just set up ifc project manually
     model = tool.Ifc.get()
 
     # load standard library
@@ -24,12 +55,25 @@ def blender_beams(query_profile_dict):
 
     query_profile_names = query_profile_dict.keys()
     ref_dict = {}
-    beam_counter = 0
 
     print("inspecting library elements and loading necessary types:")
     for index, element in enumerate(bpy.context.scene.BIMProjectProperties.library_elements):
         if element.name in query_profile_names:
-            # ... (keep this part as is)
+            ifc_definition_id = getattr(element, 'ifc_definition_id')
+            print(f'index: {index}, name: {element.name}, ifc_definition_id: {ifc_definition_id}')
+            ref_dict[element.name] = {
+                'index': index,
+                'ifc_definition_id': ifc_definition_id
+            }
+
+            # Load the profile to the project
+            bpy.ops.bim.append_library_element(definition=ifc_definition_id, prop_index=index)
+
+            # Set up for beam type creation
+            bpy.ops.bim.load_type_thumbnails(ifc_class="IfcBeamType")
+            bpy.ops.bim.enable_add_type()
+            bpy.context.scene.BIMModelProperties.type_class = 'IfcBeamType'
+            bpy.context.scene.BIMModelProperties.type_template = 'PROFILESET'
 
             profile_type_name = f'beamprofiletype_{element.name}'
             bpy.context.scene.BIMModelProperties.type_name = profile_type_name
@@ -41,47 +85,6 @@ def blender_beams(query_profile_dict):
 
             # Assign material and create instance
             assign_material_and_create_instance(profile_type_name, element.name)
-
-    def assign_material_and_create_instance(profile_type_name, element_name):
-        objectname = f'IfcBeamType/{profile_type_name}'
-
-        if objectname not in bpy.data.objects:
-            print(f"Error: Object {objectname} not found. Skipping material assignment and instance creation.")
-            return
-
-        obj = bpy.data.objects[objectname]
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-
-        # Enable editing of assigned material
-        bpy.ops.bim.enable_editing_assigned_material()
-
-        # Find the correct profile
-        profile_id = None
-        for profile in bpy.context.scene.BIMModelProperties.profiles:
-            if profile.name == element_name:
-                profile_id = profile.id
-                break
-
-        if profile_id is not None:
-            # Set the profile directly
-            bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
-
-            # Edit the material set (this might create a material_set_item if it doesn't exist)
-            bpy.ops.bim.edit_material_set()
-        else:
-            print(f"Error: Profile {element_name} not found.")
-
-        # Find the correct type ID
-        relating_type = obj.BIMObjectProperties.relating_type
-        if relating_type:
-            bpy.context.scene.BIMModelProperties.relating_type_id = str(relating_type)
-            bpy.ops.bim.add_constr_type_instance()
-        else:
-            print(f"Error: No relating type found for {objectname}")
-
-        bpy.ops.bim.load_type_thumbnails(ifc_class="IfcBeamType")
-        bpy.ops.bim.disable_editing_assigned_material(obj=objectname)
 
 
 if __name__ == "__main__":
