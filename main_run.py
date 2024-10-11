@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 8
+    cache_flag = 6
     single_step = True
     ##########
     ##########
@@ -235,6 +235,7 @@ if __name__ == '__main__':
                 bone.h_beam_verts = False
 
         skeleton.cache_pickle(config.project.parking_path)
+        skeleton.cache_json(config.project.parking_path)
         if single_step:
             raise ValueError('stop here, single step')
 

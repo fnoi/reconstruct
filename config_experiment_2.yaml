@@ -57,9 +57,9 @@ skeleton_visual:
   line_length_projection: 0.2
 
 cs_fit:
-  n_downsample: 10000
-  n_pop: 5000
-  n_lambda: 5000
-  n_mu: 5000
+  n_downsample: 1000
+  n_pop: 5
+  n_lambda: 5
+  n_mu: 5
   n_gen: 20
   inlier_thresh: 0.005

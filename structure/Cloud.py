@@ -212,7 +212,7 @@ class Segment(object):
         # dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
         dists = np.linalg.norm(self.points_2D - np.median(self.points_2D, axis=0), axis=1)
         closest_ind = np.argmin(dists)
-        #### TODO
+        #### TODO: shift to coordinate system with origin at cog, consider in all passed params
 
         cog2D_x = np.mean(self.points_2D[:, 0])
         cog2D_y = np.mean(self.points_2D[:, 1])
@@ -386,7 +386,7 @@ class Segment(object):
         # plot_2D_points_bbox(self.points_2D_fitting)
 
         # timer = time.time()
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
+        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
         # print(f'elapsed time: {time.time() - timer:.3f}')
         # timer = time.time()
 
@@ -407,6 +407,7 @@ class Segment(object):
         self.cog_2D = np.array((cog_x, cog_y))
 
         self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
+
 
         # points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
         # # find left and right points

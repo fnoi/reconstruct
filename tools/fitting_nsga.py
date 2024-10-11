@@ -40,8 +40,14 @@ def setup_lims_placement(points):
 def solve_w_nsga(points, config, all_points):
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
         data = pickle.load(f)
+    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'r') as f:
+        all_cs = f.readlines()
+    # purge '\n' from all_cs
+    all_cs = [cs.strip() for cs in all_cs]
 
     data = data.dropna()
+    # only keep rows where name is in all_cs
+    data = data[data['label'].isin(all_cs)]
     # load config
 
 
@@ -172,9 +178,12 @@ def solve_w_nsga(points, config, all_points):
     h_beam_verts = best_verts
     h_beam_cost = pareto_track[0][1]
 
+
+    # cstype is the name of the profile
+    cstype = data.iloc[best_solution[0]]['label']
     # raise ValueError("This is a test exception")
 
-    return h_beam_params, h_beam_verts, h_beam_cost
+    return h_beam_params, h_beam_verts, h_beam_cost, cstype
 
 ###########
 

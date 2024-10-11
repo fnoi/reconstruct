@@ -1,6 +1,15 @@
-import bonsai.tool as tool
-import bpy
+import math
 import pandas as pd
+import numpy as np
+
+
+try:
+    import bonsai.tool as tool
+    import bpy
+    import numpy as np
+    import pandas as pd
+except ImportError:
+    pass
 
 
 def print_out_material_infos(model):
@@ -140,6 +149,35 @@ def blender_beams(query_profile_dict):
 
         # bpy.ops.bim.edit_material_set_item(material_set_item=id_0) # this call kills blender
 
+        # Create beam instance
+        bpy.ops.bim.disable_editing_assigned_material(obj=f"IfcBeamType/{profile_type_name}")
+        # bpy.context.scene.BIMModelProperties.relating_type_id = str(id_0)  # Use the material set ID
+        bpy.ops.bim.add_constr_type_instance()
+
+        # Get the newly created beam object
+        obj = bpy.context.active_object
+        obj.name = f'beam_{profile_name}'
+
+        # Set beam length by scaling
+        length = query_profile_dict[profile_name]['length']
+        obj.scale = (length, 1, 1)
+
+        # Rotate beam
+        rot_mat = query_profile_dict[profile_name]['rot_mat']
+        obj.rotation_euler = (
+            math.atan2(rot_mat[2][1], rot_mat[2][2]),
+            math.atan2(-rot_mat[2][0], math.sqrt(rot_mat[2][1] ** 2 + rot_mat[2][2] ** 2)),
+            math.atan2(rot_mat[1][0], rot_mat[0][0])
+        )
+
+        # Move beam to origin
+        obj.location = (0, 0, 0)
+
+        print(f':::created beam: {profile_name}')
+    print(':::done')
+
+
+
 
 
 
@@ -148,16 +186,42 @@ def blender_beams(query_profile_dict):
 if __name__ == "__main__":
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
         skeleton = pd.read_json(f)
-    print(skeleton)
+    # print(skeleton)
+
+    profiles = {}
+    # iterate over columns in skeleton dataframe
+    for bone, data in skeleton.items():
+        cstype = data['cstype']
+        start = data['start']
+        end = data['end']
+        length = math.sqrt(sum((a - b) ** 2 for a, b in zip(start, end)))
+
+        rot_mat = np.asarray(data['rot_mat'])
+        z_angle_add = data['angle_xy']
+        # define rotation matrix for z axis rotation
+        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                                [0, 0, 1]])
+        # multiply rotation matrices
+        rot_mat = np.dot(rot_mat.T, rot_mat_z)
 
 
 
-    profiles = {'W8X67':
-                    {'length':1.5},
-                'W6X12':
-                    {'length':1.0},
-                'HP12X53':
-                    {'length':0.2}
-                }
+        profiles[cstype] = {
+            'length': length,
+            'rot_mat': rot_mat
+        }
+
+    # print(profiles)
+    # raise ValueError('End of script')
+    #
+    #
+    # profiles = {'W8X67':
+    #                 {'length':1.5},
+    #             'W6X12':
+    #                 {'length':1.0},
+    #             'HP12X53':
+    #                 {'length':0.2}
+    #             }
 
     blender_beams(profiles)

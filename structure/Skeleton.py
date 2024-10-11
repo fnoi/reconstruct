@@ -58,7 +58,8 @@ class Skeleton:
                 'beam_verts': bone.h_beam_verts.tolist(),
                 'beam_params': bone.h_beam_params,
                 'rot_mat': bone.mat_rotation_xy.tolist(),
-                'angle_xy': bone.angle_2D
+                'angle_xy': bone.angle_2D,
+                'cstype': bone.cstype
             }
         with open(f'{path}/skeleton_cache.json', 'w') as f:
             json.dump(export_dict, f)
