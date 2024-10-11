@@ -1,5 +1,7 @@
 import bonsai.tool as tool
 import bpy
+import pandas as pd
+
 
 def print_out_material_infos(model):
     for rel in model.by_type('IfcRelAssociatesMaterial'):
@@ -73,7 +75,9 @@ def blender_beams(query_profile_dict):
 
     # import the necessary profiles from library to project
     print('\n--\n1.')
+    all_cs = []
     for index, element in enumerate(bpy.context.scene.BIMProjectProperties.library_elements):
+        all_cs.append(element.name)
         if element.name in query_profile_names:
             print(f':::looking for {element.name}')
             ifc_definition_id = getattr(element, 'ifc_definition_id')
@@ -86,6 +90,11 @@ def blender_beams(query_profile_dict):
                 'profile_id': profile_id
             }
             print(f':::loaded profile: {element.name} to project with id {profile_id}')
+
+    # save all_cs to txt file
+    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'w') as f:
+        for cs in all_cs:
+            f.write(f'{cs}\n')
 
     # create beam type, assign profile (no psets)
     print('\n--\n2.')
@@ -137,6 +146,12 @@ def blender_beams(query_profile_dict):
 
 
 if __name__ == "__main__":
+    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
+        skeleton = pd.read_json(f)
+    print(skeleton)
+
+
+
     profiles = {'W8X67':
                     {'length':1.5},
                 'W6X12':

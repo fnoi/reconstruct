@@ -40,6 +40,7 @@ def setup_lims_placement(points):
 def solve_w_nsga(points, config, all_points):
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
         data = pickle.load(f)
+
     data = data.dropna()
     # load config
 

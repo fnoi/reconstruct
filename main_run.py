@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
+    cache_flag = 8
     single_step = True
     ##########
     ##########
@@ -256,7 +256,11 @@ if __name__ == '__main__':
 
 
     if cache_flag <= 8:
+        with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
+            skeleton = pd.read_json(f)
+            a = 0
         print(f' - model generation (blender)')
+        raise ValueError('blender call is disabled, blender needs to be ran to create new IFC file in application, then run script.')
         blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
         # blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
         script_path = os.path.abspath("/Users/fnoic/PycharmProjects/reconstruct/tools/blender/blender_profiles.py")
