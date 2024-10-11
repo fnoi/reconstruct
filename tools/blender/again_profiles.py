@@ -211,6 +211,7 @@ def blender_beams(query_profile_dict):
     print("inspecting library elements and load necessary types:")
     for index, element in enumerate(bpy.context.scene.BIMProjectProperties.library_elements):
         if element.name in query_profile_names:
+            print('looking for:::')
             ifc_definition_id = getattr(element, 'ifc_definition_id')
             print(f'\nstandard steel attributes:\n'
                   f'index: {index}, name: {element.name}, ifc_definition_id: {ifc_definition_id}')
@@ -236,15 +237,15 @@ def blender_beams(query_profile_dict):
             bpy.ops.bim.load_type_thumbnails(ifc_class="IfcBeamType")
 
             # add type and specify the profile
-            print('try to clear the cache')
-            cache_dir = os.path.join(tempfile.gettempdir(), "bonsai")
-            if os.path.exists(cache_dir):
-                for file in os.listdir(cache_dir):
-                    os.remove(os.path.join(cache_dir, file))
-            print('cache cleared (?)')
-            print(f'adding profile type {profile_type_name}')
+            # print('try to clear the cache')
+            # cache_dir = os.path.join(tempfile.gettempdir(), "bonsai")
+            # if os.path.exists(cache_dir):
+            #     for file in os.listdir(cache_dir):
+            #         os.remove(os.path.join(cache_dir, file))
+            # print('cache cleared (?)')
+            # print(f'adding profile type {profile_type_name}')
             bpy.ops.bim.add_type()
-            print(f'added profile type {profile_type_name }')
+            # print(f'added profile type {profile_type_name }')
             bpy.ops.bim.disable_add_type()
             print(f'added profile type {profile_type_name }')
 
@@ -263,6 +264,7 @@ def blender_beams(query_profile_dict):
             # # create beam instance
             # bpy.ops.bim.add_constr_type_instance()
 
+    raise Exception('stop here')
     print('types setup complete')
 
     for profile_name, sonder in sonder_dict.items():
@@ -274,18 +276,18 @@ def blender_beams(query_profile_dict):
               f"profile_id: {profile_id},\n"
               f"material_set_id: {material_set_id}")
 
-        bpy.ops.outliner.item_activate(deselect_all=True)
-        bpy.ops.bim.enable_edititng_assigned_material()
-        bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
-        bpy.data.objects[f"IfcBeamType/{sonder['profile_type_name']}"].BIMObjectMaterialProperties.material = str(material_set_item_material_id)
-        bpy.ops.bim.enable_editing_assigned_material(material_set_item=material_set_item_id)
-        bpy.data.objects[f"IfcBeamType/{sonder['profile_type_name']}"].BIMObjectMaterialProperties.material_set_item_material = str(material_set_item_material_id)
-        bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
-        bpy.ops.bim.disable_editing_material_set_item(obj=f"IfcBeamType/{sonder['profile_type_name']}")
-        bpy.ops.bim.edit_material_set_item(material_set_item=material_set_item_id)
-        bpy.ops.bim.disable_editing_material_set_item()
-        bpy.ops.bim.disable_editing_assigned_material(obj=f"IfcBeamType/{sonder['profile_type_name']}")
-        bpy.ops.bim.enable_editing_assigned_material(material_set=material_set_id)
+        # bpy.ops.outliner.item_activate(deselect_all=True)
+        # bpy.ops.bim.enable_edititng_assigned_material()
+        # bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
+        # bpy.data.objects[f"IfcBeamType/{sonder['profile_type_name']}"].BIMObjectMaterialProperties.material = str(material_set_item_material_id)
+        # bpy.ops.bim.enable_editing_assigned_material(material_set_item=material_set_item_id)
+        # bpy.data.objects[f"IfcBeamType/{sonder['profile_type_name']}"].BIMObjectMaterialProperties.material_set_item_material = str(material_set_item_material_id)
+        # bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
+        # bpy.ops.bim.disable_editing_material_set_item(obj=f"IfcBeamType/{sonder['profile_type_name']}")
+        # bpy.ops.bim.edit_material_set_item(material_set_item=material_set_item_id)
+        # bpy.ops.bim.disable_editing_material_set_item()
+        # bpy.ops.bim.disable_editing_assigned_material(obj=f"IfcBeamType/{sonder['profile_type_name']}")
+        # bpy.ops.bim.enable_editing_assigned_material(material_set=material_set_id)
 
 
     raise Exception('stop here')
