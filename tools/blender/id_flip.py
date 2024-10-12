@@ -175,8 +175,13 @@ def blender_beams(query_profile_dict):
         obj = bpy.context.active_object
         obj.name = beam_obj_name
 
-        beam_iter += 1
+        # Set the beam object's origin to its geometric center
+        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
 
+        # Set the beam's position to the world origin
+        obj.location = (0, 0, 0)
+
+        # Apply rotation
         rot_mat = beam_data['rot_mat']
         obj.rotation_euler = (
             math.atan2(rot_mat[2][1], rot_mat[2][2]),
@@ -184,8 +189,11 @@ def blender_beams(query_profile_dict):
             math.atan2(rot_mat[1][0], rot_mat[0][0])
         )
 
-        location = beam_data['start'] + np.array(beam_data['offset_2D'])
-        obj.location = location
+        # Set the final position
+        center = [(a + b) / 2 for a, b in zip(beam_data['start'], beam_data['end'])]
+        obj.location = center
+
+        beam_iter += 1
 
         # export single object to fbx
         bpy.ops.object.select_all(action='DESELECT')
