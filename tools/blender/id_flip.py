@@ -118,7 +118,10 @@ def blender_beams(query_profile_dict):
             bpy.context.scene.BIMModelProperties.type_class = 'IfcBeamType'
             bpy.context.scene.BIMModelProperties.type_template = 'PROFILESET'
             bpy.context.scene.BIMModelProperties.type_name = profile_type_name
-            print(f':::creating beam type: {profile_type_name}')
+
+            material_name = f'M_{element.name}'
+
+            print(f':::creating beam type: {profile_type_name} and material: {material_name}')
             bpy.ops.bim.add_type()
             bpy.ops.bim.disable_add_type()
             ref_dict[element.name]['profile_type_name'] = profile_type_name
@@ -127,9 +130,6 @@ def blender_beams(query_profile_dict):
             ref_dict[element.name]['id_1'] = id_1
             ref_dict[element.name]['relating_type_id'] = retrieve_relating_type_id(profile_type_name, model)
 
-            print(f':::created beam type: {profile_type_name}')
-
-            material_name = f'M_{element.name}'
             bpy.ops.bim.add_material(name=material_name)
             material_id = retrieve_material_id(model)
             ref_dict[element.name]['material_id'] = material_id
@@ -160,7 +160,7 @@ def blender_beams(query_profile_dict):
         profile_type_data = ref_dict[beam_data['cstype']]
         type_obj_name = f"IfcBeamType/{profile_type_data['profile_type_name']}"
         beam_obj_name = f"Beam_{beam_iter}_{beam_data['cstype']}"
-        print(f':::creating beam {beam_name} -> {beam_obj_name}')
+        print(f'\n:::creating beam {beam_name} -> {beam_obj_name}')
 
         bpy.ops.object.select_all(action='DESELECT')
         obj = bpy.data.objects.get(type_obj_name)
@@ -184,9 +184,21 @@ def blender_beams(query_profile_dict):
             math.atan2(rot_mat[1][0], rot_mat[0][0])
         )
 
-        obj.location = beam_data['start']
-        print(f':::created beam: {beam_name}')
+        location = beam_data['start'] + np.array(beam_data['offset_2D'])
+        obj.location = location
 
+        # export single object to fbx
+        bpy.ops.object.select_all(action='DESELECT')
+        obj = bpy.data.objects.get(beam_obj_name)
+        obj.select_set(True)
+        bpy.ops.export_scene.fbx(filepath=f'/Users/fnoic/PycharmProjects/reconstruct/data/parking/{beam_obj_name}.fbx', use_selection=True)
+
+    # export all objects to fbx
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.export_scene.fbx(filepath='/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.fbx', use_selection=True)
+
+    # save ifc project
+    bpy.ops.bim.save_project(filepath='/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.ifc', should_save_as=True, save_as_invoked=True)
 
     print(':::done')
 
@@ -194,12 +206,6 @@ def blender_beams(query_profile_dict):
     # with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'w') as f:
     #     for cs in all_cs:
     #         f.write(f'{cs}\n')
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -223,14 +229,13 @@ if __name__ == "__main__":
         # multiply rotation matrices
         rot_mat = np.dot(rot_mat.T, rot_mat_z)
 
-
-
         profiles[data.name] = {
             'cstype': data.cstype,
             'length': length,
             'rot_mat': rot_mat,
             'start': start,
-            'end': end
+            'end': end,
+            'offset_2D': data['offset']
         }
     print(f'working with {len(profiles)} profiles')
 
