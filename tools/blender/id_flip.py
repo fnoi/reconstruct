@@ -170,8 +170,8 @@ def blender_beams(query_profile_dict):
             math.atan2(rot_mat[1][0], rot_mat[0][0])
         )
 
-        # Move beam to origin
-        obj.location = (0, 0, 0)
+        # Move beam to start point
+        obj.location = query_profile_dict[profile_name]['end']
 
         print(f':::created beam: {profile_name}')
     print(':::done')
@@ -209,7 +209,9 @@ if __name__ == "__main__":
 
         profiles[cstype] = {
             'length': length,
-            'rot_mat': rot_mat
+            'rot_mat': rot_mat,
+            'start': start,
+            'end': end
         }
 
     # print(profiles)

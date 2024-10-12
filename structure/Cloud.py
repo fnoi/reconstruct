@@ -379,28 +379,14 @@ class Segment(object):
 
     def fit_cs_rev(self, config=None):
         points_after_sampling = config.cs_fit.n_downsample
-        grid_resolution = 0.01
         # plot_2D_points_bbox(self.points_2D)
-        # self.downsample_dbscan_grid(grid_resolution, points_after_sampling)
+        # self.downsample_dbscan_grid(config.cs_fit.grid_size, points_after_sampling)
         self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
         # plot_2D_points_bbox(self.points_2D_fitting)
 
         # timer = time.time()
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
-        # print(f'elapsed time: {time.time() - timer:.3f}')
-        # timer = time.time()
-
-
-        # print(f' working on {self.name}, full point cloud with {self.points_2D.shape[0]} points')
-        # solve_me = solve_w_nsga(self.points_2D)
-
-        # print(f'elapsed time: {time.time() - timer:.3f}')
-
-        # raise ValueError("This is a test exception")
-
-
         # self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
-        # fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
 
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
@@ -408,19 +394,6 @@ class Segment(object):
 
         self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
 
-
-        # points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
-        # # find left and right points
-        # ref_x = -99999999
-        # ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
-        # ref_pt = self.cog_3D + ref_t * self.line_raw_dir
-        # vecs = points_on_line - ref_pt
-        # dists = np.linalg.norm(vecs, axis=1)
-        # l_ind = np.argmin(dists)
-        # r_ind = np.argmax(dists)
-        # self.line_cog_left = points_on_line[l_ind]
-        # self.line_cog_right = points_on_line[r_ind]
-        # self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
 
     def downsample_dbscan_rand(self, points_after_sampling):
