@@ -32,6 +32,12 @@ def retrieve_material_id(model):
     return material_id
 
 
+def retrieve_relating_type_id(profile_type_name, model):
+    for beam_type in model.by_type('IfcBeamType'):
+        if beam_type.Name == profile_type_name:
+            return beam_type.id()
+    raise ValueError(f'Beam type {profile_type_name} not found in model')
+
 
 def print_materials_info(model):
 
@@ -77,7 +83,11 @@ def blender_beams(query_profile_dict):
     bpy.ops.bim.select_library_file(filepath="/Users/fnoic/Library/Application Support/Blender/4.2/extensions/.local/lib/python3.11/site-packages/bonsai/bim/data/libraries/IFC4 US Steel.ifc")
     bpy.ops.bim.change_library_element(element_name="IfcIShapeProfileDef")
 
-    query_profile_names = query_profile_dict.keys()
+    query_profile_names = []
+    for _key, _value in query_profile_dict.items():
+        query_profile_names.append(_value['cstype'])
+    query_profile_names = list(set(query_profile_names))
+    # query_profile_names = query_profile_dict.keys()
     print(f'inspecting types: {query_profile_names}')
 
     ref_dict = {} # dict to store reference data between loops
@@ -99,82 +109,91 @@ def blender_beams(query_profile_dict):
                 'profile_id': profile_id
             }
             print(f':::loaded profile: {element.name} to project with id {profile_id}')
+            # create beam type
+            profile_type_name = f'T_{element.name}'
+            # replace . with _ in profile type name to avoid blender errors
+            profile_type_name = profile_type_name.replace('.', '_')
+            ref_dict[element.name]['profile_type_name'] = profile_type_name
+            bpy.ops.bim.enable_add_type()
+            bpy.context.scene.BIMModelProperties.type_class = 'IfcBeamType'
+            bpy.context.scene.BIMModelProperties.type_template = 'PROFILESET'
+            bpy.context.scene.BIMModelProperties.type_name = profile_type_name
+            print(f':::creating beam type: {profile_type_name}')
+            bpy.ops.bim.add_type()
+            bpy.ops.bim.disable_add_type()
+            ref_dict[element.name]['profile_type_name'] = profile_type_name
+            id_0, id_1 = retrieve_id_magic(model)
+            ref_dict[element.name]['id_0'] = id_0
+            ref_dict[element.name]['id_1'] = id_1
+            ref_dict[element.name]['relating_type_id'] = retrieve_relating_type_id(profile_type_name, model)
 
-    # save all_cs to txt file
-    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'w') as f:
-        for cs in all_cs:
-            f.write(f'{cs}\n')
+            print(f':::created beam type: {profile_type_name}')
 
-    # create beam type, assign profile (no psets)
+            material_name = f'M_{element.name}'
+            bpy.ops.bim.add_material(name=material_name)
+            material_id = retrieve_material_id(model)
+            ref_dict[element.name]['material_id'] = material_id
+            print(f':::created material: {material_name}, id: {material_id}')
+
+            # link beam type to material and profile
+            bpy.ops.object.select_all(action='DESELECT')
+            obj = bpy.data.objects.get(f"IfcBeamType/{profile_type_name}")
+
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+            bpy.ops.bim.enable_editing_assigned_material()
+            bpy.ops.bim.enable_editing_material_set_item(material_set_item=id_1)
+            bpy.data.objects[f"IfcBeamType/{profile_type_name}"].BIMObjectMaterialProperties.material_set_item_material = str(material_id)
+            bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
+            bpy.ops.bim.disable_editing_material_set_item(obj=f"IfcBeamType/{profile_type_name}")
+            bpy.ops.bim.edit_material_set_item(material_set_item=id_1)
+            bpy.ops.bim.disable_editing_material_set_item()
+            bpy.ops.bim.disable_editing_assigned_material(obj=f"IfcBeamType/{profile_type_name}")
+
+            # print_out_material_infos(model)
+            # print_materials_info(model)
+            print(f':::material set id: {id_0}, material profile id: {id_1}')
+
     print('\n--\n2.')
-    for profile_name, profile_data in ref_dict.items():
-        print(f':::creating beam type for {profile_name}')
-        profile_type_name = f'beamprofiletype_{profile_name}'
-        bpy.ops.bim.enable_add_type()
-        bpy.context.scene.BIMModelProperties.type_class = 'IfcBeamType'
-        bpy.context.scene.BIMModelProperties.type_template = 'PROFILESET'
-        bpy.context.scene.BIMModelProperties.type_name = profile_type_name
-        bpy.ops.bim.add_type()
-        bpy.ops.bim.disable_add_type()
-        ref_dict[profile_name]['profile_type_name'] = profile_type_name
-        id_0, id_1 = retrieve_id_magic(model)
-        print(f':::created beam type: {profile_type_name}')
+    beam_iter = 0
+    for beam_name, beam_data in query_profile_dict.items():
+        profile_type_data = ref_dict[beam_data['cstype']]
+        type_obj_name = f"IfcBeamType/{profile_type_data['profile_type_name']}"
+        beam_obj_name = f"Beam_{beam_iter}_{beam_data['cstype']}"
+        print(f':::creating beam {beam_name} -> {beam_obj_name}')
 
-        material_name = f'M_{profile_name}'
-        bpy.ops.bim.add_material(name=material_name)
-        material_id = retrieve_material_id(model)
-        print(f':::created material: {material_name}, id: {material_id}')
-
-        print_out_material_infos(model)
-        print_materials_info(model)
-        print(f':::material set id: {id_0}, material profile id: {id_1}')
-
-
-        print(f'id_0={id_0}, id_1={id_1}, material_id={material_id}, profile_id={profile_data["profile_id"]}')
-    #     raise ValueError('End of script')
-    #
-    # for _ in False:
-        obj_name = f"IfcBeamType/{profile_type_name}"
-        obj = bpy.data.objects.get(obj_name)
+        bpy.ops.object.select_all(action='DESELECT')
+        obj = bpy.data.objects.get(type_obj_name)
         obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.bim.enable_editing_assigned_material()
-        bpy.ops.bim.enable_editing_material_set_item(material_set_item=id_1)
-        bpy.data.objects[obj_name].BIMObjectMaterialProperties.material_set_item_material = str(material_id)
-        bpy.context.scene.BIMMaterialProperties.profiles = str(profile_id)
-        bpy.ops.bim.disable_editing_material_set_item(obj=obj_name)
-        bpy.ops.bim.edit_material_set_item(material_set_item=id_1)
-        bpy.ops.bim.disable_editing_material_set_item()
-        bpy.ops.bim.disable_editing_assigned_material(obj=obj_name)
 
-        # bpy.ops.bim.edit_material_set_item(material_set_item=id_0) # this call kills blender
+        bpy.context.scene.BIMModelProperties.extrusion_depth = beam_data['length']
+        bpy.context.scene.BIMMaterialProperties.profiles = str(profile_type_data['profile_id'])
+        bpy.context.scene.BIMModelProperties.relating_type_id = str(profile_type_data['relating_type_id'])
 
-        # Create beam instance
-        bpy.ops.bim.disable_editing_assigned_material(obj=f"IfcBeamType/{profile_type_name}")
-        # bpy.context.scene.BIMModelProperties.relating_type_id = str(id_0)  # Use the material set ID
         bpy.ops.bim.add_constr_type_instance()
 
-        # Get the newly created beam object
         obj = bpy.context.active_object
-        obj.name = f'beam_{profile_name}'
+        obj.name = beam_obj_name
 
-        # Set beam length by scaling
-        length = query_profile_dict[profile_name]['length']
-        obj.scale = (length, 1, 1)
+        beam_iter += 1
 
-        # Rotate beam
-        rot_mat = query_profile_dict[profile_name]['rot_mat']
+        rot_mat = beam_data['rot_mat']
         obj.rotation_euler = (
             math.atan2(rot_mat[2][1], rot_mat[2][2]),
             math.atan2(-rot_mat[2][0], math.sqrt(rot_mat[2][1] ** 2 + rot_mat[2][2] ** 2)),
             math.atan2(rot_mat[1][0], rot_mat[0][0])
         )
 
-        # Move beam to start point
-        obj.location = query_profile_dict[profile_name]['end']
+        obj.location = beam_data['start']
+        print(f':::created beam: {beam_name}')
 
-        print(f':::created beam: {profile_name}')
+
     print(':::done')
+
+    # # save all_cs to txt file  ## legacy, activate to save all_cs to txt file: use this to reduce profile list for MOO / CS fitting step
+    # with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'w') as f:
+    #     for cs in all_cs:
+    #         f.write(f'{cs}\n')
 
 
 
@@ -191,7 +210,6 @@ if __name__ == "__main__":
     profiles = {}
     # iterate over columns in skeleton dataframe
     for bone, data in skeleton.items():
-        cstype = data['cstype']
         start = data['start']
         end = data['end']
         length = math.sqrt(sum((a - b) ** 2 for a, b in zip(start, end)))
@@ -207,12 +225,14 @@ if __name__ == "__main__":
 
 
 
-        profiles[cstype] = {
+        profiles[data.name] = {
+            'cstype': data.cstype,
             'length': length,
             'rot_mat': rot_mat,
             'start': start,
             'end': end
         }
+    print(f'working with {len(profiles)} profiles')
 
     # print(profiles)
     # raise ValueError('End of script')

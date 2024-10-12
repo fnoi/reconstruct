@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
+    cache_flag = 7
     single_step = True
     ##########
     ##########
