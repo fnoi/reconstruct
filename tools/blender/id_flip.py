@@ -1,6 +1,8 @@
 import math
 import pandas as pd
 import numpy as np
+import bmesh
+import mathutils
 
 
 try:
@@ -201,9 +203,35 @@ def blender_beams(query_profile_dict):
         obj.select_set(True)
         bpy.ops.export_scene.fbx(filepath=f'/Users/fnoic/PycharmProjects/reconstruct/data/parking/{beam_obj_name}.fbx', use_selection=True)
 
+        bpy.ops.export_scene.fbx(
+            filepath=f'/Users/fnoic/PycharmProjects/reconstruct/data/parking/beamies/{beam_iter}_{beam_obj_name}.fbx',
+            use_selection=True,
+            global_scale=1.0,
+            apply_unit_scale=True,
+            apply_scale_options='FBX_SCALE_ALL',
+            use_space_transform=True,
+            bake_space_transform=True,
+            axis_forward='Y',  # -Y Forward
+            axis_up='Z',  # Z Up
+            use_mesh_modifiers=True,
+            mesh_smooth_type='OFF',
+            use_mesh_edges=False,
+            use_tspace=False,
+            use_custom_props=False,
+            path_mode='AUTO',
+            embed_textures=False,
+            batch_mode='OFF',
+            use_batch_own_dir=True,
+            use_metadata=True
+        )
+        bpy.ops.wm.obj_export(filepath=f'/Users/fnoic/PycharmProjects/reconstruct/data/parking/beamies/{beam_iter}_{beam_obj_name}.obj', export_selected_objects=True)
+
+
     # export all objects to fbx
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.export_scene.fbx(filepath='/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.fbx', use_selection=True)
+    bpy.ops.wm.obj_export(filepath='/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.obj', export_selected_objects=True)
+
 
     # save ifc project
     bpy.ops.bim.save_project(filepath='/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.ifc', should_save_as=True, save_as_invoked=True)

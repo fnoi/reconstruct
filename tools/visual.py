@@ -224,7 +224,7 @@ def dist_hist(distances, bone_id):
     plt.show()
 
 
-def dist_hist_color(distances, bone_id):
+def dist_hist_color(distances, bone_id, angle_desc=None):
     # Create the figure and axis
     fig, ax = plt.subplots()
 
@@ -248,6 +248,9 @@ def dist_hist_color(distances, bone_id):
     ax.set_title(f"Beam {bone_id}")
     ax.set_xlabel("Distance")
     ax.set_ylabel("Frequency")
+
+    if angle_desc is not None:
+        ax.set_title(f"Beam {bone_id} - {angle_desc}")
 
     # Add colorbar
     cbar = fig.colorbar(sm, ax=ax)
