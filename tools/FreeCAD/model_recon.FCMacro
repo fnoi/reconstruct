@@ -95,6 +95,14 @@ if __name__ == '__main__':
         # multiply rotation matrices
         rot_mat = np.dot(rot_mat.T, rot_mat_z)
 
+        rot_mat = np.asarray(bone['rot_mat'])
+        z_angle_add = bone['angle_xy']
+        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                                [0, 0, 1]])
+        rot_mat = np.dot(rot_mat_z, rot_mat)
+
+
         # create placement
         try:
             pl = FreeCAD.Placement()

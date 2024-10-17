@@ -174,7 +174,7 @@ def mesh_points_cc(points, distances, mesh, ortho=False):
         x=x,
         y=y,
         z=z,
-        opacity=0.5,
+        opacity=0.25,
         color='grey',
         i=i,
         j=j,
@@ -185,6 +185,7 @@ def mesh_points_cc(points, distances, mesh, ortho=False):
         x=x_edge,
         y=y_edge,
         z=z_edge,
+        opacity=0.5,
         mode='lines',
         line=dict(color='black', width=1)
     ))

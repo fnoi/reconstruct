@@ -58,9 +58,9 @@ skeleton_visual:
 
 cs_fit:
   grid_size: 0.01
-  n_downsample: 1000
-  n_pop: 100
-  n_lambda: 100
-  n_mu: 100
+  n_downsample: 10000
+  n_pop: 2000
+  n_lambda: 2000
+  n_mu: 2000
   n_gen: 20
   inlier_thresh: 0.005

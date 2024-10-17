@@ -23,7 +23,7 @@ try:
     from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
     project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
     intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
-    rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D, rotate_xy2xyz
+    rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D, rotate_xy2xyz, angle_between_line_segments
     from tools import visual as vis, fitting_pso
 except ImportError as e:
     print(f'Import Error: {e}')
@@ -116,7 +116,6 @@ class Segment(object):
             config=self.config,
             step="skeleton"
         )
-        # print(origin)
 
         if planes is None:
             self.break_flag = True
@@ -138,28 +137,34 @@ class Segment(object):
         self.line_raw_dir = direction
         self.line_raw_center = (self.line_raw_left + self.line_raw_right) / 2
 
+        print(f'line raw left x: {self.line_raw_left[0]} y: {self.line_raw_left[1]} z: {self.line_raw_left[2]}')
+        print(f'line raw right x: {self.line_raw_right[0]} y: {self.line_raw_right[1]} z: {self.line_raw_right[2]}')
+
+        # raise ValueError # stop here
+
         # find projection plane and lines indicating the planes
         proj_plane = normal_and_point_to_plane(self.line_raw_dir, self.line_raw_left)
-        self.point = intersection_point_of_line_and_plane_rev(origin, direction, proj_plane)
+        # self.point = intersection_point_of_line_and_plane_rev(origin, direction, proj_plane)
+        # print(f'point x: {self.point[0]} y: {self.point[1]} z: {self.point[2]}')
 
         proj_dir_0, proj_origin_0 = intersecting_line(proj_plane, planes[0])
         proj_dir_1, proj_origin_1 = intersecting_line(proj_plane, planes[1])
 
         len_proj = self.config.skeleton_visual.line_length_projection
         proj_dir_0 = np.array(
-            [[self.point[0] - (proj_dir_0[0] * len_proj),
-              self.point[1] - (proj_dir_0[1] * len_proj),
-              self.point[2] - (proj_dir_0[2] * len_proj)],
-             [self.point[0] + (proj_dir_0[0] * len_proj),
-              self.point[1] + (proj_dir_0[1] * len_proj),
-              self.point[2] + (proj_dir_0[2] * len_proj)]])
+            [[self.line_raw_left[0] - (proj_dir_0[0] * len_proj),
+              self.line_raw_left[1] - (proj_dir_0[1] * len_proj),
+              self.line_raw_left[2] - (proj_dir_0[2] * len_proj)],
+             [self.line_raw_left[0] + (proj_dir_0[0] * len_proj),
+              self.line_raw_left[1] + (proj_dir_0[1] * len_proj),
+              self.line_raw_left[2] + (proj_dir_0[2] * len_proj)]])
         proj_dir_1 = np.array(
-            [[self.point[0] - (proj_dir_1[0] * len_proj),
-              self.point[1] - (proj_dir_1[1] * len_proj),
-              self.point[2] - (proj_dir_1[2] * len_proj)],
-             [self.point[0] + (proj_dir_1[0] * len_proj),
-              self.point[1] + (proj_dir_1[1] * len_proj),
-              self.point[2] + (proj_dir_1[2] * len_proj)]])
+            [[self.line_raw_left[0] - (proj_dir_1[0] * len_proj),
+              self.line_raw_left[1] - (proj_dir_1[1] * len_proj),
+              self.line_raw_left[2] - (proj_dir_1[2] * len_proj)],
+             [self.line_raw_left[0] + (proj_dir_1[0] * len_proj),
+              self.line_raw_left[1] + (proj_dir_1[1] * len_proj),
+              self.line_raw_left[2] + (proj_dir_1[2] * len_proj)]])
         proj_lines = [proj_dir_0, proj_dir_1]
 
         proj_points_plane = points_to_actual_plane(points, self.line_raw_dir, self.line_raw_left)
@@ -185,12 +190,18 @@ class Segment(object):
         # proj_lines_flat = rotate_points_to_xy_plane(proj_lines, self.line_raw_dir)
         # angle between line plane 1 and x-axis
         line_plane_2D_0 = proj_lines_flat[0][1] - proj_lines_flat[0][0]
-        line_plane_2d_1 = proj_lines_flat[1][1] - proj_lines_flat[1][0]
+        line_plane_2D_1 = proj_lines_flat[1][1] - proj_lines_flat[1][0]
 
         line_plane_2D_0 = line_plane_2D_0 / np.linalg.norm(line_plane_2D_0)
-        line_plane_2D_0 = line_plane_2D_0[:2]
+        line_plane_2D_1 = line_plane_2D_1 / np.linalg.norm(line_plane_2D_1)
+
+        # line_plane_2D_0 = line_plane_2D_0[:2]
         x_axis = np.array([1, 0])
         angle = np.arccos(np.dot(line_plane_2D_0, x_axis) / (np.linalg.norm(line_plane_2D_0) * np.linalg.norm(x_axis)))
+        print(f'angle between line and x-axis: {angle}: {np.degrees(angle)}')
+        angle = angle_between_line_segments((0,0), line_plane_2D_0, x_axis)
+        print(f'angle between line and x-axis (full): {angle}: {np.degrees(angle)}')
+
         self.angle_2D = angle
         # rotate points to align line with x-axis
 
@@ -198,7 +209,7 @@ class Segment(object):
         true_origin_2D = rotate_points_2D(true_origin_2D, angle)
         self.points_2D = rotate_points_2D(self.points_2D, angle)
         line_plane_2D_rot_0 = rotate_points_2D(line_plane_2D_0, angle)
-        line_plane_2D_rot_1 = rotate_points_2D(line_plane_2d_1, angle)
+        line_plane_2D_rot_1 = rotate_points_2D(line_plane_2D_1, angle)
         lines_plane_fix = [line_plane_2D_rot_0, line_plane_2D_rot_1]
 
         ransac_data = (inliers_0, inliers_1)
@@ -286,9 +297,12 @@ class Segment(object):
         points_after_sampling = config.cs_fit.n_downsample
         # plot_2D_points_bbox(self.points_2D)
         # self.downsample_dbscan_grid(config.cs_fit.grid_size, points_after_sampling)
-        self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
+
+
+        # self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
         # plot_2D_points_bbox(self.points_2D_fitting)
 
+        self.points_2D_fitting = self.points_2D
         # timer = time.time()
         self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
         # self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)

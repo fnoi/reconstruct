@@ -178,10 +178,10 @@ def blender_beams(query_profile_dict):
         obj.name = beam_obj_name
 
         # Set the beam object's origin to its geometric center
-        bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+        # bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
 
         # Set the beam's position to the world origin
-        obj.location = (0, 0, 0)
+        # obj.location = (0, 0, 0)
 
         # Apply rotation
         rot_mat = beam_data['rot_mat']
@@ -193,7 +193,7 @@ def blender_beams(query_profile_dict):
 
         # Set the final position
         center = [(a + b) / 2 for a, b in zip(beam_data['start'], beam_data['end'])]
-        obj.location = center
+        obj.location = beam_data['end']
 
         beam_iter += 1
 

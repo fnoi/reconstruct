@@ -730,3 +730,22 @@ def rotate_xy2xyz(point_2D, rot_matrix, xy_angle):
     return point_3D
 
 
+def angle_between_line_segments(origin, endpoint_0, endpoint_1):
+    """compute angle between two lines defined by shared origin and endpoints"""
+    v0 = np.array(endpoint_0) - np.array(origin)
+    v1 = np.array(endpoint_1) - np.array(origin)
+
+    dot_product = np.dot(v0, v1)
+
+    v0_mag = np.linalg.norm(v0)
+    v1_mag = np.linalg.norm(v1)
+
+    cos_angle = dot_product / (v0_mag * v1_mag)
+
+    angle_rad = np.arccos(np.clip(cos_angle, -1.0, 1.0))
+
+    cross_product = np.cross(v0, v1)
+    if cross_product < 0:
+        angle_rad = 2 * np.pi - angle_rad
+
+    return angle_rad
