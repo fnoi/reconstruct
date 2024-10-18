@@ -19,6 +19,7 @@ from tools.IO import cache_io, config_io
 from tools.local import calculate_supernormals_rev, ransac_patches, patch_context_supernormals
 from tools.metrics import calculate_metrics, supernormal_evaluation, calculate_purity
 from tools.model_eval import model_evaluation
+from tools.to_model import model_builder
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_experiment_2.yaml')
@@ -40,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 8
     single_step = True
     ##########
     ##########
@@ -258,27 +259,10 @@ if __name__ == '__main__':
     if cache_flag <= 8:
         with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
             skeleton = pd.read_json(f)
-            a = 0
-        print(f' - model generation (blender)')
-        raise ValueError('blender call is disabled, blender needs to be ran to create new IFC file in application, then run script.')
-        blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
-        # blender_path = "/Applications/Blender.app/Contents/MacOS/Blender"  # Update this path for your system
-        script_path = os.path.abspath("/Users/fnoic/PycharmProjects/reconstruct/tools/blender/blender_profiles.py")
+        model_builder(skeleton)
+        if single_step:
+            raise ValueError('stop here, single step')
 
-        command = [
-            blender_path,
-            "--background",
-            "--python",
-            script_path
-        ]
-
-        try:
-            result = subprocess.run(command, check=True, capture_output=True, text=True)
-            print("Blender script output:")
-            print(result.stdout)
-        except subprocess.CalledProcessError as e:
-            print("An error occurred while running the Blender script:")
-            print(e.stderr)
 
     if cache_flag <= 9:
         print(f' - model evaluation')
