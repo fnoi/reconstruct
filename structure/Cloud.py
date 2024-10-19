@@ -99,6 +99,8 @@ class Segment(object):
         """
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
+        # insertion
+        plot = True
         points = self.points
         try:
             normals = self.points_data[['nx', 'ny', 'nz']].values
@@ -206,10 +208,19 @@ class Segment(object):
         # rotate points to align line with x-axis
 
         # vis.segment_projection_2D(proj_points_flat, proj_lines_flat)
-        true_origin_2D = rotate_points_2D(true_origin_2D, angle)
-        self.points_2D = rotate_points_2D(self.points_2D, angle)
-        line_plane_2D_rot_0 = rotate_points_2D(line_plane_2D_0, angle)
-        line_plane_2D_rot_1 = rotate_points_2D(line_plane_2D_1, angle)
+        true_origin_2D = rotate_points_2D(true_origin_2D, -angle)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.scatter(self.points_2D[:, 0], self.points_2D[:, 1], c='g')
+        fig.show()
+
+        self.points_2D = rotate_points_2D(self.points_2D, -angle)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.scatter(self.points_2D[:, 0], self.points_2D[:, 1], c='r')
+        fig.show()
+        line_plane_2D_rot_0 = rotate_points_2D(line_plane_2D_0, -angle)
+        line_plane_2D_rot_1 = rotate_points_2D(line_plane_2D_1, -angle)
         lines_plane_fix = [line_plane_2D_rot_0, line_plane_2D_rot_1]
 
         ransac_data = (inliers_0, inliers_1)
@@ -243,6 +254,32 @@ class Segment(object):
         self.line_cog_left = points_on_line[l_ind]
         self.line_cog_right = points_on_line[r_ind]
         self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
+
+        rot_mat = np.asarray(self.mat_rotation_xy)
+        z_angle_add = -self.angle_2D
+        z_angle_add = np.degrees(z_angle_add)
+        # define rotation matrix for z axis rotation
+        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+                                [0, 0, 1]])
+        # multiply rotation matrices
+        rot_mat = np.dot(rot_mat, rot_mat_z)
+
+        # apply rot_mat to points
+        points_rot = np.dot(points, rot_mat)
+        # plot points in 3D
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(points_rot[:, 0], points_rot[:, 1], points_rot[:, 2])
+        fig.show()
+
+        points_rot_2 = np.dot(points, rot_mat.T)
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        ax.scatter(points_rot_2[:, 0], points_rot_2[:, 1], points_rot_2[:, 2])
+        fig.show()
+
+        a = 0
 
 
     def update_axes(self):
