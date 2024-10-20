@@ -95,6 +95,11 @@ class Segment(object):
         self.points = data[:, :3]
         self.points_center = np.mean(self.points, axis=0)
 
+    def calc_axes_rev(self):
+        """revision of calc_axes, aim to modularize and debug geometry calculations"""
+        return None
+
+
     def calc_axes(self, plot=True):
         """
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
