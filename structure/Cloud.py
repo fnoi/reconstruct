@@ -32,37 +32,41 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.left_3D = None
+        self.right_3D = None
+        self.center_3D = None
+        self.vector_3D = None
+        self.left_2D = None
+        self.right_2D = None
+        self.center_2D = None
+
         self.h_beam_verts = None
         self.break_flag = None
-        self.cog_3D = None
         self.angle_2D = None
+        self.points_2D = None
         self.points_2D_fitting = None
         self.line_cog_center = None
         self.line_cog_right = None
         self.line_cog_left = None
         self.cog_2D = None
+
         self.h_beam_params = None
         self.h_beam_params_lookup = None
+
         self.points_2D = None
         self.points_data = None
-        self.line_raw_center = None
         self.line_raw_dir = None
         self.points_cleaned = None
         self.intermediate_points = []
-        self.line_raw_left = None
+
         self.left_edit = False
         self.left_joint = False
-        self.line_raw_right = None
         self.right_edit = False
         self.right_joint = False
         self.radius = None
-        self.rot_mat_pcb = None
-        self.rot_mat_pca = None
-        self.pcc = None
-        self.pcb = None
+
         self.name = name
         self.points_center = None
-        self.pca = None
         self.points = None
         self.parent_path = f'data/out/'
         self.outpath = f'data/out/{name}'
@@ -136,9 +140,9 @@ class Segment(object):
         r_ind = np.argmax(dists)
 
         # raw line data from points projected to segment direction vector
-        self.line_raw_left = points_on_line[l_ind]
-        self.line_raw_right = points_on_line[r_ind]
-        self.line_raw_dir = direction
+        self.left_3D = points_on_line[l_ind]
+        self.right_3D = points_on_line[r_ind]
+        self.vector_3D = direction
         self.line_raw_center = (self.line_raw_left + self.line_raw_right) / 2
 
         print(f'line raw left x: {self.line_raw_left[0]} y: {self.line_raw_left[1]} z: {self.line_raw_left[2]}')
