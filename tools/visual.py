@@ -71,7 +71,7 @@ def segment_projection_3D(points, lines):
     fig.show()
 
 
-def segment_projection_2D(points, lines, extra_point=None, ransac_highlight=False, ransac_data=None):
+def segment_projection_2D(points, ransac_highlight=False, ransac_data=None, line_dir_2=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     mask_scatter = np.ones(points.shape[0], dtype=bool)
@@ -82,20 +82,21 @@ def segment_projection_2D(points, lines, extra_point=None, ransac_highlight=Fals
     if ransac_highlight:
         ax.scatter(points[ransac_data[0], 0], points[ransac_data[0], 1], s=0.05, color='red', zorder=9)
         ax.scatter(points[ransac_data[1], 0], points[ransac_data[1], 1], s=0.05, color='purple', zorder=8)
-    if extra_point is not None:
-        ax.scatter(extra_point[0], extra_point[1], color='orange', s=10, zorder=10)
-    line_0 = np.array([extra_point - lines[0] * 1e3, extra_point + lines[0] * 1e3])
-    line_1 = np.array([extra_point - lines[1] * 1e3, extra_point + lines[1] * 1e3])
+    ax.scatter(0, 0, color='orange', s=10, zorder=10)
+    plot_length = 1e3
+    line_dir = line_dir_2[1][:2] - line_dir_2[0][:2]
+    origin = [0, 0]
+    line_2 = origin - plot_length * line_dir, origin + plot_length * line_dir
     # plot lines
     ax.plot(
-        line_0[:, 0], line_0[:, 1],
+        [-plot_length, plot_length], [0, 0],
         color='red',
         alpha=0.25,
         zorder=5,
         linewidth=4
     )
     ax.plot(
-        line_1[:, 0], line_1[:, 1],
+        [0, 0], [-plot_length, plot_length],
         color='purple',
         alpha=0.25,
         zorder=6,
@@ -260,7 +261,8 @@ def dist_hist_color(distances, bone_id, angle_desc=None):
     plt.show()
 
 
-def transformation_tracer(points_source, points_target, points_inter_1=None, points_inter_2=None):
+def transformation_tracer(points_source, points_target, points_inter_1=None, points_inter_2=None,
+                          source_angle=None, target_angle=None):
     # create go figure
     fig = go.Figure()
     # scatter plot original points
@@ -290,26 +292,62 @@ def transformation_tracer(points_source, points_target, points_inter_1=None, poi
             marker=dict(size=1, color='purple', opacity=0.8),
             name='Intermediate 2'
         ))
+    if source_angle is not None:
+        # add purple line for source angle 0:1
+        fig.add_trace(go.Scatter3d(
+            x=[source_angle[0][0], source_angle[1][0]], y=[source_angle[0][1], source_angle[1][1]],
+            z=[source_angle[0][2], source_angle[1][2]],
+            mode='lines',
+            line=dict(color='purple', width=10),
+            name='Source Angle'
+        ))
+        # add orange line for source angle 1:2
+        fig.add_trace(go.Scatter3d(
+            x=[source_angle[1][0], source_angle[2][0]], y=[source_angle[1][1], source_angle[2][1]],
+            z=[source_angle[1][2], source_angle[2][2]],
+            mode='lines',
+            line=dict(color='orange', width=10),
+            name='Source Angle'
+        ))
 
-    # add lines for coordinate system
-    fig.add_trace(go.Scatter3d(
-        x=[0, 1], y=[0, 0], z=[0, 0],
-        mode='lines',
-        line=dict(color='red', width=10),
-        name='X'
-    ))
-    fig.add_trace(go.Scatter3d(
-        x=[0, 0], y=[0, 1], z=[0, 0],
-        mode='lines',
-        line=dict(color='green', width=10),
-        name='Y'
-    ))
-    fig.add_trace(go.Scatter3d(
-        x=[0, 0], y=[0, 0], z=[0, 1],
-        mode='lines',
-        line=dict(color='blue', width=10),
-        name='Z'
-    ))
+    if target_angle is not None:
+        # add purple line for target angle 0:1
+        fig.add_trace(go.Scatter3d(
+            x=[target_angle[0][0], target_angle[1][0]], y=[target_angle[0][1], target_angle[1][1]],
+            z=[target_angle[0][2], target_angle[1][2]],
+            mode='lines',
+            line=dict(color='purple', width=10),
+            name='Target Angle'
+        ))
+        # add orange line for target angle 1:2
+        fig.add_trace(go.Scatter3d(
+            x=[target_angle[1][0], target_angle[2][0]], y=[target_angle[1][1], target_angle[2][1]],
+            z=[target_angle[1][2], target_angle[2][2]],
+            mode='lines',
+            line=dict(color='orange', width=10),
+            name='Target Angle'
+        ))
+
+    else:
+        # add lines for coordinate system
+        fig.add_trace(go.Scatter3d(
+            x=[0, 1], y=[0, 0], z=[0, 0],
+            mode='lines',
+            line=dict(color='red', width=10),
+            name='X'
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[0, 0], y=[0, 1], z=[0, 0],
+            mode='lines',
+            line=dict(color='green', width=10),
+            name='Y'
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[0, 0], y=[0, 0], z=[0, 1],
+            mode='lines',
+            line=dict(color='blue', width=10),
+            name='Z'
+        ))
     # orthographic projection
     fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
     # equal axes

@@ -21,10 +21,7 @@ try:
     from tools.IO import points2txt, lines2obj, cache_meta
     from tools.fitting_1 import params2verts
     from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
-    from tools.geometry import rotation_matrix_from_vectors, angle_between_planes, line_of_intersection, \
-    project_points_onto_plane, rotate_points_to_xy_plane, normal_and_point_to_plane, \
-    intersection_point_of_line_and_plane, points_to_actual_plane, project_points_to_line, intersecting_line, \
-    rotate_points_3D, orientation_estimation, intersection_point_of_line_and_plane_rev, orientation_2D, rotate_points_2D, rotate_xy2xyz, angle_between_line_segments
+    from tools import geometry as geom
     from tools import visual as vis, fitting_pso
 except ImportError as e:
     print(f'Import Error: {e}')
@@ -39,6 +36,11 @@ class Segment(object):
         self.left_2D = None
         self.right_2D = None
         self.center_2D = None
+
+        self.rotation_pose = None
+        self.rotation_long = None
+        self.translation = None
+        self.transformation_matrix = None
 
         self.h_beam_verts = None
         self.break_flag = None
@@ -55,7 +57,6 @@ class Segment(object):
 
         self.points_2D = None
         self.points_data = None
-        self.line_raw_dir = None
         self.points_cleaned = None
         self.intermediate_points = []
 
@@ -67,6 +68,7 @@ class Segment(object):
 
         self.name = name
         self.points_center = None
+        self.points = None
         self.points = None
         self.parent_path = f'data/out/'
         self.outpath = f'data/out/{name}'
@@ -107,6 +109,7 @@ class Segment(object):
         """
         # insertion
         plot = True
+        self.points_hom = np.hstack((self.points, np.ones((self.points.shape[0], 1))))
         points = self.points
         try:
             normals = self.points_data[['nx', 'ny', 'nz']].values
@@ -119,7 +122,7 @@ class Segment(object):
             normals = np.asarray(pcd.normals)
 
         # find the two best planes and their line of intersection
-        planes, direction, origin, inliers_0, inliers_1 = orientation_estimation(
+        planes, direction, origin, inliers_0, inliers_1 = geom.orientation_estimation(
             np.concatenate((points, normals), axis=1),
             config=self.config,
             step="skeleton"
@@ -129,7 +132,9 @@ class Segment(object):
             self.break_flag = True
             return
 
-        points_on_line, closest_ind = project_points_to_line(points, origin, direction)
+        n_0 = np.array(planes[0][:3], dtype=np.float64)  # normal of plane 0
+
+        points_on_line, closest_ind = geom.project_points_to_line(points, origin, direction)
 
         ref_x = -100000
         ref_t = (ref_x - origin[0]) / direction[0]
@@ -142,179 +147,71 @@ class Segment(object):
         # raw line data from points projected to segment direction vector
         self.left_3D = points_on_line[l_ind]
         self.right_3D = points_on_line[r_ind]
-        self.vector_3D = direction
-        self.line_raw_center = (self.line_raw_left + self.line_raw_right) / 2
+        direction = self.right_3D - self.left_3D
+        self.vector_3D = direction / np.linalg.norm(direction)
+        self.center_3D = (self.left_3D + self.right_3D) / 2
 
-        print(f'line raw left x: {self.line_raw_left[0]} y: {self.line_raw_left[1]} z: {self.line_raw_left[2]}')
-        print(f'line raw right x: {self.line_raw_right[0]} y: {self.line_raw_right[1]} z: {self.line_raw_right[2]}')
+        self.translation = self.left_3D
+        self.transformation_matrix = np.eye(4)
+        self.transformation_matrix[:3,3] = self.translation
 
-        # raise ValueError # stop here
+        # find projection plane and lines indicating the planes (2D)
+        proj_plane = geom.normal_and_point_to_plane(self.vector_3D, self.left_3D)
 
-        # find projection plane and lines indicating the planes
-        proj_plane = normal_and_point_to_plane(self.line_raw_dir, self.line_raw_left)
-        # self.point = intersection_point_of_line_and_plane_rev(origin, direction, proj_plane)
-        # print(f'point x: {self.point[0]} y: {self.point[1]} z: {self.point[2]}')
-
-        proj_dir_0, proj_origin_0 = intersecting_line(proj_plane, planes[0])
-        proj_dir_1, proj_origin_1 = intersecting_line(proj_plane, planes[1])
+        proj_dir_0, proj_origin_0 = geom.intersecting_line(proj_plane, planes[0])
+        proj_dir_1, proj_origin_1 = geom.intersecting_line(proj_plane, planes[1])
 
         len_proj = self.config.skeleton_visual.line_length_projection
         proj_dir_0 = np.array(
-            [[self.line_raw_left[0] - (proj_dir_0[0] * len_proj),
-              self.line_raw_left[1] - (proj_dir_0[1] * len_proj),
-              self.line_raw_left[2] - (proj_dir_0[2] * len_proj)],
-             [self.line_raw_left[0] + (proj_dir_0[0] * len_proj),
-              self.line_raw_left[1] + (proj_dir_0[1] * len_proj),
-              self.line_raw_left[2] + (proj_dir_0[2] * len_proj)]])
+            [[self.left_3D[0] - (proj_dir_0[0] * len_proj),
+              self.left_3D[1] - (proj_dir_0[1] * len_proj),
+              self.left_3D[2] - (proj_dir_0[2] * len_proj)],
+             [self.left_3D[0] + (proj_dir_0[0] * len_proj),
+              self.left_3D[1] + (proj_dir_0[1] * len_proj),
+              self.left_3D[2] + (proj_dir_0[2] * len_proj)]])
         proj_dir_1 = np.array(
-            [[self.line_raw_left[0] - (proj_dir_1[0] * len_proj),
-              self.line_raw_left[1] - (proj_dir_1[1] * len_proj),
-              self.line_raw_left[2] - (proj_dir_1[2] * len_proj)],
-             [self.line_raw_left[0] + (proj_dir_1[0] * len_proj),
-              self.line_raw_left[1] + (proj_dir_1[1] * len_proj),
-              self.line_raw_left[2] + (proj_dir_1[2] * len_proj)]])
+            [[self.left_3D[0] - (proj_dir_1[0] * len_proj),
+              self.left_3D[1] - (proj_dir_1[1] * len_proj),
+              self.left_3D[2] - (proj_dir_1[2] * len_proj)],
+             [self.left_3D[0] + (proj_dir_1[0] * len_proj),
+              self.left_3D[1] + (proj_dir_1[1] * len_proj),
+              self.left_3D[2] + (proj_dir_1[2] * len_proj)]])
         proj_lines = [proj_dir_0, proj_dir_1]
 
-        proj_points_plane = points_to_actual_plane(points, self.line_raw_dir, self.line_raw_left)
-        proj_origin_plane = points_to_actual_plane(np.array([origin]), self.line_raw_dir, self.line_raw_left)
+        proj_points_plane = geom.points_to_actual_plane(points, self.vector_3D, self.left_3D)
 
-        # revise from here
+        origin = np.array([0, 0, 0])
+        target_axis_s = np.array([0, 0, 1])  # Z AXIS
+        target_axis_n = np.array([0, 1, 0])  # Y AXIS
 
-        target_axis = np.array([0, 0, 1])  # Z AXIS
-        self.mat_R_0 = rotation_matrix_from_vectors(self.line_raw_dir, target_axis)
-        proj_points_flat = np.dot(proj_points_plane, self.mat_R_0)
-        proj_points_flat, self.mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir, target_axis)
-        proj_origin_flat, _ = rotate_points_to_xy_plane(proj_origin_plane, self.line_raw_dir, target_axis)
+        # calc length between self.left and self.right
+        length = np.linalg.norm(self.right_3D - self.left_3D)
+        target_left = target_axis_n
+        target_center = origin
+        target_right = target_axis_s
+        target = (target_left, target_center, target_right)
 
-        tracker_matrix = np.eye(4)
-        # add mat_rotation_xy to tracker matrix
-        tracker_matrix[:3, :3] = self.mat_rotation_xy
+        source_left = self.left_3D + n_0
+        source_center = self.left_3D
+        source_right = source_center + self.vector_3D
+        source = (source_left, source_center, source_right)
+        self.transformation_matrix = geom.simplified_transform_lines(source, target)
 
-        # move points to z=0 / xy-plane
-        self.z_delta = proj_points_flat[0, 2]
-        proj_points_flat[:, 2] = proj_points_flat[:, 2] - self.z_delta
-        self.points_2D = proj_points_flat[:, :2]
-        true_origin_2D = proj_origin_flat[:, 2] - self.z_delta
-        true_origin_2D = proj_origin_flat[0, :2]
+        self.rotation_pose = geom.rotation_matrix_from_vectors(self.vector_3D, target_axis_s)
+        proj_points_flat = np.dot(proj_points_plane, self.rotation_pose)
 
-        # add z_deta to tracker matrix
-        tracker_matrix[2, 3] = self.z_delta
+        target_points = np.dot(self.transformation_matrix, self.points_hom.T).T[:,:3]
+        transformation_tracer(self.points, target_points, source_angle=source, target_angle=target)
 
-        points = np.hstack((points, np.ones((points.shape[0], 1))))
-
-        # apply xy mat to points and scatter plot
-        points_rot = np.dot(points, tracker_matrix)
-
-        # apply only xy mat to points and scatter plot
-        embed_mat = np.eye(4)
-        embed_mat[:3, :3] = self.mat_rotation_xy.T
-        points_rot_2 = np.dot(points, embed_mat)
-
-        transformation_tracer(points, points_rot, points_rot_2)
-
-
-
-        a = 0
-
-
-        proj_origin_flat = proj_origin_flat[0, :2]
-
-        proj_lines_flat = []
-        for line in proj_lines:
-            line_new, _ = rotate_points_to_xy_plane(line, self.line_raw_dir)
-            line_new = line_new[:, :2]
-            proj_lines_flat.append(line_new)
-        # proj_lines_flat = rotate_points_to_xy_plane(proj_lines, self.line_raw_dir)
-        # angle between line plane 1 and x-axis
-        line_plane_2D_0 = proj_lines_flat[0][1] - proj_lines_flat[0][0]
-        line_plane_2D_1 = proj_lines_flat[1][1] - proj_lines_flat[1][0]
-
-        line_plane_2D_0 = line_plane_2D_0 / np.linalg.norm(line_plane_2D_0)
-        line_plane_2D_1 = line_plane_2D_1 / np.linalg.norm(line_plane_2D_1)
-
-        # line_plane_2D_0 = line_plane_2D_0[:2]
-        x_axis = np.array([1, 0])
-        angle = np.arccos(np.dot(line_plane_2D_0, x_axis) / (np.linalg.norm(line_plane_2D_0) * np.linalg.norm(x_axis)))
-        print(f'angle between line and x-axis: {angle}: {np.degrees(angle)}')
-        angle = angle_between_line_segments((0,0), line_plane_2D_0, x_axis)
-        print(f'angle between line and x-axis (full): {angle}: {np.degrees(angle)}')
-
-        self.angle_2D = angle
-        # rotate points to align line with x-axis
-
-        # vis.segment_projection_2D(proj_points_flat, proj_lines_flat)
-        true_origin_2D = rotate_points_2D(true_origin_2D, -angle)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.scatter(self.points_2D[:, 0], self.points_2D[:, 1], c='g')
-        fig.show()
-
-        self.points_2D = rotate_points_2D(self.points_2D, -angle)
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.scatter(self.points_2D[:, 0], self.points_2D[:, 1], c='r')
-        fig.show()
-        line_plane_2D_rot_0 = rotate_points_2D(line_plane_2D_0, -angle)
-        line_plane_2D_rot_1 = rotate_points_2D(line_plane_2D_1, -angle)
-        lines_plane_fix = [line_plane_2D_rot_0, line_plane_2D_rot_1]
+        self.points_2D = target_points[:, :2]
 
         ransac_data = (inliers_0, inliers_1)
         if plot:
-            vis.segment_projection_2D(self.points_2D, lines=lines_plane_fix, extra_point=true_origin_2D,
-                                      ransac_highlight=True, ransac_data=ransac_data)
+            vis.segment_projection_2D(self.points_2D, ransac_highlight=True, ransac_data=ransac_data, line_dir_2=proj_dir_1)
 
             # vis.segment_projection_3D(points, proj_lines)
             # vis.segment_projection_3D(proj_points_plane, proj_lines)
 
-        # dists = np.linalg.norm(self.points_2D - np.mean(self.points_2D, axis=0), axis=1)
-        dists = np.linalg.norm(self.points_2D - np.median(self.points_2D, axis=0), axis=1)
-        closest_ind = np.argmin(dists)
-        #### TODO: shift to coordinate system with origin at cog, consider in all passed params
-
-        cog2D_x = np.mean(self.points_2D[:, 0])
-        cog2D_y = np.mean(self.points_2D[:, 1])
-        self.cog_2D = np.array([cog2D_x, cog2D_y])
-
-        self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
-
-        points_on_line, closest_ind = project_points_to_line(self.points, self.cog_3D, self.line_raw_dir)
-        # find left and right points
-        ref_x = -99999999
-        ref_t = (ref_x - self.cog_3D[0]) / self.line_raw_dir[0]
-        ref_pt = self.cog_3D + ref_t * self.line_raw_dir
-        vecs = points_on_line - ref_pt
-        dists = np.linalg.norm(vecs, axis=1)
-        l_ind = np.argmin(dists)
-        r_ind = np.argmax(dists)
-        self.line_cog_left = points_on_line[l_ind]
-        self.line_cog_right = points_on_line[r_ind]
-        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
-
-        rot_mat = np.asarray(self.mat_rotation_xy)
-        z_angle_add = -self.angle_2D
-        z_angle_add = np.degrees(z_angle_add)
-        # define rotation matrix for z axis rotation
-        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
-                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
-                                [0, 0, 1]])
-        # multiply rotation matrices
-        rot_mat = np.dot(rot_mat, rot_mat_z)
-
-        # apply rot_mat to points
-        points_rot = np.dot(points, rot_mat)
-        # plot points in 3D
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points_rot[:, 0], points_rot[:, 1], points_rot[:, 2])
-        fig.show()
-
-        points_rot_2 = np.dot(points, rot_mat.T)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(points_rot_2[:, 0], points_rot_2[:, 1], points_rot_2[:, 2])
-        fig.show()
-
-        a = 0
 
 
     def update_axes(self):

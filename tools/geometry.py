@@ -567,7 +567,7 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 def rotate_points_to_xy_plane(points, plane_normal, target_axis):
-    # TODO: why extra step
+    # TODO: eliminate extra step
     # find rotation matrix
     rot_matrix = rotation_matrix_from_vectors(plane_normal, target_axis)
     # rotate points
@@ -674,9 +674,9 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
     normal2, d2 = np.array(f_1[:3], dtype=np.float64), f_1[3]
     orientation = np.cross(normal1, normal2)
 
-    A = np.array([normal1, normal2, orientation])
-    B = np.array([-d1, -d2, 0])
-    point_on_line = np.linalg.lstsq(A.T, B, rcond=None)[0]
+    # A = np.array([normal1, normal2, orientation])
+    # B = np.array([-d1, -d2, 0])
+    # point_on_line = np.linalg.lstsq(A.T, B, rcond=None)[0]
     point_on_line = np.cross((normal1 * d2 - normal2 * d1), orientation) / np.linalg.norm(orientation) ** 2
 
     if step == "skeleton":
@@ -750,3 +750,205 @@ def angle_between_line_segments(origin, endpoint_0, endpoint_1):
         angle_rad = 2 * np.pi - angle_rad
 
     return angle_rad
+
+
+def transform_up(rotation_pose, rotation_long, translation):
+    mat = np.eye(4)
+    mat[:3, :3] = rotation_pose
+    mat[:3, 3] = translation
+
+    return mat
+
+def transform_down(rotation_pose, rotation_long, translation):
+    mat = np.eye(4)
+    mat[:3, :3] = rotation_pose.T
+    mat[:3, 3] = -np.dot(rotation_pose.T, translation)
+
+    return mat
+
+
+def transform_lines(line_0_left, line_0_right, line_1_left, line_1_right):
+    line_0_left, line_0_right, line_1_left, line_1_right = map(
+        np.array,
+        [line_0_left, line_0_right, line_1_left, line_1_right]
+    )
+
+    # Calculate vectors
+    vec_0 = line_0_right - line_0_left
+    vec_1 = line_1_right - line_1_left
+
+    # Normalize vectors
+    vec_0_norm = vec_0 / np.linalg.norm(vec_0)
+    vec_1_norm = vec_1 / np.linalg.norm(vec_1)
+
+    # Calculate rotation
+    rotation_axis = np.cross(vec_0_norm, vec_1_norm)
+    if np.allclose(rotation_axis, 0):
+        if np.allclose(vec_0_norm, vec_1_norm):
+            rot_mat = np.eye(3)
+        else:
+            rot_mat = -np.eye(3)
+    else:
+        rotation_axis = rotation_axis / np.linalg.norm(rotation_axis)
+        cos_angle = np.dot(vec_0_norm, vec_1_norm)
+        sin_angle = np.sqrt(1 - cos_angle ** 2)  # More numerically stable than np.linalg.norm(np.cross())
+
+        # Rodrigues' rotation formula
+        K = np.array([
+            [0, -rotation_axis[2], rotation_axis[1]],
+            [rotation_axis[2], 0, -rotation_axis[0]],
+            [-rotation_axis[1], rotation_axis[0], 0]
+        ])
+        rot_mat = np.eye(3) + sin_angle * K + (1 - cos_angle) * np.dot(K, K)
+
+    # Calculate scaling factor
+    scale = np.linalg.norm(vec_1) / np.linalg.norm(vec_0)
+
+    # Apply scaling to rotation matrix
+    rot_mat = scale * rot_mat
+
+    # Calculate translation
+    translation = line_1_left - np.dot(rot_mat, line_0_left)
+
+    # Construct 4x4 transformation matrix
+    trans_mat = np.eye(4)
+    trans_mat[:3, :3] = rot_mat
+    trans_mat[:3, 3] = translation
+
+    # Debug information
+    print("Debug Information:")
+    print(f"vec_0: {vec_0}, length: {np.linalg.norm(vec_0)}")
+    print(f"vec_1: {vec_1}, length: {np.linalg.norm(vec_1)}")
+    print(f"Scaling factor: {scale}")
+    print(f"Rotation matrix:\n{rot_mat}")
+    print(f"Translation: {translation}")
+    print(f"Final transformation matrix:\n{trans_mat}")
+
+    # Verify transformation
+    transformed_line_0_left = np.dot(trans_mat, np.append(line_0_left, 1))[:3]
+    transformed_line_0_right = np.dot(trans_mat, np.append(line_0_right, 1))[:3]
+    print("\nVerification:")
+    print(f"Transformed line_0_left: {transformed_line_0_left}")
+    print(f"Original line_1_left: {line_1_left}")
+    print(f"Transformed line_0_right: {transformed_line_0_right}")
+    print(f"Original line_1_right: {line_1_right}")
+
+    return trans_mat
+
+
+def add_z_rotation_angle(transform_matrix, angle_degrees, target_point):
+    """
+    Incorporate a rotation around the z-axis at the target point into the existing transformation matrix.
+
+    :param transform_matrix: The original 4x4 transformation matrix
+    :param angle_degrees: The rotation angle in degrees
+    :param target_point: The 3D point around which to rotate
+    :return: A new 4x4 transformation matrix incorporating the z-axis rotation
+    """
+    # Convert angle to radians
+    angle_radians = np.radians(angle_degrees)
+
+    # Create the z-axis rotation matrix
+    cos_theta, sin_theta = np.cos(angle_radians), np.sin(angle_radians)
+    z_rotation = np.array([
+        [cos_theta, -sin_theta, 0, 0],
+        [sin_theta, cos_theta, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
+
+    # Create translation matrices
+    translate_to_origin = np.eye(4)
+    translate_to_origin[:3, 3] = -target_point
+
+    translate_back = np.eye(4)
+    translate_back[:3, 3] = target_point
+
+    # Combine all transformations
+    final_transform = np.dot(translate_back, np.dot(z_rotation, np.dot(translate_to_origin, transform_matrix)))
+
+    return final_transform
+
+
+def add_z_rotation_matrix(transform_matrix, rotation_matrix, target_point):
+    """
+    Incorporate a rotation described by a 3x3 rotation matrix around the z-axis at the target point
+    into the existing transformation matrix.
+
+    :param transform_matrix: The original 4x4 transformation matrix
+    :param rotation_matrix: A 3x3 rotation matrix describing the z-axis rotation
+    :param target_point: The 3D point around which to rotate
+    :return: A new 4x4 transformation matrix incorporating the z-axis rotation
+    """
+    # Check if the rotation matrix is valid
+    if rotation_matrix.shape != (3, 3):
+        raise ValueError("Rotation matrix must be 3x3")
+
+    # Create a 4x4 transformation matrix from the 3x3 rotation matrix
+    z_rotation = np.eye(4)
+    z_rotation[:3, :3] = rotation_matrix
+
+    # Create translation matrices
+    translate_to_origin = np.eye(4)
+    translate_to_origin[:3, 3] = -target_point
+
+    translate_back = np.eye(4)
+    translate_back[:3, 3] = target_point
+
+    # Combine all transformations
+    final_transform = np.dot(translate_back, np.dot(z_rotation, np.dot(translate_to_origin, transform_matrix)))
+
+    return final_transform
+
+
+def simplified_transform_lines(source_angle, target_angle):
+    """
+    Calculate the transformation matrix to map one normalized right angle to another.
+
+    :param source_angle: Tuple of (left, common, right) points for the source angle
+    :param target_angle: Tuple of (left, common, right) points for the target angle
+    :return: 4x4 transformation matrix
+    """
+    src_left, src_common, src_right = map(np.array, source_angle)
+    tgt_left, tgt_common, tgt_right = map(np.array, target_angle)
+
+    # Calculate normalized vectors for source and target angles
+    src_x = src_left - src_common
+    src_y = src_right - src_common
+    src_z = np.cross(src_x, src_y)
+
+    tgt_x = tgt_left - tgt_common
+    tgt_y = tgt_right - tgt_common
+    tgt_z = np.cross(tgt_x, tgt_y)
+
+    # Create rotation matrices
+    rot_src = np.column_stack((src_x, src_y, src_z))
+    rot_tgt = np.column_stack((tgt_x, tgt_y, tgt_z))
+
+    # Calculate the rotation from source to target
+    rotation = np.dot(rot_tgt, rot_src.T)
+
+    # Calculate the translation
+    translation = tgt_common - np.dot(rotation, src_common)
+
+    # Create the 4x4 transformation matrix
+    transform = np.eye(4)
+    transform[:3, :3] = rotation
+    transform[:3, 3] = translation
+
+    debug = False
+    if debug:
+        # Verification
+        print("Verification:")
+        for src, tgt, label in zip([src_left, src_common, src_right],
+                                   [tgt_left, tgt_common, tgt_right],
+                                   ['Left', 'Common', 'Right']):
+            transformed = np.dot(transform, np.append(src, 1))[:3]
+            print(f"{label} point:")
+            print(f"  Original:    {src}")
+            print(f"  Transformed: {transformed}")
+            print(f"  Target:      {tgt}")
+            print(f"  Error:       {np.linalg.norm(transformed - tgt)}")
+            print()
+
+    return transform
