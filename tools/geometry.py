@@ -566,9 +566,10 @@ def rotation_matrix_from_vectors(vec1, vec2):
     return np.identity(3) + np.sin(angle) * kmat + (1 - np.cos(angle)) * np.dot(kmat, kmat)
 
 
-def rotate_points_to_xy_plane(points, normal):
+def rotate_points_to_xy_plane(points, plane_normal, target_axis):
+    # TODO: why extra step
     # find rotation matrix
-    rot_matrix = rotation_matrix_from_vectors(normal, np.array([0, 0, 1]))
+    rot_matrix = rotation_matrix_from_vectors(plane_normal, target_axis)
     # rotate points
     rotated_points = np.dot(points, rot_matrix.T)
 

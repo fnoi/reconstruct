@@ -5,6 +5,7 @@ import time
 
 from tools.fitting_nsga import solve_w_nsga
 from tools.metrics import huber_loss
+from tools.visual import transformation_tracer
 
 try:
     import numpy as np
@@ -95,10 +96,6 @@ class Segment(object):
         self.points = data[:, :3]
         self.points_center = np.mean(self.points, axis=0)
 
-    def calc_axes_rev(self):
-        """revision of calc_axes, aim to modularize and debug geometry calculations"""
-        return None
-
 
     def calc_axes(self, plot=True):
         """
@@ -177,8 +174,17 @@ class Segment(object):
         proj_points_plane = points_to_actual_plane(points, self.line_raw_dir, self.line_raw_left)
         proj_origin_plane = points_to_actual_plane(np.array([origin]), self.line_raw_dir, self.line_raw_left)
 
-        proj_points_flat, self.mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir)
-        proj_origin_flat, _ = rotate_points_to_xy_plane(proj_origin_plane, self.line_raw_dir)
+        # revise from here
+
+        target_axis = np.array([0, 0, 1])  # Z AXIS
+        self.mat_R_0 = rotation_matrix_from_vectors(self.line_raw_dir, target_axis)
+        proj_points_flat = np.dot(proj_points_plane, self.mat_R_0)
+        proj_points_flat, self.mat_rotation_xy = rotate_points_to_xy_plane(proj_points_plane, self.line_raw_dir, target_axis)
+        proj_origin_flat, _ = rotate_points_to_xy_plane(proj_origin_plane, self.line_raw_dir, target_axis)
+
+        tracker_matrix = np.eye(4)
+        # add mat_rotation_xy to tracker matrix
+        tracker_matrix[:3, :3] = self.mat_rotation_xy
 
         # move points to z=0 / xy-plane
         self.z_delta = proj_points_flat[0, 2]
@@ -186,6 +192,26 @@ class Segment(object):
         self.points_2D = proj_points_flat[:, :2]
         true_origin_2D = proj_origin_flat[:, 2] - self.z_delta
         true_origin_2D = proj_origin_flat[0, :2]
+
+        # add z_deta to tracker matrix
+        tracker_matrix[2, 3] = self.z_delta
+
+        points = np.hstack((points, np.ones((points.shape[0], 1))))
+
+        # apply xy mat to points and scatter plot
+        points_rot = np.dot(points, tracker_matrix)
+
+        # apply only xy mat to points and scatter plot
+        embed_mat = np.eye(4)
+        embed_mat[:3, :3] = self.mat_rotation_xy.T
+        points_rot_2 = np.dot(points, embed_mat)
+
+        transformation_tracer(points, points_rot, points_rot_2)
+
+
+
+        a = 0
+
 
         proj_origin_flat = proj_origin_flat[0, :2]
 

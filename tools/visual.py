@@ -258,3 +258,61 @@ def dist_hist_color(distances, bone_id, angle_desc=None):
     cbar.set_label('Distance')
 
     plt.show()
+
+
+def transformation_tracer(points_source, points_target, points_inter_1=None, points_inter_2=None):
+    # create go figure
+    fig = go.Figure()
+    # scatter plot original points
+    fig.add_trace(go.Scatter3d(
+        x=points_source[:, 0], y=points_source[:, 1], z=points_source[:, 2],
+        mode='markers',
+        marker=dict(size=1, color='blue', opacity=0.8),
+        name='Source'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=points_target[:, 0], y=points_target[:, 1], z=points_target[:, 2],
+        mode='markers',
+        marker=dict(size=1, color='green', opacity=0.8),
+        name='Target'
+    ))
+    if points_inter_1 is not None:
+        fig.add_trace(go.Scatter3d(
+            x=points_inter_1[:, 0], y=points_inter_1[:, 1], z=points_inter_1[:, 2],
+            mode='markers',
+            marker=dict(size=1, color='orange', opacity=0.8),
+            name='Intermediate 1'
+        ))
+    if points_inter_2 is not None:
+        fig.add_trace(go.Scatter3d(
+            x=points_inter_2[:, 0], y=points_inter_2[:, 1], z=points_inter_2[:, 2],
+            mode='markers',
+            marker=dict(size=1, color='purple', opacity=0.8),
+            name='Intermediate 2'
+        ))
+
+    # add lines for coordinate system
+    fig.add_trace(go.Scatter3d(
+        x=[0, 1], y=[0, 0], z=[0, 0],
+        mode='lines',
+        line=dict(color='red', width=10),
+        name='X'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[0, 0], y=[0, 1], z=[0, 0],
+        mode='lines',
+        line=dict(color='green', width=10),
+        name='Y'
+    ))
+    fig.add_trace(go.Scatter3d(
+        x=[0, 0], y=[0, 0], z=[0, 1],
+        mode='lines',
+        line=dict(color='blue', width=10),
+        name='Z'
+    ))
+    # orthographic projection
+    fig.update_layout(scene_camera=dict(projection=dict(type='orthographic')))
+    # equal axes
+    fig.update_layout(scene=dict(aspectmode='data'))
+    # show
+    fig.show()
