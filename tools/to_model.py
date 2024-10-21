@@ -13,22 +13,12 @@ def data_preprocessor(skeleton):
 
         length = math.sqrt(sum((a - b) ** 2 for a, b in zip(start, end)))
 
-        rot_mat = np.asarray(data['rot_mat'])
-        z_angle_add = data['angle_xy']
-        # define rotation matrix for z axis rotation
-        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
-                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
-                                [0, 0, 1]])
-        # multiply rotation matrices
-        rot_mat = np.dot(rot_mat.T, rot_mat_z)
-
         profiles[data.name] = {
             'cstype': data.cstype,
             'length': length,
-            'rot_mat': rot_mat,
+            'rot_mat': data.rot_mat,
             'start': start,
-            'end': end,
-            'offset_2D': data['offset']
+            'end': end
         }
     print(f'working with {len(profiles)} profiles')
     return profiles

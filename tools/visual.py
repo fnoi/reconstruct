@@ -71,7 +71,7 @@ def segment_projection_3D(points, lines):
     fig.show()
 
 
-def segment_projection_2D(points, ransac_highlight=False, ransac_data=None, line_dir_2=None):
+def segment_projection_2D(points, ransac_highlight=False, ransac_data=None):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     mask_scatter = np.ones(points.shape[0], dtype=bool)
@@ -84,9 +84,7 @@ def segment_projection_2D(points, ransac_highlight=False, ransac_data=None, line
         ax.scatter(points[ransac_data[1], 0], points[ransac_data[1], 1], s=0.05, color='purple', zorder=8)
     ax.scatter(0, 0, color='orange', s=10, zorder=10)
     plot_length = 1e3
-    line_dir = line_dir_2[1][:2] - line_dir_2[0][:2]
     origin = [0, 0]
-    line_2 = origin - plot_length * line_dir, origin + plot_length * line_dir
     # plot lines
     ax.plot(
         [-plot_length, plot_length], [0, 0],
@@ -97,9 +95,9 @@ def segment_projection_2D(points, ransac_highlight=False, ransac_data=None, line
     )
     ax.plot(
         [0, 0], [-plot_length, plot_length],
-        color='purple',
+        color='green',
         alpha=0.25,
-        zorder=6,
+        zorder=5,
         linewidth=4
     )
     # limit axis to points + 10%

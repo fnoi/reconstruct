@@ -53,14 +53,12 @@ class Skeleton:
         export_dict = {}
         for i, bone in enumerate(self.bones):
             export_dict[f'bone_{i}'] = {
-                'start': bone.line_cog_left.tolist(),
-                'end': bone.line_cog_right.tolist(),
+                'start': bone.left_3D.tolist(),
+                'end': bone.right_3D.tolist(),
                 'beam_verts': bone.h_beam_verts.tolist(),
                 'beam_params': bone.h_beam_params,
-                'rot_mat': bone.mat_rotation_xy.tolist(),
-                'angle_xy': bone.angle_2D,
-                'cstype': bone.cstype,
-                'offset': bone.cog_2D.tolist()
+                'rot_mat': bone.transformation_matrix.tolist(),
+                'cstype': bone.cstype
             }
         with open(f'{path}/skeleton_cache.json', 'w') as f:
             json.dump(export_dict, f)
@@ -125,10 +123,10 @@ class Skeleton:
 
                 if acute_angle < self.config.skeleton.aggregate_angle_max:
                     # find minimum distance
-                    P0 = bone_1.line_cog_left
-                    P1 = bone_1.line_cog_right
-                    P2 = bone_2.line_cog_left
-                    P3 = bone_2.line_cog_right
+                    P0 = bone_1.left_3D
+                    P1 = bone_1.right_3D
+                    P2 = bone_2.left_3D
+                    P3 = bone_2.right_3D
                     L0 = np.linalg.norm(P0 - P2)
                     L1 = np.linalg.norm(P0 - P3)
                     L2 = np.linalg.norm(P1 - P2)
@@ -207,17 +205,17 @@ class Skeleton:
                     bridgepoint_joining = joint[1]['bridgepoint1']
                 else:
                     raise Exception('joint type not covered')
-                dist_left = np.linalg.norm(np.asarray(self.bones[joining].line_cog_left) - np.asarray(bridgepoint_joining))
-                dist_right = np.linalg.norm(np.asarray(self.bones[joining].line_cog_right) - np.asarray(bridgepoint_joining))
+                dist_left = np.linalg.norm(np.asarray(self.bones[joining].left_3D) - np.asarray(bridgepoint_joining))
+                dist_right = np.linalg.norm(np.asarray(self.bones[joining].right_3D) - np.asarray(bridgepoint_joining))
                 if dist_left < dist_right:
                     # if self.bones[joining].left_edit:  # edited before
                     #     continue
                     # else:
-                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].line_cog_left))
+                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].left_3D))
                     if delta > 0:
-                        self.bones[joining].line_cog_left = np.asarray(bridgepoint_joining)
+                        self.bones[joining].left_3D = np.asarray(bridgepoint_joining)
                         # bone = self.bones[joining]
-                        self.bones[joining].points_center = (np.asarray(self.bones[joining].line_cog_right) + np.asarray(self.bones[joining].line_cog_left)) / 2
+                        self.bones[joining].points_center = (np.asarray(self.bones[joining].right_3D) + np.asarray(self.bones[joining].left_3D)) / 2
                         self.bones[joining].left_edit = True
                         print(f'did sth, moved bone {joining} by {delta}')
                         edit_flag = True
@@ -225,11 +223,11 @@ class Skeleton:
                     # if self.bones[joining].right_edit:
                     #     continue
                     # else:
-                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].line_cog_right))
+                    delta = np.linalg.norm(np.asarray(bridgepoint_joining) - np.asarray(self.bones[joining].right_3D))
                     if delta > 0:
-                        self.bones[joining].line_cog_right = np.asarray(bridgepoint_joining)
+                        self.bones[joining].right_3D = np.asarray(bridgepoint_joining)
                         # bone = self.bones[joining]
-                        self.bones[joining].points_center = (np.asarray(self.bones[joining].line_cog_right) + np.asarray(self.bones[joining].line_cog_left)) / 2
+                        self.bones[joining].points_center = (np.asarray(self.bones[joining].right_3D) + np.asarray(self.bones[joining].left_3D)) / 2
                         self.bones[joining].right_edit = True
                         print(f'did sth, moved bone {joining} by {delta}')
                         edit_flag = True
@@ -697,16 +695,19 @@ class Skeleton:
             # equal axis
             fig.update_layout(scene=dict(aspectmode='data'))
 
-            # plot line_cog_left, line_cog_right as lines
-            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
-                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
-                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
+            print(f'left: {bone.left_3D}')
+            print(f'right: {bone.right_3D}')
+
+            # plot left_3D, right_3D as lines
+            fig.add_trace(go.Scatter3d(x=[bone.left_3D[0], bone.right_3D[0]],
+                                       y=[bone.left_3D[1], bone.right_3D[1]],
+                                       z=[bone.left_3D[2], bone.right_3D[2]],
                                        mode='lines',
                                        line=dict(color=linecolor[i], width=3)))
-            # add line_cog_left, line_cog_right as scatter points
-            fig.add_trace(go.Scatter3d(x=[bone.line_cog_left[0], bone.line_cog_right[0]],
-                                       y=[bone.line_cog_left[1], bone.line_cog_right[1]],
-                                       z=[bone.line_cog_left[2], bone.line_cog_right[2]],
+            # add left_3D, right_3D as scatter points
+            fig.add_trace(go.Scatter3d(x=[bone.left_3D[0], bone.right_3D[0]],
+                                       y=[bone.left_3D[1], bone.right_3D[1]],
+                                       z=[bone.left_3D[2], bone.right_3D[2]],
                                        mode='markers',
                                        marker=dict(color=cogcolor[i], size=5)))
             # point cloud scatter
@@ -716,7 +717,7 @@ class Skeleton:
                                        mode='markers',
                                        marker=dict(color=pointcloudcolor[i], size=.6, opacity=0.8)))
             # add beam name to center point plus offset
-            center_point = (bone.line_cog_right + bone.line_cog_left) / 2
+            center_point = (bone.right_3D + bone.left_3D) / 2
             d_x = 0.4
             d_y = 0.3
             d_z = 0.2

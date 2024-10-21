@@ -98,7 +98,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
             for ranged_segment in ranged_segments:
                 # retrieve bone
                 segment = skeleton.get_bone(ranged_segment)
-                segment_direction = segment.line_raw_dir
+                segment_direction = segment.vector_3D
                 angle = angular_deviation(nonseg_patch_point_rn, segment_direction) % 90
                 angle = min(angle, 90 - angle)
 
@@ -130,7 +130,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
         if len(ranged_segments) != 0:
             for ranged_segment in ranged_segments:
                 segment = skeleton.get_bone(ranged_segment)
-                segment_direction = segment.line_raw_dir
+                segment_direction = segment.vector_3D
                 angle = angular_deviation(point_normal, segment_direction) % 90
                 angle = min(angle, 90 - angle)
 

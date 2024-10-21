@@ -159,10 +159,10 @@ def rotation_matrix_from_vectors(vec1, vec2):
 
 
 def skew_lines(seg1, seg2):
-    ptc_1 = np.mean([seg1.line_cog_left, seg1.line_cog_right], axis=0)
-    ptc_2 = np.mean([seg2.line_cog_left, seg2.line_cog_right], axis=0)
-    dir_1 = seg1.line_cog_right - seg1.line_cog_left
-    dir_2 = seg2.line_cog_right - seg2.line_cog_left
+    ptc_1 = np.mean([seg1.left_3D, seg1.right_3D], axis=0)
+    ptc_2 = np.mean([seg2.left_3D, seg2.right_3D], axis=0)
+    dir_1 = seg1.right_3D - seg1.left_3D
+    dir_2 = seg2.right_3D - seg2.left_3D
 
     connect = ptc_2 - ptc_1
     dir_1_dot_dir_2 = np.dot(dir_1, dir_2)
@@ -200,8 +200,8 @@ def skew_lines(seg1, seg2):
 
         nearest_point = (bridgepoint_1 + bridgepoint_2) / 2
 
-        within_seg1 = (np.dot(bridgepoint_1 - seg1.line_cog_left, seg1.line_cog_right - seg1.line_cog_left) >= 0 >= np.dot(bridgepoint_1 - seg1.line_cog_right, seg1.line_cog_right - seg1.line_cog_left))
-        within_seg2 = (np.dot(bridgepoint_2 - seg2.line_cog_left, seg2.line_cog_right - seg2.line_cog_left) >= 0 >= np.dot(bridgepoint_2 - seg2.line_cog_right, seg2.line_cog_right - seg2.line_cog_left))
+        within_seg1 = (np.dot(bridgepoint_1 - seg1.left_3D, seg1.right_3D - seg1.left_3D) >= 0 >= np.dot(bridgepoint_1 - seg1.right_3D, seg1.right_3D - seg1.left_3D))
+        within_seg2 = (np.dot(bridgepoint_2 - seg2.left_3D, seg2.right_3D - seg2.left_3D) >= 0 >= np.dot(bridgepoint_2 - seg2.right_3D, seg2.right_3D - seg2.left_3D))
 
         if within_seg1 and not within_seg2:
             case = 0
@@ -220,9 +220,9 @@ def skew_lines(seg1, seg2):
         if debug_plot:
             fig = go.Figure()
             fig.add_trace(go.Scatter3d(
-                x=[seg1.line_cog_left[0], seg1.line_cog_right[0]],
-                y=[seg1.line_cog_left[1], seg1.line_cog_right[1]],
-                z=[seg1.line_cog_left[2], seg1.line_cog_right[2]],
+                x=[seg1.left_3D[0], seg1.right_3D[0]],
+                y=[seg1.left_3D[1], seg1.right_3D[1]],
+                z=[seg1.left_3D[2], seg1.right_3D[2]],
                 mode='lines',
                 line=dict(
                     color='blue',
@@ -230,9 +230,9 @@ def skew_lines(seg1, seg2):
                 )
             ))
             fig.add_trace(go.Scatter3d(
-                x=[seg2.line_cog_left[0], seg2.line_cog_right[0]],
-                y=[seg2.line_cog_left[1], seg2.line_cog_right[1]],
-                z=[seg2.line_cog_left[2], seg2.line_cog_right[2]],
+                x=[seg2.left_3D[0], seg2.right_3D[0]],
+                y=[seg2.left_3D[1], seg2.right_3D[1]],
+                z=[seg2.left_3D[2], seg2.right_3D[2]],
                 mode='lines',
                 line=dict(
                     color='red',
@@ -269,12 +269,12 @@ def skew_lines(seg1, seg2):
 
 
 def warped_vectors_intersection(seg1, seg2):
-    # dir1 = seg1.line_cog_right - seg1.line_cog_left
-    # dir2 = seg2.line_cog_right - seg2.line_cog_left
+    # dir1 = seg1.right_3D - seg1.left_3D
+    # dir2 = seg2.right_3D - seg2.left_3D
     # dir1 = seg1.pca
     # dir2 = seg2.pca
-    dir1 = seg1.line_cog_right - seg1.line_cog_left
-    dir2 = seg2.line_cog_right - seg2.line_cog_left
+    dir1 = seg1.right_3D - seg1.left_3D
+    dir2 = seg2.right_3D - seg2.left_3D
 
     # calculate angle of "intersection"
     angle = np.arccos(np.clip(np.dot(dir1, dir2) / (np.linalg.norm(dir1) * np.linalg.norm(dir2)), -1, 1))
@@ -288,9 +288,9 @@ def warped_vectors_intersection(seg1, seg2):
     # source: https://math.stackexchange.com/questions/2213165/find-shortest-distance-between-lines-in-3d
 
     if seg1.points_center is None:
-        seg1.points_center = (seg1.line_cog_left + seg1.line_cog_right) / 2
+        seg1.points_center = (seg1.left_3D + seg1.right_3D) / 2
     if seg2.points_center is None:
-        seg2.points_center = (seg2.line_cog_left + seg2.line_cog_right) / 2
+        seg2.points_center = (seg2.left_3D + seg2.right_3D) / 2
 
     connect_2 = seg2.points_center - seg1.points_center
 
@@ -321,17 +321,17 @@ def warped_vectors_intersection(seg1, seg2):
     bridgepoint2 = bridgepoint2_2
 
     # check if t1 is in segment 1 and t2 in segment 2
-    xrange1 = np.sort([seg1.line_cog_left[0], seg1.line_cog_right[0]])
-    yrange1 = np.sort([seg1.line_cog_left[1], seg1.line_cog_right[1]])
-    zrange1 = np.sort([seg1.line_cog_left[2], seg1.line_cog_right[2]])
+    xrange1 = np.sort([seg1.left_3D[0], seg1.right_3D[0]])
+    yrange1 = np.sort([seg1.left_3D[1], seg1.right_3D[1]])
+    zrange1 = np.sort([seg1.left_3D[2], seg1.right_3D[2]])
     x_check = xrange1[0] <= bridgepoint1[0] <= xrange1[1]
     y_check = yrange1[0] <= bridgepoint1[1] <= yrange1[1]
     z_check = zrange1[0] <= bridgepoint1[2] <= zrange1[1]
     check1 = x_check and y_check and z_check
 
-    xrange2 = np.sort([seg2.line_cog_left[0], seg2.line_cog_right[0]])
-    yrange2 = np.sort([seg2.line_cog_left[1], seg2.line_cog_right[1]])
-    zrange2 = np.sort([seg2.line_cog_left[2], seg2.line_cog_right[2]])
+    xrange2 = np.sort([seg2.left_3D[0], seg2.right_3D[0]])
+    yrange2 = np.sort([seg2.left_3D[1], seg2.right_3D[1]])
+    zrange2 = np.sort([seg2.left_3D[2], seg2.right_3D[2]])
     x_check = xrange2[0] <= bridgepoint2[0] <= xrange2[1]
     y_check = yrange2[0] <= bridgepoint2[1] <= yrange2[1]
     z_check = zrange2[0] <= bridgepoint2[2] <= zrange2[1]
@@ -344,7 +344,7 @@ def warped_vectors_intersection(seg1, seg2):
         if check1:  # seg1 is dominant: case = 0
             rating = np.min(
                 np.asarray(
-                    [np.linalg.norm(bridgepoint1 - seg2.line_cog_left), np.linalg.norm(bridgepoint1 - seg2.line_cog_right)]
+                    [np.linalg.norm(bridgepoint1 - seg2.left_3D), np.linalg.norm(bridgepoint1 - seg2.right_3D)]
                 )
             )
             case = 0
@@ -352,7 +352,7 @@ def warped_vectors_intersection(seg1, seg2):
         elif check2:  # seg2 is dominant: case = 1
             rating = np.min(
                 np.asarray(
-                    [np.linalg.norm(bridgepoint2 - seg1.line_cog_left), np.linalg.norm(bridgepoint2 - seg1.line_cog_right)]
+                    [np.linalg.norm(bridgepoint2 - seg1.left_3D), np.linalg.norm(bridgepoint2 - seg1.right_3D)]
                 )
             )
             case = 1
@@ -363,12 +363,12 @@ def warped_vectors_intersection(seg1, seg2):
         # report the worse rating of both segments
         rating1 = np.min(
             np.asarray(
-                [np.linalg.norm(bridgepoint1 - seg2.line_cog_left), np.linalg.norm(bridgepoint1 - seg2.line_cog_right)]
+                [np.linalg.norm(bridgepoint1 - seg2.left_3D), np.linalg.norm(bridgepoint1 - seg2.right_3D)]
             )
         )
         rating2 = np.min(
             np.asarray(
-                [np.linalg.norm(bridgepoint2 - seg1.line_cog_left), np.linalg.norm(bridgepoint2 - seg1.line_cog_right)]
+                [np.linalg.norm(bridgepoint2 - seg1.left_3D), np.linalg.norm(bridgepoint2 - seg1.right_3D)]
             )
         )
         rating = np.max(np.asarray([rating1, rating2]))

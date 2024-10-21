@@ -206,8 +206,9 @@ class Segment(object):
         self.points_2D = target_points[:, :2]
 
         ransac_data = (inliers_0, inliers_1)
+        plot = False
         if plot:
-            vis.segment_projection_2D(self.points_2D, ransac_highlight=True, ransac_data=ransac_data, line_dir_2=proj_dir_1)
+            vis.segment_projection_2D(self.points_2D, ransac_highlight=True, ransac_data=ransac_data)
 
             # vis.segment_projection_3D(points, proj_lines)
             # vis.segment_projection_3D(proj_points_plane, proj_lines)
@@ -278,9 +279,15 @@ class Segment(object):
 
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
-        self.cog_2D = np.array((cog_x, cog_y))
+        self.left_2D = np.array((cog_x, cog_y))
 
-        self.cog_3D = rotate_xy2xyz(self.cog_2D, self.mat_rotation_xy, self.angle_2D)
+        # TODO: calculate offset of new CS to old CS / origin. transform to depict left_3D in original CS
+
+
+        cog_2D_hom = np.array([cog_x, cog_y, 0, 1])
+        print(self.left_3D)
+        self.left_3D = np.dot(self.transformation_matrix.T, cog_2D_hom.T).T[:3]
+        print(self.left_3D)
 
 
     def downsample_dbscan_rand(self, points_after_sampling):
