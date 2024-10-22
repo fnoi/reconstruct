@@ -274,7 +274,10 @@ class Segment(object):
 
         # update COG / left in 2D and 3D
         self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, cog_x, cog_y)
-        self.right_3D = self.left_3D + self.vector_3D
+        self.right_3D = geom.calculate_shifted_source_pt(self.source_angle, cog_x, cog_y, third_pt=self.right_3D)
+        direction = self.right_3D - self.left_3D
+        self.vector_3D = direction / np.linalg.norm(direction)
+        self.vector_3D = self.right_3D - self.left_3D
         self.center_3D = (self.left_3D + self.right_3D) / 2
 
         source_vec_left = self.source_angle[0] - self.source_angle[1]

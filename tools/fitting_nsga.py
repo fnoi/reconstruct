@@ -237,6 +237,15 @@ def cost_combined(solution_params, data_points, data_frame):
     solution_verts = params2verts(solution_params, from_cog=False)
     solution_edges = verts2edges(solution_verts)
 
+    n_up = [0, 1]
+    n_down = [0, -1]
+    n_left = [-1, 0]
+    n_right = [1, 0]
+
+    edge_normals = np.array(
+        [n_left, n_up, n_left, n_down, n_left, n_up, n_right, n_down, n_right, n_up, n_right, n_down]
+    )
+
     edge_lengths = np.linalg.norm(solution_edges[:, 1] - solution_edges[:, 0], axis=1)
     edge_length_total = np.sum(edge_lengths)
 
