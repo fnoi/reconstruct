@@ -16,7 +16,7 @@ def data_preprocessor(skeleton):
         profiles[data.name] = {
             'cstype': data.cstype,
             'length': length,
-            'rot_mat': data.rot_mat,
+            'rot_mat': np.array(data.rot_mat),
             'start': start,
             'end': end
         }
@@ -54,6 +54,9 @@ def model_builder(skeleton):
         body = model.createIfcExtrudedAreaSolid(ifc_profile, None, zDir, profile_properties['length'])
         bodyRep = model.createIfcShapeRepresentation(ctx, "Body", "SweptSolid", [body])
         prdDefShape = model.createIfcProductDefinitionShape(None, None, (bodyRep,))
+
+        print(f'rot mat {profile_properties["rot_mat"]}')
+
         beam = model.createIfcBeam(ifcopenshell.guid.new(), None, bone_name, None, None, placement, prdDefShape, None, None)
 
 
