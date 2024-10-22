@@ -952,3 +952,78 @@ def simplified_transform_lines(source_angle, target_angle):
             print()
 
     return transform
+
+
+def calculate_shifted_source_pt(angle_source, shift_x, shift_y, third_pt=None):
+    # calculate global direction of y as cross product of source angle vectors
+    vec_y = angle_source[0] - angle_source[1]  # local y direction
+    vec_z = angle_source[2] - angle_source[1] # local z direction
+    vec_x = np.cross(vec_y, vec_z)  # local x direction
+    vec_x = vec_x / np.linalg.norm(vec_x)  # normalize
+
+    if third_pt is None:
+        common = angle_source[1]
+    else:
+        common = third_pt
+
+    shifted_pt = common + shift_x * vec_x + shift_y * vec_y
+
+    return shifted_pt
+
+
+
+
+def calculate_shifted_point(angle_tuple, shift_x, shift_y):
+    """
+    Calculate a new point based on x,y shifts in the plane perpendicular to the angle's normal.
+    The angle vectors define the y-z plane, and shifts are applied in the x-y plane.
+
+    :param angle_tuple: Tuple of (left, common, right) points defining the angle in y-z
+    :param shift_x: Shift in global x direction
+    :param shift_y: Shift in direction of 'left' vector projection onto x-y plane
+    :return: The new point coordinates in 3D space
+    """
+    left, common, right = map(np.array, angle_tuple)
+
+    # Get normalized direction vectors
+    vec_left = left - common  # first angle vector (in y-z)
+    vec_right = right - common  # second angle vector (in y-z)
+
+    # Calculate normal of the y-z plane defined by the angle
+    normal = np.cross(vec_left, vec_right)
+    normal = normal / np.linalg.norm(normal)  # ensure normalized
+
+    # Project left vector onto x-y plane
+    # First, get the component of vec_left perpendicular to normal
+    proj_left = vec_left - np.dot(vec_left, normal) * normal
+    # Then project this onto x-y plane
+    proj_left[2] = 0  # zero out z component
+    if np.linalg.norm(proj_left) > 0:
+        proj_left = proj_left / np.linalg.norm(proj_left)  # normalize
+
+    # x direction is simply the global x direction
+    x_dir = np.array([1, 0, 0])
+
+    # Calculate the shifted point
+    shifted_point = common + shift_x * x_dir + shift_y * proj_left
+
+    return shifted_point
+
+
+def transform_shifted_point(source_angle, target_angle, local_point):
+    """
+    Transform a point from source angle's local coordinate system to target system.
+
+    :param source_angle: Tuple of (left, common, right) points for source
+    :param target_angle: Tuple of (left, common, right) points for target
+    :param local_point: Point in 3D space relative to source angle
+    :return: Transformed point in target coordinate system
+    """
+    # Calculate transformation matrix
+    transform = simplified_transform_lines(source_angle, target_angle)
+
+    # Transform the point
+    point_homogeneous = np.append(local_point, 1)
+    transformed_point = np.dot(transform, point_homogeneous)[:3]
+
+    return transformed_point

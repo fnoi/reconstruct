@@ -109,6 +109,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
                     patch_point_data = cloud.loc[cloud['id'].isin(patch_point_ids)]
                     segment.points = np.vstack((segment.points, patch_point_data[['x', 'y', 'z']].values.astype(np.float32)))
                     segment.points_data = pd.concat([segment.points_data, patch_point_data])
+                    segment.calc_axes(plot=False)
                     cloud.loc[nonseg_patch_point, 'instance_pr'] = ranged_segment
                     # remove points from to_do
                     to_do = [x for x in to_do if x not in patch_point_ids]

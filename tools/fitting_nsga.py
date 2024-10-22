@@ -18,7 +18,6 @@ from scipy.spatial import cKDTree, Delaunay
 from scipy.spatial.distance import cdist
 
 from tools.fitting_1 import params2verts, params2verts_rev, verts2edges
-from tools.fitting_pso import cs_plot
 
 
 def setup_lims_placement(points):
@@ -66,7 +65,6 @@ def solve_w_nsga(points, config, all_points):
 
     toolbox = base.Toolbox()
 
-    cs_ids = [_ for _ in range(len(data))]
     # Register the function to select a random row from the parameter set
     toolbox.register("attr_row", random.randint, 0, len(data) - 1)
     toolbox.register("attr_x_offset", random.uniform, *x_range)
@@ -120,70 +118,47 @@ def solve_w_nsga(points, config, all_points):
 
     pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
 
-    # Save the Pareto front to a text file
-    with open('pareto_front.txt', 'w') as f:
-        for ind in pareto_front[0]:  # pareto_front[0] contains the first front, the actual Pareto front
-            f.write(str(ind) + " Fitness: " + str(ind.fitness.values) + '\n')
+    pareto_unique = []
+    for pareto_individual in pareto_front[0]:
+        if pareto_individual not in pareto_unique:
+            pareto_unique.append(pareto_individual)
 
-
+    min_fitness_individual = min(pareto_unique, key=lambda x: x.fitness.values[0])
 
     pareto_plot = True
     if pareto_plot:
         fig = plot_all_generations_hof_and_pareto_front(all_individuals,
                                                         hof,
-                                                        pareto_front,
+                                                        pareto_unique,
                                                         ["Log Distance", "Active Edge Length", "Activation Distance"],
                                                         plot_pareto_surface=False
                                                         )
         fig.show()
 
-    # identify unique entries in pareto_front[0]
-    pareto_front_unique = list(map(list, set(map(tuple,pareto_front[0]))))
-    pareto_track = []
-    for _pareto_iter, _pareto_solution in enumerate(pareto_front_unique):
-        _params = _pareto_solution[1:] + parameter_set[_pareto_solution[0]]
-        _verts = params2verts(_params)
-        # count polygon inliers
-        _edges = verts2edges(_verts)
-        _distances = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in _edges])
-        __distances = np.array([point_segment_distance(all_points, edge[0], edge[1]) for edge in _edges])
-        _inliers = np.sum(np.min(_distances, axis=0) < config.cs_fit.inlier_thresh)
-        __inliers = np.sum(np.min(__distances, axis=0) < config.cs_fit.inlier_thresh)
-        # pareto_track.append([_pareto_solution, _inliers])
-        pareto_track.append([_pareto_solution, __inliers])
 
-        # cs_plot(_verts, points_array, headline=f'Pareto Solution {_pareto_iter} - Inliers: {_inliers}')
-
-    # identify max inliers in pareto_track
-    pareto_track = sorted(pareto_track, key=lambda x: x[1], reverse=True)
-    best_solution = pareto_track[0][0]
-    relative_inliers = pareto_track[0][1] / len(all_points)
-    best_params = best_solution[1:] + parameter_set[best_solution[0]]
-    best_verts = params2verts(best_params)
-    # cs_plot(best_verts, points_array, headline=f'Best Solution: {pareto_track[0][1]} Inliers')
-    cs_plot(best_verts, all_points, headline=f'Best Solution: {pareto_track[0][1]} Inliers, relative: {relative_inliers}')
-
-
-
+    params = min_fitness_individual[1:] + parameter_set[min_fitness_individual[0]]
+    verts = params2verts(params, from_cog=False)
+    edges = verts2edges(verts)
+    dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
+    inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
+    rel_inliers = inliers / len(all_points)
+    cs_plot(verts, all_points, headline=f'best solution: {inliers}\ninliers, relative: {rel_inliers:.2f}')
 
     # delete Individual and FitnessMin
     del creator.FitnessMulti
     del creator.Individual
 
-
-
-
     # should return h_beam_params, h_beam_verts and final cost
-    h_beam_params = parameter_set[best_solution[0]]
-    h_beam_verts = best_verts
-    h_beam_cost = pareto_track[0][1]
-
+    h_beam_params = params
+    h_beam_verts = verts
+    h_beam_cost = min_fitness_individual.fitness.values
 
     # cstype is the name of the profile
-    cstype = data.iloc[best_solution[0]]['label']
-    # raise ValueError("This is a test exception")
+    cstype = data.iloc[min_fitness_individual[0]]['label']
 
-    return h_beam_params, h_beam_verts, h_beam_cost, cstype
+    # h_beam_cost no longer returned
+
+    return h_beam_params, h_beam_verts, cstype
 
 ###########
 
@@ -259,7 +234,7 @@ def cost_combined(solution_params, data_points, data_frame):
     params = data_frame.iloc[solution_params[0]]
     params = params[['tw', 'tf', 'bf', 'd']].values.tolist()
     solution_params = [solution_params[1], solution_params[2]] + params
-    solution_verts = params2verts(solution_params)
+    solution_verts = params2verts(solution_params, from_cog=False)
     solution_edges = verts2edges(solution_verts)
 
     edge_lengths = np.linalg.norm(solution_edges[:, 1] - solution_edges[:, 0], axis=1)
@@ -449,7 +424,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
 
     # Extract the true Pareto front
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)[0]
-    pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front[0]])
+    pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front])
 
     # Create the scatter plot for all solutions
     fig = go.Figure(data=go.Scatter3d(
@@ -459,34 +434,34 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
         mode='markers',
         marker=dict(
             size=2,
-            color=all_fitness_values[:, 2],  # Color by the third objective
+            color=all_fitness_values[:, 0],  # Color by the first objective
             colorscale='Viridis',
             opacity=0.6,
-            colorbar=dict(title="Fitness (Obj 3)")
+            colorbar=dict(title="fitness (objective 1)")
         ),
-        text=[f"Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+        text=[f"solution {i}<br>obj1: {v[0]:.4f}<br>obj2: {v[1]:.4f}<br>obj3: {v[2]:.4f}"
               for i, v in enumerate(all_fitness_values)],
         hoverinfo='text',
-        name='All Solutions'
+        name='all Solutions'
     ))
 
-    # Add Hall of Fame solutions
-    fig.add_trace(go.Scatter3d(
-        x=hof_fitness_values[:, 0],
-        y=hof_fitness_values[:, 1],
-        z=hof_fitness_values[:, 2],
-        mode='markers',
-        marker=dict(
-            size=5,
-            color='yellow',
-            symbol='diamond',
-            line=dict(color='black', width=1)
-        ),
-        text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
-              for i, v in enumerate(hof_fitness_values)],
-        hoverinfo='text',
-        name='Hall of Fame'
-    ))
+    # # Add Hall of Fame solutions
+    # fig.add_trace(go.Scatter3d(
+    #     x=hof_fitness_values[:, 0],
+    #     y=hof_fitness_values[:, 1],
+    #     z=hof_fitness_values[:, 2],
+    #     mode='markers',
+    #     marker=dict(
+    #         size=5,
+    #         color='yellow',
+    #         symbol='diamond',
+    #         line=dict(color='black', width=1)
+    #     ),
+    #     text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+    #           for i, v in enumerate(hof_fitness_values)],
+    #     hoverinfo='text',
+    #     name='Hall of Fame'
+    # ))
 
     # Add true Pareto front solutions
     fig.add_trace(go.Scatter3d(
@@ -548,7 +523,12 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
         ),
         width=1000,
         height=800,
-        margin=dict(r=20, b=10, l=10, t=40)
+        margin=dict(r=20, b=10, l=10, t=40),
+        # font times new roman
+        font=dict(
+            family="Times New Roman",
+            size=12,
+        )
     )
 
     return fig
@@ -615,3 +595,28 @@ if __name__ == "__main__":
     print(fitness)
 
     a = 0
+
+
+def cs_plot(vertices=None, points=None, headline=None):
+    # plot lines in 2D iterate 0 - 11 and 0
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    color = 'purple'
+    if vertices is not None:
+        for i in range(11):
+            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]], color=color)
+            # plot vertex id as text
+            # ax.text(vertices[i][0], vertices[i][1], str(i))
+        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
+    if points is not None:
+        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+    if headline is not None:
+        # title in times new roman
+        ax.set_title(headline, fontname='Times New Roman')
+    ax.set_aspect('equal')
+    # axis font tnr
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(12)
+        item.set_fontname('Times New Roman')
+    plt.show()

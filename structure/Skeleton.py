@@ -72,9 +72,6 @@ class Skeleton:
                     f'l 1 2 \n')
         self.bone_count += 1
 
-    # def add_bone(self, bone):
-    #     self.bones.append(bone)
-    #     self.bone_count += 1
 
     def to_obj(self, topic: str, radius: bool = False):
         for i, bone in enumerate(self.bones):
@@ -167,7 +164,7 @@ class Skeleton:
                         segment_new.calc_axes()
 
                         self.add_cloud(segment_new)
-                        self.update_bones()
+                        self.update_bone_ids()
 
                         print(f'ummm now {len(self.bones)} bones')
 
@@ -620,7 +617,7 @@ class Skeleton:
             self.potential[2] = 1
         return
 
-    def update_bones(self):
+    def update_bone_ids(self):
         for i, bone in enumerate(self.bones):
             bone.name = f'beam_{i}'
         self.bone_count = len(self.bones)
@@ -695,8 +692,8 @@ class Skeleton:
             # equal axis
             fig.update_layout(scene=dict(aspectmode='data'))
 
-            print(f'left: {bone.left_3D}')
-            print(f'right: {bone.right_3D}')
+            # print(f'left: {bone.left_3D}')
+            # print(f'right: {bone.right_3D}')
 
             # plot left_3D, right_3D as lines
             fig.add_trace(go.Scatter3d(x=[bone.left_3D[0], bone.right_3D[0]],

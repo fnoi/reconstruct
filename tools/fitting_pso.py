@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt
 
 from pyswarm import pso
 
-from tools.fitting_0 import cost_fct_0
 from tools.fitting_1 import cost_fct_1, params2verts
+from tools.fitting_nsga import cs_plot
 
 
 def point_to_line_distance(point, v1, v2):
@@ -49,25 +49,6 @@ def min_distance_to_polygon(points, vertices, active_edges=False):
         return min_distances, inactive_edges_count
     else:
         return min_distances
-
-
-def cs_plot(vertices=None, points=None, headline=None):
-    # plot lines in 2D iterate 0 - 11 and 0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    color = 'purple'
-    if vertices is not None:
-        for i in range(11):
-            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]], color=color)
-            # plot vertex id as text
-            # ax.text(vertices[i][0], vertices[i][1], str(i))
-        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
-    if points is not None:
-        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
-    if headline is not None:
-        ax.set_title(headline)
-    ax.set_aspect('equal')
-    plt.show()
 
 
 def plot_2D_points_bbox(points_array_2D):

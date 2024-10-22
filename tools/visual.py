@@ -259,23 +259,26 @@ def dist_hist_color(distances, bone_id, angle_desc=None):
     plt.show()
 
 
-def transformation_tracer(points_source, points_target, points_inter_1=None, points_inter_2=None,
-                          source_angle=None, target_angle=None):
+def transformation_tracer(points_source=None, points_target=None, points_inter_1=None, points_inter_2=None,
+                          source_angle=None, target_angle=None, source_angle_2=None, target_angle_2=None):
     # create go figure
     fig = go.Figure()
-    # scatter plot original points
-    fig.add_trace(go.Scatter3d(
-        x=points_source[:, 0], y=points_source[:, 1], z=points_source[:, 2],
-        mode='markers',
-        marker=dict(size=1, color='blue', opacity=0.8),
-        name='Source'
-    ))
-    fig.add_trace(go.Scatter3d(
-        x=points_target[:, 0], y=points_target[:, 1], z=points_target[:, 2],
-        mode='markers',
-        marker=dict(size=1, color='green', opacity=0.8),
-        name='Target'
-    ))
+    if points_source is not None:
+        # scatter plot source points
+        fig.add_trace(go.Scatter3d(
+            x=points_source[:, 0], y=points_source[:, 1], z=points_source[:, 2],
+            mode='markers',
+            marker=dict(size=1, color='blue', opacity=0.8),
+            name='Source'
+        ))
+    if points_target is not None:
+        # scatter plot target points
+        fig.add_trace(go.Scatter3d(
+            x=points_target[:, 0], y=points_target[:, 1], z=points_target[:, 2],
+            mode='markers',
+            marker=dict(size=1, color='green', opacity=0.8),
+            name='Target'
+        ))
     if points_inter_1 is not None:
         fig.add_trace(go.Scatter3d(
             x=points_inter_1[:, 0], y=points_inter_1[:, 1], z=points_inter_1[:, 2],
@@ -308,6 +311,23 @@ def transformation_tracer(points_source, points_target, points_inter_1=None, poi
             name='Source Angle'
         ))
 
+    if source_angle_2 is not None:
+        # same as source_angle but dotted
+        fig.add_trace(go.Scatter3d(
+            x=[source_angle_2[0][0], source_angle_2[1][0]], y=[source_angle_2[0][1], source_angle_2[1][1]],
+            z=[source_angle_2[0][2], source_angle_2[1][2]],
+            mode='lines',
+            line=dict(color='purple', width=10, dash='dash'),
+            name='Source Angle 2'
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[source_angle_2[1][0], source_angle_2[2][0]], y=[source_angle_2[1][1], source_angle_2[2][1]],
+            z=[source_angle_2[1][2], source_angle_2[2][2]],
+            mode='lines',
+            line=dict(color='orange', width=10, dash='dash'),
+            name='Source Angle 2'
+        ))
+
     if target_angle is not None:
         # add purple line for target angle 0:1
         fig.add_trace(go.Scatter3d(
@@ -326,7 +346,24 @@ def transformation_tracer(points_source, points_target, points_inter_1=None, poi
             name='Target Angle'
         ))
 
-    else:
+    if target_angle_2 is not None:
+        # same as target_angle but dotted
+        fig.add_trace(go.Scatter3d(
+            x=[target_angle_2[0][0], target_angle_2[1][0]], y=[target_angle_2[0][1], target_angle_2[1][1]],
+            z=[target_angle_2[0][2], target_angle_2[1][2]],
+            mode='lines',
+            line=dict(color='purple', width=10, dash='dash'),
+            name='Target Angle 2'
+        ))
+        fig.add_trace(go.Scatter3d(
+            x=[target_angle_2[1][0], target_angle_2[2][0]], y=[target_angle_2[1][1], target_angle_2[2][1]],
+            z=[target_angle_2[1][2], target_angle_2[2][2]],
+            mode='lines',
+            line=dict(color='orange', width=10, dash='dash'),
+            name='Target Angle 2'
+        ))
+
+    if target_angle is None and target_angle_2 is None:
         # add lines for coordinate system
         fig.add_trace(go.Scatter3d(
             x=[0, 1], y=[0, 0], z=[0, 0],

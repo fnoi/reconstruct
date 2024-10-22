@@ -22,7 +22,7 @@ from tools.model_eval import model_evaluation
 from tools.to_model import model_builder
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_experiment_2.yaml')
+    config = OmegaConf.load('config_0.yaml')
     config = config_io(config)
 
     ##########
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 5
+    cache_flag = 4
     single_step = False
     ##########
     ##########
@@ -194,7 +194,7 @@ if __name__ == '__main__':
         print('\n- skeleton segment aggregation, metrics revised')  # baseline exists but omg indeed
 
         skeleton.aggregate_bones()
-        skeleton.update_bones()
+        skeleton.update_bone_ids()
 
         metrics_report = True
         if metrics_report:
@@ -208,7 +208,7 @@ if __name__ == '__main__':
             raise ValueError('stop here, single step')
 
     if cache_flag <= 6:
-        print('\n- fit cross-sections, lookup cross-sections')
+        print('\n- fit cross-sections from catalog')
         # fit cross-sections
         skeleton = pd.read_pickle(f'{config.project.parking_path}/skeleton_cache.pickle')
         for bone in skeleton.bones:
@@ -227,13 +227,12 @@ if __name__ == '__main__':
 
             try:
                 bone.fit_cs_rev(config)
-                # raise ValueError('stop here')
-                # bone.cs_lookup()
             except ValueError as e:
                 print(f'error: {e}')
                 bone.h_beam_params = False
                 bone.h_beam_verts = False
 
+        skeleton.plot_cog_skeleton()
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.cache_json(config.project.parking_path)
         if single_step:

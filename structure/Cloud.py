@@ -3,7 +3,12 @@ import itertools
 import os
 import time
 
-from tools.fitting_nsga import solve_w_nsga
+from ifcopenshell.express.rules.IFC4X3 import marker
+from open3d.examples.pipelines.colored_icp_registration import source
+
+import tools.fitting_nsga
+from tools.fitting_nsga import solve_w_nsga, cs_plot
+from tools.geometry import calculate_shifted_point, transform_shifted_point, simplified_transform_lines
 from tools.metrics import huber_loss
 from tools.visual import transformation_tracer
 
@@ -20,7 +25,7 @@ try:
 
     from tools.IO import points2txt, lines2obj, cache_meta
     from tools.fitting_1 import params2verts
-    from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1, cs_plot
+    from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1
     from tools import geometry as geom
     from tools import visual as vis, fitting_pso
 except ImportError as e:
@@ -29,6 +34,8 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.cstype = None
+
         self.left_3D = None
         self.right_3D = None
         self.center_3D = None
@@ -36,6 +43,9 @@ class Segment(object):
         self.left_2D = None
         self.right_2D = None
         self.center_2D = None
+
+        self.source_angle = None
+        self.target_angle = None
 
         self.rotation_pose = None
         self.rotation_long = None
@@ -107,8 +117,6 @@ class Segment(object):
         """
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
-        # insertion
-        plot = True
         self.points_hom = np.hstack((self.points, np.ones((self.points.shape[0], 1))))
         points = self.points
         try:
@@ -189,19 +197,21 @@ class Segment(object):
         target_left = target_axis_n
         target_center = origin
         target_right = target_axis_s
-        target = (target_left, target_center, target_right)
+        self.target_angle = (target_left, target_center, target_right)
 
         source_left = self.left_3D + n_0
         source_center = self.left_3D
         source_right = source_center + self.vector_3D
-        source = (source_left, source_center, source_right)
-        self.transformation_matrix = geom.simplified_transform_lines(source, target)
+        self.source_angle = (source_left, source_center, source_right)
+        self.transformation_matrix = geom.simplified_transform_lines(self.source_angle, self.target_angle)
 
         self.rotation_pose = geom.rotation_matrix_from_vectors(self.vector_3D, target_axis_s)
-        proj_points_flat = np.dot(proj_points_plane, self.rotation_pose)
 
         target_points = np.dot(self.transformation_matrix, self.points_hom.T).T[:,:3]
-        transformation_tracer(self.points, target_points, source_angle=source, target_angle=target)
+
+        trace = False
+        if trace:
+            transformation_tracer(self.points, target_points, source_angle=self.source_angle, target_angle=self.target_angle)
 
         self.points_2D = target_points[:, :2]
 
@@ -215,7 +225,7 @@ class Segment(object):
 
 
 
-    def update_axes(self):
+    def update_axes(self):  # still needed?
         """bring back center of gravity cog (from lookup) to its correct position in the original coordinate system"""
         cog_flat = rotate_points_2D(self.cog_2D, - self.angle_2D)
 
@@ -241,53 +251,40 @@ class Segment(object):
         self.line_cog_right = projected[r_ind]
         self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
 
-    def find_cylinder(self):
-        cyl = pyrsc.Cylinder()
-        res = cyl.fit(self.points, 0.04, 1000)
-
-        return res
-
-    def calc_pca_o3d(self):
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(self.points)
-
-        # clean up point cloud to improve pca results
-        pcd_clean, ind = pcd.remove_statistical_outlier(nb_neighbors=20, std_ratio=.75)
-        self.points_cleaned = np.asarray(pcd_clean.points)
-
-        cov = pcd_clean.compute_mean_and_covariance()
-        pc = np.linalg.eig(cov[1])
-
-        self.pca = pc[1][:, 0]
-        self.pcb = pc[1][:, 1]
-        self.pcc = pc[1][:, 2]
-
 
     def fit_cs_rev(self, config=None):
-        points_after_sampling = config.cs_fit.n_downsample
-        # plot_2D_points_bbox(self.points_2D)
-        # self.downsample_dbscan_grid(config.cs_fit.grid_size, points_after_sampling)
-
-
-        # self.downsample_dbscan_rand(points_after_sampling)  # TODO: check method limitations, mitigate risk, investigate weighting
+        if self.config.cs_fit.n_downsample != 0:
+            self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
+        else:
+            self.points_2D_fitting = self.points_2D
         # plot_2D_points_bbox(self.points_2D_fitting)
 
-        self.points_2D_fitting = self.points_2D
-        # timer = time.time()
-        self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
-        # self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
+        if self.config.cs_fit.method == 'nsga3':
+            # cross-section fitting with NSGA-III (multi-objective optimization)
+            self.h_beam_params, self.h_beam_verts, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
+        elif self.config.cs_fit.method == 'pso':
+            # cross-section fitting with PSO (single-objective optimization)
+            self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
+        else:
+            # not implemented
+            raise NotImplementedError(f'CS fitting method {self.config.cs_fit.method} not implemented')
 
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
-        self.left_2D = np.array((cog_x, cog_y))
 
-        # TODO: calculate offset of new CS to old CS / origin. transform to depict left_3D in original CS
+        # update COG / left in 2D and 3D
+        self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, cog_x, cog_y)
+        self.right_3D = self.left_3D + self.vector_3D
+        self.center_3D = (self.left_3D + self.right_3D) / 2
 
+        source_vec_left = self.source_angle[0] - self.source_angle[1]
+        source_vec_right = self.source_angle[2] - self.source_angle[1]
+        source_vec_center = self.left_3D
 
-        cog_2D_hom = np.array([cog_x, cog_y, 0, 1])
-        print(self.left_3D)
-        self.left_3D = np.dot(self.transformation_matrix.T, cog_2D_hom.T).T[:3]
-        print(self.left_3D)
+        self.source_angle = (source_vec_center + source_vec_left, source_vec_center, source_vec_center + source_vec_right)
+        self.transformation_matrix = simplified_transform_lines(self.source_angle, self.target_angle)
+
+        self.h_beam_verts = params2verts(self.h_beam_params, from_cog=False)
 
 
     def downsample_dbscan_rand(self, points_after_sampling):
@@ -486,7 +483,7 @@ class Segment(object):
 
         # TODO: identify bf and d deltas and move x0/y0 accordingly (to avoid the overall movement)
 
-        fitting_pso.cs_plot(self.h_beam_verts, self.points_2D)
+        tools.fitting_nsga.cs_plot(self.h_beam_verts, self.points_2D)
 
         return
         # return beams_frame

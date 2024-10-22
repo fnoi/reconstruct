@@ -118,8 +118,13 @@ def params2verts_rev(solution):
     return vertices
 
 
-def params2verts(solution):
-    x0, y0, tf, tw, bf, d = solution
+def params2verts(solution, from_cog=True):
+    if from_cog:
+        tf, tw, bf, d = solution
+        x0 = -bf / 2
+        y0 = -d / 2
+    else:
+        x0, y0, tf, tw, bf, d = solution
 
     v0 = np.array([x0, y0])
     v1 = v0 + np.array([0, tf])
