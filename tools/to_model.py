@@ -2,6 +2,7 @@ import math
 
 import ifcopenshell
 import numpy as np
+import pandas as pd
 
 
 def data_preprocessor(skeleton):
@@ -60,7 +61,7 @@ def model_builder(skeleton):
         beam = model.createIfcBeam(ifcopenshell.guid.new(), None, bone_name, None, None, placement, prdDefShape, None, None)
 
 
-    model.write("model.ifc")
+    model.write("/Users/fnoic/Downloads/model.ifc")
 
 
 
@@ -70,12 +71,8 @@ def model_builder(skeleton):
 
 
 if __name__ == '__main__':
-    profiles = {'W8X67':
-                    {'length':1.5},
-                'W6X12':
-                    {'length':1.0},
-                'HP12X53':
-                    {'length':0.2}
-                }
-    model_builder(profiles)
+    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
+        skeleton = pd.read_json(f)
+    # print(skeleton)
 
+    model_builder(skeleton)
