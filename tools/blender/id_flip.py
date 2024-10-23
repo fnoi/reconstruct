@@ -192,8 +192,8 @@ def blender_beams(query_profile_dict):
         )
 
         # Set the final position
-        center = [(a + b) / 2 for a, b in zip(beam_data['start'], beam_data['end'])]
-        obj.location = beam_data['end']
+        # center = [(a + b) / 2 for a, b in zip(beam_data['start'], beam_data['end'])]
+        obj.location = beam_data['start']
 
         beam_iter += 1
 
@@ -256,43 +256,43 @@ if __name__ == "__main__":
         end = data['end']
         length = math.sqrt(sum((a - b) ** 2 for a, b in zip(start, end)))
 
-        rot_mat = np.asarray(data['rot_mat'])
-        z_angle_add = data['angle_xy']
-        # define rotation matrix for z axis rotation
-        rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
-                                [np.sin(z_angle_add), np.cos(z_angle_add), 0],
-                                [0, 0, 1]])
-        # multiply rotation matrices
-        rot_mat = np.dot(rot_mat.T, rot_mat_z)
+        rot_mat = np.asarray(data['rot_mat']).T
+        # z_angle_add = data['angle_xy']
+        # # define rotation matrix for z axis rotation
+        # rot_mat_z = np.asarray([[np.cos(z_angle_add), -np.sin(z_angle_add), 0],
+        #                         [np.sin(z_angle_add), np.cos(z_angle_add), 0],
+        #                         [0, 0, 1]])
+        # # multiply rotation matrices
+        # rot_mat = np.dot(rot_mat.T, rot_mat_z)
 
         # apply reverse rotation to start and end
-        _start = np.dot(rot_mat.T, start)
-        __start = _start + start
-        ___start = _start + end
-
-        _end = np.dot(rot_mat.T, end)
-        __end = _end + start
-        ___end = _end + end
-
-        print(f'{start}, start')
-        print(f'{__start}, __start')
-        print(f'{___start}, ___start')
-
-        print(f'{end}, end')
-        print(f'{__end}, __end')
-        print(f'{___end}, ___end')
-
-
-
-
-        thresh = 0.01
-        print('bone name:', bone)
-        if np.linalg.norm(target - end) < thresh:
-            print(f'A', np.linalg.norm(target - end))
-        if np.linalg.norm(target - start) < thresh:
-            print('B', np.linalg.norm(target - start))
-
-        continue
+        # _start = np.dot(rot_mat.T, start)
+        # __start = _start + start
+        # ___start = _start + end
+        #
+        # _end = np.dot(rot_mat.T, end)
+        # __end = _end + start
+        # ___end = _end + end
+        #
+        # print(f'{start}, start')
+        # print(f'{__start}, __start')
+        # print(f'{___start}, ___start')
+        #
+        # print(f'{end}, end')
+        # print(f'{__end}, __end')
+        # print(f'{___end}, ___end')
+        #
+        #
+        # #
+        #
+        # thresh = 0.01
+        # print('bone name:', bone)
+        # if np.linalg.norm(target - end) < thresh:
+        #     print(f'A', np.linalg.norm(target - end))
+        # if np.linalg.norm(target - start) < thresh:
+        #     print('B', np.linalg.norm(target - start))
+        #
+        # # continue
 
 
         profiles[data.name] = {
@@ -300,8 +300,7 @@ if __name__ == "__main__":
             'length': length,
             'rot_mat': rot_mat,
             'start': start,
-            'end': end,
-            'offset_2D': data['offset']
+            'end': end
         }
     print(f'working with {len(profiles)} profiles')
 
@@ -316,5 +315,5 @@ if __name__ == "__main__":
     #             'HP12X53':
     #                 {'length':0.2}
     #             }
-    raise ValueError('End of script')
+    # raise ValueError('End of script')
     blender_beams(profiles)

@@ -4,6 +4,25 @@ import ifcopenshell
 import numpy as np
 import pandas as pd
 
+import uuid
+import string
+
+
+
+def newGUID():
+    chars = string.digits + string.ascii_uppercase + string.ascii_lowercase + "_$"
+
+    g = uuid.uuid4().hex
+    bs = [int(g[i : i + 2], 16) for i in range(0, len(g), 2)]
+
+    def b64(v, l=4):
+        return "".join([chars[(v // (64**i)) % 64] for i in range(l)][::-1])
+
+    return "".join([b64(bs[0], 2)] + [b64((bs[i] << 16) + (bs[i + 1] << 8) + bs[i + 2]) for i in range(1, 16, 3)])
+
+
+# print(newGUID())
+
 
 def data_preprocessor(skeleton):
     profiles = {}
@@ -58,7 +77,10 @@ def model_builder(skeleton):
 
         print(f'rot mat {profile_properties["rot_mat"]}')
 
-        beam = model.createIfcBeam(ifcopenshell.guid.new(), None, bone_name, None, None, placement, prdDefShape, None, None)
+        # chars = string.digits + string.ascii_uppercase + string.ascii_lowercase + "_$"
+        guid_ = newGUID()
+
+        beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
 
 
     model.write("/Users/fnoic/Downloads/model.ifc")
