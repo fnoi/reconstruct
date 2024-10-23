@@ -1,23 +1,19 @@
 import copy
 import pickle
 import random
-from typing import final
 
-import deap
 import numpy as np
 import plotly.graph_objects as go
 from deap import creator, base, tools, algorithms
 
-from functools import partial
-
 from matplotlib import pyplot as plt
-
-from scipy.interpolate import splprep, splev
 
 from scipy.spatial import cKDTree, Delaunay
 from scipy.spatial.distance import cdist
 
-from tools.fitting_1 import params2verts, params2verts_rev, verts2edges
+from tools.fitting_1 import params2verts, verts2edges
+
+from sklearn.metrics.pairwise import cosine_similarity
 
 
 def setup_lims_placement(points):
@@ -36,7 +32,7 @@ def setup_lims_placement(points):
     return limits_x_moved, limits_y_moved
 
 
-def solve_w_nsga(points, config, all_points):
+def solve_w_nsga(points, normals, config, all_points):
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
         data = pickle.load(f)
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'r') as f:
@@ -57,10 +53,11 @@ def solve_w_nsga(points, config, all_points):
     points_array = copy.deepcopy(points)
     # points_array = np.asarray(points_array)
     points = [row.tolist() for row in points]
+    normals = [row.tolist() for row in normals]
 
     ###########
     # creator.create("FitnessMin", base.Fitness, weights=(-1.0,))                 # log_distance, active_edge_length_relative, activation_distance
-    creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0)) # minimize log distance, maximize relative active edge length, minimize edge activation distance
+    creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0, 1.0)) # minimize log distance, maximize relative active edge length, minimize edge activation distance, maximize cosine sim
     creator.create("Individual", list, fitness=creator.FitnessMulti)
 
     toolbox = base.Toolbox()
@@ -80,13 +77,13 @@ def solve_w_nsga(points, config, all_points):
     toolbox.register("individual", create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register("evaluate", cost_combined, data_points=points, data_frame=data)
+    toolbox.register("evaluate", cost_combined, data_points=points, data_normals=normals, data_frame=data)
     toolbox.register("mate", tools.cxTwoPoint)
     toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=parameter_set, x_range=x_range, y_range=y_range)
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
     # toolbox.register("select", tools.selNSGA2)
-    ref_points = tools.uniform_reference_points(nobj=3, p=12)
+    ref_points = tools.uniform_reference_points(nobj=4, p=12)
     toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
     population = toolbox.population(n=config.cs_fit.n_pop)
@@ -130,7 +127,7 @@ def solve_w_nsga(points, config, all_points):
         fig = plot_all_generations_hof_and_pareto_front(all_individuals,
                                                         hof,
                                                         pareto_unique,
-                                                        ["Log Distance", "Active Edge Length", "Activation Distance"],
+                                                        ["Log Distance", "Active Edge Length", "Cosine Similarity"],
                                                         plot_pareto_surface=False
                                                         )
         fig.show()
@@ -228,8 +225,9 @@ def cost_log_distance(solution_params, data_points, data_frame):
     return np.sum(np.log(min_distances)),
 
 
-def cost_combined(solution_params, data_points, data_frame):
+def cost_combined(solution_params, data_points, data_normals, data_frame):
     data_points = np.array(data_points)
+    data_normals = np.array(data_normals)
 
     params = data_frame.iloc[solution_params[0]]
     params = params[['tw', 'tf', 'bf', 'd']].values.tolist()
@@ -242,9 +240,15 @@ def cost_combined(solution_params, data_points, data_frame):
     n_left = [-1, 0]
     n_right = [1, 0]
 
-    edge_normals = np.array(
+    polygon_edge_normals = np.array(
         [n_left, n_up, n_left, n_down, n_left, n_up, n_right, n_down, n_right, n_up, n_right, n_down]
     )
+
+    # Pre-compute all cosine similarities
+    all_similarities = np.array([
+        cosine_similarity(normal.reshape(1, -1), data_normals)[0]
+        for normal in polygon_edge_normals
+    ])
 
     edge_lengths = np.linalg.norm(solution_edges[:, 1] - solution_edges[:, 0], axis=1)
     edge_length_total = np.sum(edge_lengths)
@@ -264,8 +268,12 @@ def cost_combined(solution_params, data_points, data_frame):
             edge_activity[edge] = 1
     edge_activity_log = copy.deepcopy(edge_activity)
 
+    normal_cosine_similarity = 0
     for edge in range(len(solution_edges)):
         if edge_activity_log[edge] == 1:
+            related_points = np.where(best_edge_per_point == edge)[0]
+            normal_cosine_similarity += np.sum(all_similarities[edge][related_points])
+
             neighbor_low = edge - 1 if edge - 1 >= 0 else len(solution_edges) - 1
             neighbor_high = edge + 1 if edge + 1 < len(solution_edges) else 0
             active_low = edge_activity_log[neighbor_low] == 0
@@ -285,13 +293,13 @@ def cost_combined(solution_params, data_points, data_frame):
                     edge_activation_dist[edge] = dist_low
                 else:
                     edge_activation_dist[edge] = dist_high
-            else:
-                continue
+
+    normal_cosine_similarity = normal_cosine_similarity / len(data_points)
 
     active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
     activation_distance = np.sum(edge_activation_dist)
 
-    return log_distance, active_edge_length_relative, activation_distance
+    return log_distance, active_edge_length_relative, activation_distance, normal_cosine_similarity
 
 
 
@@ -439,7 +447,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     fig = go.Figure(data=go.Scatter3d(
         x=all_fitness_values[:, 0],
         y=all_fitness_values[:, 1],
-        z=all_fitness_values[:, 2],
+        z=all_fitness_values[:, 3], # cosine instead
         mode='markers',
         marker=dict(
             size=2,
@@ -476,7 +484,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     fig.add_trace(go.Scatter3d(
         x=pareto_fitness_values[:, 0],
         y=pareto_fitness_values[:, 1],
-        z=pareto_fitness_values[:, 2],
+        z=pareto_fitness_values[:, 3], # cosine instead
         mode='markers',
         marker=dict(
             size=5,

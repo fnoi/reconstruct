@@ -108,6 +108,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
                     # add points to segment
                     patch_point_data = cloud.loc[cloud['id'].isin(patch_point_ids)]
                     segment.points = np.vstack((segment.points, patch_point_data[['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.normals = np.vstack((segment.normals, patch_point_data[['nx', 'ny', 'nz']].values.astype(np.float32)))
                     segment.points_data = pd.concat([segment.points_data, patch_point_data])
                     segment.calc_axes(plot=False)
                     cloud.loc[nonseg_patch_point, 'instance_pr'] = ranged_segment
@@ -137,6 +138,7 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
 
                 if angle < config.skeleton.init_max_angle_n_sn:
                     segment.points = np.vstack((segment.points, cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.normals = np.vstack((segment.normals, cloud.loc[point_id, ['nx', 'ny', 'nz']].values.astype(np.float32)))
                     segment.points_data = pd.concat([segment.points_data, cloud.loc[cloud['id'] == point_id]])
                     cloud.loc[point_id, 'instance_pr'] = ranged_segment
                     added += 1

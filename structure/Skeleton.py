@@ -145,19 +145,26 @@ class Skeleton:
                             (ind_long, ind_short) = (id_bone_1, id_bone_2)
                         else:
                             (ind_long, ind_short) = (id_bone_2, id_bone_1)
+
                         points_long = self.bones[ind_long].points
                         points_short = self.bones[ind_short].points
+
+                        normals_long = self.bones[ind_long].normals
+                        normals_short = self.bones[ind_short].normals
+
                         print(f'currently {len(self.bones)} bones')
 
                         # remove both bones
                         if ind_long > ind_short:
                             segment_new = Segment(name=f'beam_{ind_short}', config=self.config)
                             segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                            segment_new.normals = np.concatenate((normals_long, normals_short), axis=0)
                             self.bones.pop(ind_long)
                             self.bones.pop(ind_short)
                         else:
                             segment_new = Segment(name=f'beam_{ind_long}', config=self.config)
                             segment_new.points = np.concatenate((points_long, points_short), axis=0)
+                            segment_new.normals = np.concatenate((normals_long, normals_short), axis=0)
                             self.bones.pop(ind_short)
                             self.bones.pop(ind_long)
 

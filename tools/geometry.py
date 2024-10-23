@@ -6,8 +6,8 @@ import numpy as np
 import open3d as o3d
 import pyransac3d as pyrsc
 from matplotlib import pyplot as plt
-from numpy import ndarray, dtype, object_
-# from structure.CloudSegment import CloudSegment
+
+from sklearn.metrics.pairwise import cosine_similarity
 
 import plotly.graph_objects as go
 

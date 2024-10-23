@@ -34,6 +34,7 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.normals_2D = None
         self.cstype = None
 
         self.left_3D = None
@@ -79,7 +80,7 @@ class Segment(object):
         self.name = name
         self.points_center = None
         self.points = None
-        self.points = None
+        self.normals = None
         self.parent_path = f'data/out/'
         self.outpath = f'data/out/{name}'
 
@@ -99,6 +100,8 @@ class Segment(object):
         data = df[df['instance_pr'] == int(label)]
         self.points_data = data
         self.points = data[['x', 'y', 'z']].values
+        if 'nx' in data.columns:
+            self.normals = data[['nx', 'ny', 'nz']].values
         # self.points = data[:, :3]
         self.points_center = np.mean(self.points, axis=0)
 
@@ -118,6 +121,7 @@ class Segment(object):
         calculate the principal axes of the segment (core + overpowered function, consider modularizing)
         """
         self.points_hom = np.hstack((self.points, np.ones((self.points.shape[0], 1))))
+        self.normals_hom = np.hstack((self.normals, np.zeros((self.normals.shape[0], 1))))
         points = self.points
         try:
             normals = self.points_data[['nx', 'ny', 'nz']].values
@@ -208,12 +212,14 @@ class Segment(object):
         self.rotation_pose = geom.rotation_matrix_from_vectors(self.vector_3D, target_axis_s)
 
         target_points = np.dot(self.transformation_matrix, self.points_hom.T).T[:,:3]
+        target_normals = np.dot(self.transformation_matrix, self.normals_hom.T).T[:,:3]
 
         trace = False
         if trace:
             transformation_tracer(self.points, target_points, source_angle=self.source_angle, target_angle=self.target_angle)
 
         self.points_2D = target_points[:, :2]
+        self.normals_2D = target_normals[:, :2] / np.linalg.norm(target_normals[:, :2])
 
         ransac_data = (inliers_0, inliers_1)
         plot = False
@@ -255,13 +261,19 @@ class Segment(object):
     def fit_cs_rev(self, config=None):
         if self.config.cs_fit.n_downsample != 0:
             self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
+            # TODO: consider normals for downsampling / filter from segment normals
         else:
             self.points_2D_fitting = self.points_2D
         # plot_2D_points_bbox(self.points_2D_fitting)
 
         if self.config.cs_fit.method == 'nsga3':
             # cross-section fitting with NSGA-III (multi-objective optimization)
-            self.h_beam_params, self.h_beam_verts, self.cstype = solve_w_nsga(self.points_2D_fitting, config, self.points_2D)
+            self.h_beam_params, self.h_beam_verts, self.cstype = solve_w_nsga(
+                points=self.points_2D_fitting,
+                normals=self.normals_2D,
+                config=config,
+                all_points=self.points_2D
+            )
         elif self.config.cs_fit.method == 'pso':
             # cross-section fitting with PSO (single-objective optimization)
             self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)

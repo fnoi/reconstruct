@@ -6,10 +6,11 @@ project:
   experiment_path: data/experiment/
 
 data:
-  cloud_path: /data/experiment/initial_1.txt
+  cloud_path: /data/experiment/initial_2.txt
   orientation_path: /data/in_full/orientation_list.yaml
 
 preprocess:
+  downsample_flag: False
   voxel_size: 0.01
   normals_radius: 0.05
   normals_max_nn: 30
@@ -60,8 +61,8 @@ cs_fit:
   method: nsga3
   grid_size: 0.01
   n_downsample: 0
-  n_pop: 200
-  n_lambda: 200
-  n_mu: 200
+  n_pop: 2000
+  n_lambda: 2000
+  n_mu: 2000
   n_gen: 20
   inlier_thresh: 0.005

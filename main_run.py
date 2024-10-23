@@ -41,8 +41,8 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 8
-    single_step = False
+    cache_flag = 6
+    single_step = True
     ##########
     ##########
 
@@ -53,14 +53,19 @@ if __name__ == '__main__':
             cloud = pd.read_csv(f, sep=' ', header=None).values
             # cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'old_label', 'instance_gt'])
             # cloud.drop(['old_label'], axis=1, inplace=True)
-            cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
+            if config.data.cloud_path.endswith('initial_1.txt'):
+                cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
+            elif config.data.cloud_path.endswith('initial_2.txt'):
+                cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
 
         o3d_cloud = o3d.geometry.PointCloud()
         o3d_cloud.points = o3d.utility.Vector3dVector(cloud[['x', 'y', 'z']].values.astype(np.float32))
-        downsample = True
-        if downsample:
+        if 'nx' in cloud.columns:
+            o3d_cloud.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values.astype(np.float32))
+
+        if config.preprocess.downsample:
             print(f'original cloud size: {len(cloud)}')
             cloud_o3d = o3d_cloud.voxel_down_sample(voxel_size=config.preprocess.voxel_size)
             cloud_frame_new = pd.DataFrame(np.asarray(cloud_o3d.points), columns=['x', 'y', 'z'])
@@ -77,13 +82,16 @@ if __name__ == '__main__':
                 cloud_frame_new.loc[row[0], 'instance_gt'] = cloud.loc[seed_id, 'instance_gt']
             cloud = cloud_frame_new
             print(f'downsampled cloud size: {len(cloud)}')
-        cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
-            radius=config.preprocess.normals_radius, max_nn=config.preprocess.normals_max_nn))
-        normals = np.asarray(cloud_o3d.normals)
-        normals = normals / np.linalg.norm(normals, axis=1)[:, None]
-        cloud['nx'] = normals[:, 0]
-        cloud['ny'] = normals[:, 1]
-        cloud['nz'] = normals[:, 2]
+
+        # if no normals, estimate and store to df
+        if 'nx' not in cloud.columns:
+            cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                radius=config.preprocess.normals_radius, max_nn=config.preprocess.normals_max_nn))
+            normals = np.asarray(cloud_o3d.normals)
+            normals = normals / np.linalg.norm(normals, axis=1)[:, None]
+            cloud['nx'] = normals[:, 0]
+            cloud['ny'] = normals[:, 1]
+            cloud['nz'] = normals[:, 2]
 
         if 'id' not in cloud.columns:
             # add column to cloud that stores integer ID
@@ -225,12 +233,12 @@ if __name__ == '__main__':
             #         f.write(f'{point[0]} {point[1]}\n')
             # continue
 
-            try:
-                bone.fit_cs_rev(config)
-            except ValueError as e:
-                print(f'error: {e}')
-                bone.h_beam_params = False
-                bone.h_beam_verts = False
+            # try:
+            bone.fit_cs_rev(config)
+            # except ValueError as e:
+            #     print(f'error: {e}')
+            #     bone.h_beam_params = False
+            #     bone.h_beam_verts = False
 
         skeleton.plot_cog_skeleton()
         skeleton.cache_pickle(config.project.parking_path)
