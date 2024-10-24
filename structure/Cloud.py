@@ -9,7 +9,7 @@ from open3d.examples.pipelines.colored_icp_registration import source
 import tools.fitting_nsga
 import tools.visual
 from tools.fitting_nsga import solve_w_nsga
-from tools.geometry import calculate_shifted_point, transform_shifted_point, simplified_transform_lines
+from tools.geometry import calculate_shifted_point, transform_shifted_point, simplified_transform_lines, kmeans_points_normals_2D
 from tools.metrics import huber_loss
 from tools.visual import transformation_tracer, cs_plot
 
@@ -35,6 +35,8 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.filter_backmap = None
+        self.filter_weights = None
         self.normals_2D = None
         self.cstype = None
 
@@ -260,13 +262,15 @@ class Segment(object):
 
 
     def fit_cs_rev(self, config=None):
-        if self.config.cs_fit.n_downsample != 0:
-            self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
-            #
+        if self.config.cs_fit.n_downsample != 0 and self.config.cs_fit.n_downsample < self.points_2D.shape[0]:
+            self.points_2D_fitting, self.normals_2D_fitting, self.filter_weights, self.filter_backmap = kmeans_points_normals_2D(
+                self.points_2D, self.normals_2D, self.config.cs_fit.n_downsample)
+            # self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
 
             # TODO: consider normals for downsampling / filter from segment normals
         else:
             self.points_2D_fitting = self.points_2D
+            self.normals_2D_fitting = self.normals_2D
         # plot_2D_points_bbox(self.points_2D_fitting)
         cs_data, cs_dataframe = data_from_IFC(config.cs_fit.ifc_cs_path)
 
@@ -274,11 +278,14 @@ class Segment(object):
             # cross-section fitting with NSGA-III (multi-objective optimization)
             self.h_beam_params, self.h_beam_verts, self.cstype = solve_w_nsga(
                 points=self.points_2D_fitting,
-                normals=self.normals_2D,
+                normals=self.normals_2D_fitting,
                 config=config,
                 all_points=self.points_2D,
+                all_normals=self.normals_2D,
                 cs_data=cs_data,
-                cs_dataframe=cs_dataframe
+                cs_dataframe=cs_dataframe,
+                filter_weights=self.filter_weights,
+                filter_map=self.filter_backmap
             )
         elif self.config.cs_fit.method == 'pso':
             # cross-section fitting with PSO (single-objective optimization)

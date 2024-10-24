@@ -8,6 +8,7 @@ import pyransac3d as pyrsc
 from matplotlib import pyplot as plt
 
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import KMeans
 
 import plotly.graph_objects as go
 
@@ -566,15 +567,6 @@ def rotation_matrix_from_vectors(vec1, vec2):
     return np.identity(3) + np.sin(angle) * kmat + (1 - np.cos(angle)) * np.dot(kmat, kmat)
 
 
-def rotate_points_to_xy_plane(points, plane_normal, target_axis):
-    # TODO: eliminate extra step
-    # find rotation matrix
-    rot_matrix = rotation_matrix_from_vectors(plane_normal, target_axis)
-    # rotate points
-    rotated_points = np.dot(points, rot_matrix.T)
-
-    return rotated_points, rot_matrix
-
 
 def orientation_estimation(cluster_ptx_array, config=None, step=None):
     """takes in xyz array of points, performs ransac until 2 non-planar planes are found
@@ -1027,3 +1019,31 @@ def transform_shifted_point(source_angle, target_angle, local_point):
     transformed_point = np.dot(transform, point_homogeneous)[:3]
 
     return transformed_point
+
+
+def kmeans_points_normals_2D(points, point_normals, n_representatives):
+    points = np.array(points)
+    point_normals = np.array(point_normals)
+
+    # Perform k-means clustering
+    kmeans = KMeans(n_clusters=n_representatives, random_state=42)
+    labels = kmeans.fit_predict(points)
+
+    # Get cluster centers as representatives
+    representatives = kmeans.cluster_centers_
+
+    # Calculate weights based on cluster sizes
+    unique_labels, counts = np.unique(labels, return_counts=True)
+    weights = counts # / len(points)
+
+    # Calculate representative normals for each cluster
+    rep_normals = np.zeros((n_representatives, 2))
+    for i in range(n_representatives):
+        cluster_mask = labels == i
+        cluster_normals = point_normals[cluster_mask]
+        # Weighted average of normals
+        mean_normal = np.mean(cluster_normals, axis=0)
+        # Normalize to unit vector
+        rep_normals[i] = mean_normal / np.linalg.norm(mean_normal)
+
+    return representatives, rep_normals, weights, labels

@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
@@ -526,8 +528,15 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     return fig
 
 
-def cs_plot(vertices=None, points=None, normals=None, headline=None):
+def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False, filename=None, iter=None):
     # plot lines in 2D iterate 0 - 11 and 0
+    normals = np.asarray(normals)
+    # normalize
+    norms = np.linalg.norm(normals, axis=1, keepdims=True)
+    norms = np.where(norms == 0, np.finfo(float).eps, norms) * 20
+    normals = normals / norms
+    ########
+    points = np.asarray(points)
     fig = plt.figure()
     ax = fig.add_subplot(111)
     color = 'purple'
@@ -538,7 +547,12 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None):
             # ax.text(vertices[i][0], vertices[i][1], str(i))
         ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
     if points is not None:
-        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+        try:
+            ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+        # except e as error print
+        except Exception as e:
+            print(e)
+
     if normals is not None:
         # for each point plot a normal with length 0.1
         for i in range(points.shape[0]):
@@ -562,4 +576,12 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None):
         item.set_fontname('Times New Roman')
     # set figure size
     fig.set_dpi(300)
-    plt.show()
+    if save:
+        dir = f'/Users/fnoic/Downloads/tracer/{iter}/'
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+        path = f'/Users/fnoic/Downloads/tracer/{iter}/{filename}.png'
+        plt.savefig(path)
+        plt.close()
+    else:
+        plt.show()

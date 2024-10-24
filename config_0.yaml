@@ -33,13 +33,13 @@ supernormal:
   input: no ransac
 
 region_growing:
-  min_patch_size: 300
+  min_patch_size: 200
   neighborhood_shape: sphere
   neighborhood_radius: 0.3
   leftover_relative: 0.02
-  supernormal_angle_deviation_patch: 20
-  ransacnormal_angle_deviation_patch: 10
-  supernormal_angle_deviation_point: 10
+  supernormal_angle_deviation_patch: 18
+  ransacnormal_angle_deviation_patch: 8
+  supernormal_angle_deviation_point: 8
 
 skeleton:
   init_min_count: 20
@@ -60,10 +60,10 @@ skeleton_visual:
 cs_fit:
   method: nsga3
   grid_size: 0.01
-  n_downsample: 0
-  n_pop: 100
-  n_lambda: 100
-  n_mu: 100
-  n_gen: 20
+  n_downsample: 500
+  n_pop: 2000
+  n_lambda: 2000
+  n_mu: 2000
+  n_gen: 30
   inlier_thresh: 0.005
   ifc_cs_path: /Users/fnoic/PycharmProjects/IfcOpenShell/src/bonsai/bonsai/bim/data/libraries/IFC4 EU Steel.ifc

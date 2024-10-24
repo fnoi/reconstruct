@@ -1,9 +1,11 @@
 import copy
 import pickle
 import random
+import time
 
 import numpy as np
 from deap import creator, base, tools, algorithms
+from numpy.lib.npyio import savez
 
 from tools.fitting_1 import params2verts, verts2edges
 
@@ -12,7 +14,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tools.visual import plot_all_generations_hof_and_pareto_front, cs_plot
 
 
-def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
+def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_dataframe,
+                 filter_weights=None, filter_map=None):
     x_range, y_range = setup_lims_placement(points)
 
     points_array = copy.deepcopy(points)
@@ -63,17 +66,17 @@ def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
     stats.register("max", np.max, axis=0)
 
     # alternative with deap eaMuPlusLambda
-    final_pop, log = algorithms.eaMuPlusLambda(
-        population, toolbox,
-        mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
-        ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
-    )
-
-    # final_pop, log, all_individuals = eaMuPlusLambda_history(
+    # final_pop, log = algorithms.eaMuPlusLambda(
     #     population, toolbox,
     #     mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
     #     ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
     # )
+
+    final_pop, log, all_individuals = eaMuPlusLambda_history(
+        population, toolbox,
+        mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
+        ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
+    )
 
     # Save final population
     with open('final_population.txt', 'w') as f:
@@ -87,8 +90,9 @@ def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
 
     # Extract the Pareto front # final pop or all??
 
+    pareto_front = tools.sortNondominated(hof, len(hof), first_front_only=True)
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
-    pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
+    # pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
 
     pareto_unique = []
     for pareto_individual in pareto_front[0]:
@@ -99,7 +103,7 @@ def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
 
     pareto_plot = True
     if pareto_plot:
-        fig = plot_all_generations_hof_and_pareto_front(final_pop,
+        fig = plot_all_generations_hof_and_pareto_front(all_individuals,
                                                         hof,
                                                         pareto_unique,
                                                         ["Log Distance", "Active Edge Length", "Cosine Similarity"],
@@ -113,11 +117,29 @@ def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
     edges = verts2edges(verts)
     dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
     inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
-    rel_inliers = inliers / len(all_points)
+    rel_inliers = inliers / len(points)
     cs_plot(vertices=verts,
-            points=all_points,
+            points=points,
             normals=normals,
             headline=f'best solution: {inliers}\ninliers: log only, relative: {rel_inliers:.2f}')
+
+    # for each solution in pareto_unique, plot to file with headline indicating all fitness values
+    store_iter = time.strftime("%Y%m%d-%H%M%S")
+    for pareto_individual in pareto_unique:
+        params = pareto_individual[1:] + cs_data[pareto_individual[0]]
+        verts = params2verts(params, from_cog=False)
+        edges = verts2edges(verts)
+        dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
+        inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
+        rel_inliers = inliers / len(points)
+        cs_plot(vertices=verts,
+                points=all_points,
+                normals=all_normals,
+                headline=f'best solution: {inliers}\ninliers: log only, relative: {rel_inliers:.2f}'
+                         f'\nfitness values: {pareto_individual.fitness.values}',
+                save=True,
+                filename=f'pareto_{pareto_individual[0]}',
+                iter=store_iter)
 
     # calculate inliers for all in pareto and identify solution with max inliers
     inliers_all = []
@@ -134,11 +156,11 @@ def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
     params = pareto_unique[max_inliers_idx][1:] + cs_data[pareto_unique[max_inliers_idx][0]]
     verts = params2verts(params, from_cog=False)
     edges = verts2edges(verts)
-    inliers = max_inliers / len(all_points)
+    inliers = max_inliers / len(points)
     cs_plot(vertices=verts,
             points=all_points,
-            normals=normals,
-            headline=f'best solution: {max_inliers}\ninliers: inliers cutoff, relative: {inliers:.2f}')
+            normals=all_normals,
+            headline=f'best solution: {max_inliers_idx}\ninliers: inliers cutoff, relative: {inliers:.2f}')
 
 
 
@@ -275,7 +297,7 @@ def setup_lims_placement(points):
     return limits_x_moved, limits_y_moved
 
 
-def cost_combined(solution_params, data_points, data_normals, data_frame):
+def cost_combined(solution_params, data_points, data_normals, data_frame, weights=None, weights_map=None):
     data_points = np.array(data_points)
     data_normals = np.array(data_normals)
 
@@ -299,12 +321,16 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
         cosine_similarity(normal.reshape(1, -1), data_normals)[0]
         for normal in polygon_edge_normals
     ])
+    if weights is not None:
+        all_similarities = all_similarities * weights
 
     edge_lengths = np.linalg.norm(solution_edges[:, 1] - solution_edges[:, 0], axis=1)
     edge_length_total = np.sum(edge_lengths)
 
     edge_distances = np.array([point_segment_distance(data_points, edge[0], edge[1])
                                  for edge in solution_edges])
+    if weights is not None:
+        edge_distances = edge_distances * weights_map
 
     best_edge_per_point = np.argmin(edge_distances, axis=0)
     min_distances_per_point = np.min(edge_distances, axis=0)
@@ -318,7 +344,9 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
         if edge in best_edge_per_point:
             edge_activity[edge] = 1
     edge_activity_log = copy.deepcopy(edge_activity)
-    edge_quality = []
+    edge_quality = 0
+
+    cosine_similarity_n_n = np.zeros_like(min_distances_per_point)
 
     # normal_cosine_similarity = 0
     for edge in range(len(solution_edges)):
@@ -326,9 +354,11 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
 
         if edge_activity_log[edge] == 1:
             related_points = np.where(best_edge_per_point == edge)[0]
-            # normal_cosine_similarity += np.mean(all_similarities[edge][related_points])
+            cosine_similarity_n_n = all_similarities[edge][related_points]
 
-            edge_quality.append(np.mean(all_similarities[edge][related_points]))
+            normal_cosine_similarity = np.sum(all_similarities[edge][related_points])
+
+            edge_quality += normal_cosine_similarity
 
             neighbor_low = edge - 1 if edge - 1 >= 0 else len(solution_edges) - 1
             neighbor_high = edge + 1 if edge + 1 < len(solution_edges) else 0
@@ -352,13 +382,17 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
                     edge_activation_dist[edge] = dist_high
 
     # normal_cosine_similarity = normal_cosine_similarity / len(solution_edges)
+    if weights is not None:
+        cosine_similarity_n_n = cosine_similarity_n_n * weights
+    mean_cosines_similarity = np.mean(cosine_similarity_n_n)
 
     active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
     activation_distance = np.sum(edge_activation_dist)
 
-    mean_edge_cosine_quality = np.mean(edge_quality)
+    # mean_edge_cosine_quality = np.mean(edge_quality)
+    mean_edge_cosine_quality = edge_quality
 
-    return log_distance, active_edge_length_relative, activation_distance, mean_edge_cosine_quality #normal_cosine_similarity
+    return log_distance, active_edge_length_relative, activation_distance, mean_cosines_similarity #mean_edge_cosine_quality #normal_cosine_similarity
 
 
 

@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 8
+    cache_flag = 6
     single_step = False
     ##########
     ##########
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         if 'nx' in cloud.columns:
             o3d_cloud.normals = o3d.utility.Vector3dVector(cloud[['nx', 'ny', 'nz']].values.astype(np.float32))
 
-        if config.preprocess.downsample:
+        if config.preprocess.downsample_flag:
             print(f'original cloud size: {len(cloud)}')
             cloud_o3d = o3d_cloud.voxel_down_sample(voxel_size=config.preprocess.voxel_size)
             cloud_frame_new = pd.DataFrame(np.asarray(cloud_o3d.points), columns=['x', 'y', 'z'])
@@ -262,13 +262,13 @@ if __name__ == '__main__':
         if single_step:
             raise ValueError('stop here, single step')
 
-
+    raise ValueError('stop here, anyway')
     if cache_flag <= 8:
         meth = 'blender'
-        if meth = 'blender':
+        if meth == 'blender':
             # run two scripts subsequently in blender
-
-        elif meth = 'ios':
+            print('\n- model generation, not gonna happen')
+        elif meth == 'ios':
             with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
                 skeleton = pd.read_json(f)
             model_builder(skeleton, config)
