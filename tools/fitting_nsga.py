@@ -12,22 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tools.visual import plot_all_generations_hof_and_pareto_front, cs_plot
 
 
-def solve_w_nsga(points, normals, config, all_points):
-    with open('/Users/fnoic/PycharmProjects/reconstruct/data/beams/beams_frame.pkl', 'rb') as f:
-        data = pickle.load(f)
-    with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_cs.txt', 'r') as f:
-        all_cs = f.readlines()
-    # purge '\n' from all_cs
-    all_cs = [cs.strip() for cs in all_cs]
-
-    data = data.dropna()
-    # only keep rows where name is in all_cs
-    data = data[data['label'].isin(all_cs)]
-    # load config
-
-
-    # setup complete input data for solution finding // sequence is tw, tf, bf, d
-    parameter_set = data[['tw', 'tf', 'bf', 'd']].values.tolist()
+def solve_w_nsga(points, normals, config, all_points, cs_data, cs_dataframe):
     x_range, y_range = setup_lims_placement(points)
 
     points_array = copy.deepcopy(points)
@@ -37,13 +22,15 @@ def solve_w_nsga(points, normals, config, all_points):
 
     ###########
     # creator.create("FitnessMin", base.Fitness, weights=(-1.0,))                 # log_distance, active_edge_length_relative, activation_distance
-    creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0, 1.0)) # minimize log distance, maximize relative active edge length, minimize edge activation distance, maximize cosine sim
+    # creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0, 1.0)) # minimize log distance, maximize relative active edge length, minimize edge activation distance, maximize cosine sim
+    # creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0))
+    creator.create("FitnessMulti", base.Fitness, weights=(-1.0, 1.0, -1.0, 1.0))
     creator.create("Individual", list, fitness=creator.FitnessMulti)
 
     toolbox = base.Toolbox()
 
     # Register the function to select a random row from the parameter set
-    toolbox.register("attr_row", random.randint, 0, len(data) - 1)
+    toolbox.register("attr_row", random.randint, 0, len(cs_data) - 1)
     toolbox.register("attr_x_offset", random.uniform, *x_range)
     toolbox.register("attr_y_offset", random.uniform, *y_range)
 
@@ -57,13 +44,13 @@ def solve_w_nsga(points, normals, config, all_points):
     toolbox.register("individual", create_individual)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox.register("evaluate", cost_combined, data_points=points, data_normals=normals, data_frame=data)
+    toolbox.register("evaluate", cost_combined, data_points=points, data_normals=normals, data_frame=cs_dataframe)
     toolbox.register("mate", tools.cxTwoPoint)
-    toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=parameter_set, x_range=x_range, y_range=y_range)
+    toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=cs_data, x_range=x_range, y_range=y_range)
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
     # toolbox.register("select", tools.selNSGA2)
-    ref_points = tools.uniform_reference_points(nobj=4, p=12)
+    ref_points = tools.uniform_reference_points(nobj=4, p=12) ####!
     toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
     population = toolbox.population(n=config.cs_fit.n_pop)
@@ -75,11 +62,18 @@ def solve_w_nsga(points, normals, config, all_points):
     stats.register("min", np.min, axis=0)
     stats.register("max", np.max, axis=0)
 
-    final_pop, log, all_individuals = eaMuPlusLambda_history(
+    # alternative with deap eaMuPlusLambda
+    final_pop, log = algorithms.eaMuPlusLambda(
         population, toolbox,
         mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
         ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
     )
+
+    # final_pop, log, all_individuals = eaMuPlusLambda_history(
+    #     population, toolbox,
+    #     mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
+    #     ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
+    # )
 
     # Save final population
     with open('final_population.txt', 'w') as f:
@@ -93,7 +87,8 @@ def solve_w_nsga(points, normals, config, all_points):
 
     # Extract the Pareto front # final pop or all??
 
-    pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
+    # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
+    pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
 
     pareto_unique = []
     for pareto_individual in pareto_front[0]:
@@ -104,7 +99,7 @@ def solve_w_nsga(points, normals, config, all_points):
 
     pareto_plot = True
     if pareto_plot:
-        fig = plot_all_generations_hof_and_pareto_front(all_individuals,
+        fig = plot_all_generations_hof_and_pareto_front(final_pop,
                                                         hof,
                                                         pareto_unique,
                                                         ["Log Distance", "Active Edge Length", "Cosine Similarity"],
@@ -113,7 +108,7 @@ def solve_w_nsga(points, normals, config, all_points):
         fig.show()
 
 
-    params = min_fitness_individual_abs[1:] + parameter_set[min_fitness_individual_abs[0]]
+    params = min_fitness_individual_abs[1:] + cs_data[min_fitness_individual_abs[0]]
     verts = params2verts(params, from_cog=False)
     edges = verts2edges(verts)
     dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
@@ -127,7 +122,7 @@ def solve_w_nsga(points, normals, config, all_points):
     # calculate inliers for all in pareto and identify solution with max inliers
     inliers_all = []
     for pareto_individual in pareto_unique:
-        params = pareto_individual[1:] + parameter_set[pareto_individual[0]]
+        params = pareto_individual[1:] + cs_data[pareto_individual[0]]
         verts = params2verts(params, from_cog=False)
         edges = verts2edges(verts)
         dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
@@ -136,7 +131,7 @@ def solve_w_nsga(points, normals, config, all_points):
     max_inliers = max(inliers_all)
     max_inliers_idx = inliers_all.index(max_inliers)
 
-    params = pareto_unique[max_inliers_idx][1:] + parameter_set[pareto_unique[max_inliers_idx][0]]
+    params = pareto_unique[max_inliers_idx][1:] + cs_data[pareto_unique[max_inliers_idx][0]]
     verts = params2verts(params, from_cog=False)
     edges = verts2edges(verts)
     inliers = max_inliers / len(all_points)
@@ -157,7 +152,7 @@ def solve_w_nsga(points, normals, config, all_points):
     h_beam_cost = min_fitness_individual_abs.fitness.values
 
     # cstype is the name of the profile
-    cstype = data.iloc[min_fitness_individual_abs[0]]['label']
+    cstype = cs_dataframe.iloc[min_fitness_individual_abs[0]]['name']
 
     # h_beam_cost no longer returned
 
@@ -323,19 +318,25 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
         if edge in best_edge_per_point:
             edge_activity[edge] = 1
     edge_activity_log = copy.deepcopy(edge_activity)
+    edge_quality = []
 
-    normal_cosine_similarity = 0
+    # normal_cosine_similarity = 0
     for edge in range(len(solution_edges)):
+
+
         if edge_activity_log[edge] == 1:
             related_points = np.where(best_edge_per_point == edge)[0]
-            normal_cosine_similarity += np.mean(all_similarities[edge][related_points])
+            # normal_cosine_similarity += np.mean(all_similarities[edge][related_points])
+
+            edge_quality.append(np.mean(all_similarities[edge][related_points]))
 
             neighbor_low = edge - 1 if edge - 1 >= 0 else len(solution_edges) - 1
             neighbor_high = edge + 1 if edge + 1 < len(solution_edges) else 0
             active_low = edge_activity_log[neighbor_low] == 0
             active_high = edge_activity_log[neighbor_high] == 0
+
             if active_low or active_high:
-                edge_activity[edge] = 0
+                edge_activity[edge] = 1 # double check bc big change
                 if active_low:
                     dist_low = np.min(edge_distances[neighbor_low])
                 else:
@@ -350,12 +351,14 @@ def cost_combined(solution_params, data_points, data_normals, data_frame):
                 else:
                     edge_activation_dist[edge] = dist_high
 
-    normal_cosine_similarity = normal_cosine_similarity / len(solution_edges)
+    # normal_cosine_similarity = normal_cosine_similarity / len(solution_edges)
 
     active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
     activation_distance = np.sum(edge_activation_dist)
 
-    return log_distance, active_edge_length_relative, activation_distance, normal_cosine_similarity
+    mean_edge_cosine_quality = np.mean(edge_quality)
+
+    return log_distance, active_edge_length_relative, activation_distance, mean_edge_cosine_quality #normal_cosine_similarity
 
 
 

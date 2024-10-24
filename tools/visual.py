@@ -227,7 +227,7 @@ def dist_hist(distances, bone_id):
     plt.show()
 
 
-def dist_hist_color(distances, bone_id, angle_desc=None):
+def dist_hist_color(distances, distances_log, bone_id, angle_desc=None):
     # Create the figure and axis
     fig, ax = plt.subplots()
 
@@ -235,7 +235,7 @@ def dist_hist_color(distances, bone_id, angle_desc=None):
     n, bins, patches = ax.hist(distances, bins=100) #, edgecolor='black')
 
     # Create a normalization object for the color mapping
-    norm = Normalize(vmin=min(distances), vmax=max(distances))
+    norm = Normalize(vmin=min(distances_log), vmax=max(distances_log))
 
     # Create a ScalarMappable object for the colorbar
     sm = ScalarMappable(cmap='viridis', norm=norm)
@@ -422,7 +422,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     fig = go.Figure(data=go.Scatter3d(
         x=all_fitness_values[:, 0],
         y=all_fitness_values[:, 1],
-        z=all_fitness_values[:, 3], # cosine instead
+        z=all_fitness_values[:, 2],
         mode='markers',
         marker=dict(
             size=2,
@@ -459,7 +459,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     fig.add_trace(go.Scatter3d(
         x=pareto_fitness_values[:, 0],
         y=pareto_fitness_values[:, 1],
-        z=pareto_fitness_values[:, 3], # cosine instead
+        z=pareto_fitness_values[:, 2], # cosine instead
         mode='markers',
         marker=dict(
             size=5,
@@ -542,9 +542,15 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None):
     if normals is not None:
         # for each point plot a normal with length 0.1
         for i in range(points.shape[0]):
-            ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.1],
-                    [points[i][1], points[i][1] + normals[i][1] * 0.1], color='grey'
+            # ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.1],
+            #         [points[i][1], points[i][1] + normals[i][1] * 0.1], color='grey'
+            #         )
+            # # plot line with arrow head, width 0.2, len 0.5
+            ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.5],
+                    [points[i][1], points[i][1] + normals[i][1] * 0.5], color='grey', linewidth=0.02,
                     )
+            # ax.arrow(points[i][0], points[i][1], normals[i][0] * 0.5, normals[i][1] * 0.5, head_width=0.003,
+            #          fc='grey', ec='grey')
     if headline is not None:
         # title in times new roman
         ax.set_title(headline, fontname='Times New Roman')
@@ -554,4 +560,6 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None):
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(12)
         item.set_fontname('Times New Roman')
+    # set figure size
+    fig.set_dpi(300)
     plt.show()

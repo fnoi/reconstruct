@@ -1,8 +1,10 @@
 import os
 import pathlib
 import pickle
+import ifcopenshell
 
 import numpy as np
+import pandas as pd
 
 from omegaconf import OmegaConf
 
@@ -127,3 +129,23 @@ def load_angles(yaml_path):
         gt_orientation = calculate_view_direction(rpy[0], rpy[1], rpy[2])
         vecs[int(key)] = gt_orientation
     return vecs
+
+
+def data_from_IFC(path, direct=False):
+    # load the ifc file
+    profiles = ifcopenshell.open(path)
+    ishapes = profiles.by_type("IfcIShapeProfileDef")
+    if direct:
+        return ishapes
+
+    # extract beam params to dataframe
+    beams = []
+    for ishape in ishapes:
+        beams.append([ishape.ProfileName, ishape.WebThickness, ishape.FlangeThickness, ishape.OverallWidth, ishape.OverallDepth])
+    beam_df = pd.DataFrame(beams, columns=['name', 'tw', 'tf', 'bf', 'd'])
+    # divide by 1000 to convert to meters, except for 'name'
+    beam_df[['tw', 'tf', 'bf', 'd']] = beam_df[['tw', 'tf', 'bf', 'd']] / 1000
+    beam_list = beam_df.values.tolist()
+    beam_list = [beam[1:] for beam in beam_list]
+
+    return beam_list, beam_df

@@ -66,11 +66,12 @@ def model_evaluation(skeleton):
                         continue
 
                     distances_np = compute_point_cloud_to_mesh_distance(points, mesh)
+                    distances_np_log = np.log(distances_np + 1)
 
                     # dist_hist(distances_np, bone_id)
-                    dist_hist_color(distances_np, bone_id)
+                    dist_hist_color(distances_np, distances_np_log, bone_id)
                     # raise ValueError # stop here
-                    mesh_points_cc(points, distances_np, mesh, ortho=True)
+                    mesh_points_cc(points, distances_np_log, mesh, ortho=True)
 
                     print(f'beam {bone_id}: mean distance: {np.mean(distances_np)}, median distance: {np.median(distances_np)}')
 
@@ -78,7 +79,8 @@ def model_evaluation(skeleton):
     collected_mesh = o3d.io.read_triangle_mesh('/Users/fnoic/PycharmProjects/reconstruct/data/parking/all_beams.obj')
     collected_mesh = collected_mesh.rotate(np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]]), center=(0, 0, 0))
     collected_distances = compute_point_cloud_to_mesh_distance(collected_points, collected_mesh)
-    dist_hist_color(collected_distances, "complete")
+    collected_distances_log = np.log(collected_distances + 1)
+    dist_hist_color(collected_distances, collected_distances_log, "complete")
     mesh_points_cc(collected_points, collected_distances, collected_mesh, ortho=True)
 
     print(f'complete model: mean distance: {np.mean(collected_distances)}, median distance: {np.median(collected_distances)}')

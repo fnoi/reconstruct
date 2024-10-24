@@ -24,7 +24,7 @@ try:
     from pyswarm import pso
     from sklearn.cluster import DBSCAN
 
-    from tools.IO import points2txt, lines2obj, cache_meta
+    from tools.IO import points2txt, lines2obj, cache_meta, data_from_IFC
     from tools.fitting_1 import params2verts
     from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1
     from tools import geometry as geom
@@ -268,6 +268,7 @@ class Segment(object):
         else:
             self.points_2D_fitting = self.points_2D
         # plot_2D_points_bbox(self.points_2D_fitting)
+        cs_data, cs_dataframe = data_from_IFC(config.cs_fit.ifc_cs_path)
 
         if self.config.cs_fit.method == 'nsga3':
             # cross-section fitting with NSGA-III (multi-objective optimization)
@@ -275,11 +276,14 @@ class Segment(object):
                 points=self.points_2D_fitting,
                 normals=self.normals_2D,
                 config=config,
-                all_points=self.points_2D
+                all_points=self.points_2D,
+                cs_data=cs_data,
+                cs_dataframe=cs_dataframe
             )
         elif self.config.cs_fit.method == 'pso':
             # cross-section fitting with PSO (single-objective optimization)
-            self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(self.points_2D_fitting)
+            self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(
+                self.points_2D_fitting)
         else:
             # not implemented
             raise NotImplementedError(f'CS fitting method {self.config.cs_fit.method} not implemented')
@@ -328,7 +332,12 @@ class Segment(object):
             filtered_points = filtered_points[np.random.choice(filtered_points.shape[0], points_after_sampling, replace=True)]
 
         # find ids of points in points_2D that are in filtered_points
-        #####
+        ids = []
+        for i, point in enumerate(self.points_2D):
+            if np.any(np.all(np.isclose(filtered_points, point), axis=1)):
+                ids.append(i)
+
+        self.normals_2D = self.normals_2D[ids] # fix downstream issue for plots after NSGA etx
 
         self.points_2D_fitting = filtered_points
 

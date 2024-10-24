@@ -7,6 +7,8 @@ import pandas as pd
 import uuid
 import string
 
+from tools.IO import data_from_IFC
+
 
 
 def newGUID():
@@ -43,24 +45,23 @@ def data_preprocessor(skeleton):
     print(f'working with {len(profiles)} profiles')
     return profiles
 
-def get_profile(profile_name):
-    profiles = ifcopenshell.open(r"/Users/fnoic/PycharmProjects/IfcOpenShell/src/bonsai/bonsai/bim/data/libraries/IFC4 US Steel.ifc")
-    ishapes = profiles.by_type("IfcIshapeProfileDef")
-    iprofile = [i for i in ishapes if i.ProfileName in [profile_name]]
+def get_profile(profile_name, profiles):
+    iprofile = [i for i in profiles if i.ProfileName in [profile_name]]
     if len(iprofile) == 0:
         raise ValueError (f"Profile {profile_name} not found")
     return iprofile[0]
 
-def model_builder(skeleton):
+def model_builder(skeleton, config):
     # settings = ifcopenshell.geom.settings()
     # settings.set(settings.USE_PYTHON_OPENCASCADE, True)
     # settings.set(settings.SEW_SHELLS, True)
-
     profile_dict = data_preprocessor(skeleton)
     model = ifcopenshell.file(schema="IFC4")
     origin = model.createIfcCartesianPoint((0.0, 0.0, 0.0))
     gcf = model.createIfcAxis2Placement3D(origin, None, None)
     ctx = model.createIfcGeometricRepresentationContext(None, "Model", 3, 1e-5, gcf, None)
+
+    profiles = data_from_IFC(config.cs_fit.ifc_cs_path, direct=True)
 
     zDir = model.createIfcDirection((0.0, 0.0, 1.0))
     xDir = model.createIfcDirection((1.0, 0.0, 0.0))
@@ -69,17 +70,19 @@ def model_builder(skeleton):
 
     # for key value pair in profile_dict
     for bone_name, profile_properties in profile_dict.items():
+        rot = profile_properties["rot_mat"]
+        # Convert numpy values to float
+        origin = model.createIfcCartesianPoint([float(x) for x in rot[:3, 3]])
+        z_axis = model.createIfcDirection([float(x) for x in rot[:3, 2]])
+        x_axis = model.createIfcDirection([float(x) for x in rot[:3, 0]])
+        placement = model.createIfcLocalPlacement(
+            None, model.createIfcAxis2Placement3D(origin, z_axis, x_axis))
+
         profile_name = profile_properties['cstype']
-        ifc_profile = model.add(get_profile(profile_name))
-        body = model.createIfcExtrudedAreaSolid(ifc_profile, None, zDir, profile_properties['length'])
-        bodyRep = model.createIfcShapeRepresentation(ctx, "Body", "SweptSolid", [body])
-        prdDefShape = model.createIfcProductDefinitionShape(None, None, (bodyRep,))
+        ifc_profile = model.add(get_profile(profile_name, profiles))
+        body = model.createIfcExtrudedAreaSolid(ifc_profile, None, z_axis, profile_properties['length'])
 
-        print(f'rot mat {profile_properties["rot_mat"]}')
-
-        # chars = string.digits + string.ascii_uppercase + string.ascii_lowercase + "_$"
-        guid_ = newGUID()
-        beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
+        # beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
 
 
     model.write("/Users/fnoic/Downloads/model.ifc")

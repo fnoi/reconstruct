@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
+    cache_flag = 8
     single_step = False
     ##########
     ##########
@@ -264,9 +264,16 @@ if __name__ == '__main__':
 
 
     if cache_flag <= 8:
-        with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
-            skeleton = pd.read_json(f)
-        model_builder(skeleton)
+        meth = 'blender'
+        if meth = 'blender':
+            # run two scripts subsequently in blender
+
+        elif meth = 'ios':
+            with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
+                skeleton = pd.read_json(f)
+            model_builder(skeleton, config)
+        else:
+            raise ValueError('method not found')
         if single_step:
             raise ValueError('stop here, single step')
 

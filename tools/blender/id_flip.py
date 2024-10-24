@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import bmesh
 import mathutils
-
+# from omegaconf import OmegaConf
 
 try:
     import bonsai.tool as tool
@@ -81,8 +81,13 @@ def blender_beams(query_profile_dict):
     model = tool.Ifc.get()
 
     # load standard library for IfcIShapeProfileDef import
-    bpy.context.scene.BIMProjectProperties.library_file = 'IFC4 US Steel.ifc'
-    bpy.ops.bim.select_library_file(filepath="/Users/fnoic/Library/Application Support/Blender/4.2/extensions/.local/lib/python3.11/site-packages/bonsai/bim/data/libraries/IFC4 US Steel.ifc")
+    # config = OmegaConf.load('config_0.yaml')
+    # cs_path = config.cs_fit.ifc_cs_path
+    ### hard fix
+    cs_path = '/Users/fnoic/PycharmProjects/IfcOpenShell/src/bonsai/bonsai/bim/data/libraries/IFC4 EU Steel.ifc'
+    cs_library = cs_path.split('/')[-1]
+    bpy.context.scene.BIMProjectProperties.library_file = cs_library
+    bpy.ops.bim.select_library_file(filepath=cs_path)
     bpy.ops.bim.change_library_element(element_name="IfcIShapeProfileDef")
 
     query_profile_names = []
