@@ -1,8 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+from matplotlib import pyplot as plt
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
+from plotly import graph_objects as go
+from scipy.spatial import Delaunay
 
 
 def vis_segment_planes_3D(segment, point, planes, proj_plane):
@@ -389,3 +392,166 @@ def transformation_tracer(points_source=None, points_target=None, points_inter_1
     fig.update_layout(scene=dict(aspectmode='data'))
     # show
     fig.show()
+
+
+def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front, objective_names, plot_pareto_surface=True):
+    """
+    Plot all solutions from all generations, highlight the Hall of Fame,
+    show the true Pareto front, and optionally plot a Pareto surface using Plotly.
+
+    Parameters:
+    all_individuals (list): List of all individuals from all generations
+    hof (deap.tools.HallOfFame): Hall of Fame object
+    objective_names (list): List of strings with names for each objective
+    plot_pareto_surface (bool): If True, plot a semi-transparent Pareto surface
+
+    Returns:
+    plotly.graph_objs._figure.Figure: The created Plotly figure
+    """
+    # Extract fitness values for all solutions
+    all_fitness_values = np.array([ind.fitness.values for ind in all_individuals])
+
+    # Extract fitness values for Hall of Fame
+    hof_fitness_values = np.array([ind.fitness.values for ind in hof])
+
+    # Extract the true Pareto front
+    # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)[0]
+    pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front])
+
+    # Create the scatter plot for all solutions
+    fig = go.Figure(data=go.Scatter3d(
+        x=all_fitness_values[:, 0],
+        y=all_fitness_values[:, 1],
+        z=all_fitness_values[:, 3], # cosine instead
+        mode='markers',
+        marker=dict(
+            size=2,
+            color=all_fitness_values[:, 0],  # Color by the first objective
+            colorscale='Viridis',
+            opacity=0.6,
+            colorbar=dict(title="fitness (objective 1)")
+        ),
+        text=[f"solution {i}<br>obj1: {v[0]:.4f}<br>obj2: {v[1]:.4f}<br>obj3: {v[2]:.4f}"
+              for i, v in enumerate(all_fitness_values)],
+        hoverinfo='text',
+        name='all Solutions'
+    ))
+
+    # # Add Hall of Fame solutions
+    # fig.add_trace(go.Scatter3d(
+    #     x=hof_fitness_values[:, 0],
+    #     y=hof_fitness_values[:, 1],
+    #     z=hof_fitness_values[:, 2],
+    #     mode='markers',
+    #     marker=dict(
+    #         size=5,
+    #         color='yellow',
+    #         symbol='diamond',
+    #         line=dict(color='black', width=1)
+    #     ),
+    #     text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+    #           for i, v in enumerate(hof_fitness_values)],
+    #     hoverinfo='text',
+    #     name='Hall of Fame'
+    # ))
+
+    # Add true Pareto front solutions
+    fig.add_trace(go.Scatter3d(
+        x=pareto_fitness_values[:, 0],
+        y=pareto_fitness_values[:, 1],
+        z=pareto_fitness_values[:, 3], # cosine instead
+        mode='markers',
+        marker=dict(
+            size=5,
+            color='red',
+            symbol='circle',
+            line=dict(color='black', width=1)
+        ),
+        text=[f"Pareto Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, v in enumerate(pareto_fitness_values)],
+        hoverinfo='text',
+        name='True Pareto Front'
+    ))
+
+    # Add Pareto surface if requested
+    if plot_pareto_surface and len(pareto_fitness_values) > 3:
+        # Create a triangulation of the Pareto front points
+        tri = Delaunay(pareto_fitness_values[:, :2])
+
+        # Create the mesh for the surface
+        xx, yy = np.meshgrid(np.linspace(pareto_fitness_values[:, 0].min(), pareto_fitness_values[:, 0].max(), 100),
+                             np.linspace(pareto_fitness_values[:, 1].min(), pareto_fitness_values[:, 1].max(), 100))
+        zz = np.zeros(xx.shape)
+
+        # Interpolate z values
+        for i in range(xx.shape[0]):
+            for j in range(xx.shape[1]):
+                point = [xx[i, j], yy[i, j]]
+                simplex = tri.find_simplex(point)
+                if simplex != -1:
+                    b = tri.transform[simplex, :2].dot(point - tri.transform[simplex, 2])
+                    bary = np.c_[b, 1 - b.sum(axis=-1)]
+                    zz[i, j] = np.dot(bary, pareto_fitness_values[tri.simplices[simplex], 2])
+                else:
+                    zz[i, j] = np.nan
+
+        # Add the surface to the plot
+        fig.add_trace(go.Surface(
+            x=xx,
+            y=yy,
+            z=zz,
+            colorscale='Reds',
+            opacity=0.6,
+            name='Pareto Surface'
+        ))
+
+    # Update the layout
+    fig.update_layout(
+        title='3D Visualization of All Solutions, Hall of Fame, and Pareto Front',
+        scene=dict(
+            xaxis_title=objective_names[0],
+            yaxis_title=objective_names[1],
+            zaxis_title=objective_names[2],
+        ),
+        width=1000,
+        height=800,
+        margin=dict(r=20, b=10, l=10, t=40),
+        # font times new roman
+        font=dict(
+            family="Times New Roman",
+            size=12,
+        )
+    )
+
+    return fig
+
+
+def cs_plot(vertices=None, points=None, normals=None, headline=None):
+    # plot lines in 2D iterate 0 - 11 and 0
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    color = 'purple'
+    if vertices is not None:
+        for i in range(11):
+            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]], color=color)
+            # plot vertex id as text
+            # ax.text(vertices[i][0], vertices[i][1], str(i))
+        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
+    if points is not None:
+        ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+    if normals is not None:
+        # for each point plot a normal with length 0.1
+        for i in range(points.shape[0]):
+            ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.1],
+                    [points[i][1], points[i][1] + normals[i][1] * 0.1], color='grey'
+                    )
+    if headline is not None:
+        # title in times new roman
+        ax.set_title(headline, fontname='Times New Roman')
+    ax.set_aspect('equal')
+    # axis font tnr
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                 ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(12)
+        item.set_fontname('Times New Roman')
+    plt.show()

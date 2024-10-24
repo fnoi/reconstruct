@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 from pyswarm import pso
 
 from tools.fitting_1 import cost_fct_1, params2verts
-from tools.fitting_nsga import cs_plot
+from tools.visual import cs_plot
 
 
 def point_to_line_distance(point, v1, v2):

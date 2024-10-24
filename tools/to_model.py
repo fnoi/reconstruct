@@ -79,7 +79,6 @@ def model_builder(skeleton):
 
         # chars = string.digits + string.ascii_uppercase + string.ascii_lowercase + "_$"
         guid_ = newGUID()
-
         beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
 
 

@@ -7,10 +7,11 @@ from ifcopenshell.express.rules.IFC4X3 import marker
 from open3d.examples.pipelines.colored_icp_registration import source
 
 import tools.fitting_nsga
-from tools.fitting_nsga import solve_w_nsga, cs_plot
+import tools.visual
+from tools.fitting_nsga import solve_w_nsga
 from tools.geometry import calculate_shifted_point, transform_shifted_point, simplified_transform_lines
 from tools.metrics import huber_loss
-from tools.visual import transformation_tracer
+from tools.visual import transformation_tracer, cs_plot
 
 try:
     import numpy as np
@@ -261,6 +262,8 @@ class Segment(object):
     def fit_cs_rev(self, config=None):
         if self.config.cs_fit.n_downsample != 0:
             self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
+            #
+
             # TODO: consider normals for downsampling / filter from segment normals
         else:
             self.points_2D_fitting = self.points_2D
@@ -299,6 +302,9 @@ class Segment(object):
         self.source_angle = (source_vec_center + source_vec_left, source_vec_center, source_vec_center + source_vec_right)
         self.transformation_matrix = simplified_transform_lines(self.source_angle, self.target_angle)
 
+        left_3D_hom = np.append(self.left_3D, 1)
+        self.left_2D = np.dot(self.transformation_matrix, left_3D_hom)[:2]
+
         self.h_beam_verts = params2verts(self.h_beam_params, from_cog=False)
 
 
@@ -320,6 +326,9 @@ class Segment(object):
 
         if filtered_points.shape[0] > points_after_sampling:
             filtered_points = filtered_points[np.random.choice(filtered_points.shape[0], points_after_sampling, replace=True)]
+
+        # find ids of points in points_2D that are in filtered_points
+        #####
 
         self.points_2D_fitting = filtered_points
 
@@ -498,7 +507,7 @@ class Segment(object):
 
         # TODO: identify bf and d deltas and move x0/y0 accordingly (to avoid the overall movement)
 
-        tools.fitting_nsga.cs_plot(self.h_beam_verts, self.points_2D)
+        tools.visual.cs_plot(self.h_beam_verts, self.points_2D)
 
         return
         # return beams_frame
