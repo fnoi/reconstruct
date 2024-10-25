@@ -4,7 +4,7 @@ from typing import Tuple, Any
 
 import numpy as np
 import open3d as o3d
-import pyransac3d as pyrsc
+# import pyransac3d as pyrsc
 from matplotlib import pyplot as plt
 
 from sklearn.metrics.pairwise import cosine_similarity

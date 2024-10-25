@@ -53,7 +53,7 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
     # toolbox.register("select", tools.selNSGA2)
-    ref_points = tools.uniform_reference_points(nobj=4, p=12) ####!
+    ref_points = tools.uniform_reference_points(nobj=4, p=20) ####!
     toolbox.register("select", tools.selNSGA3, ref_points=ref_points)
 
     population = toolbox.population(n=config.cs_fit.n_pop)
@@ -91,15 +91,20 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     # Extract the Pareto front # final pop or all??
 
     pareto_front = tools.sortNondominated(hof, len(hof), first_front_only=True)
+    pareto_front = tools.selNSGA3(hof, len(hof), ref_points=ref_points)
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
     # pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
 
     pareto_unique = []
-    for pareto_individual in pareto_front[0]:
-        if pareto_individual not in pareto_unique:
-            pareto_unique.append(pareto_individual)
+    if len(pareto_front) == 1:
+        pareto_unique.append(pareto_front[0])
+        min_fitness_individual_abs = pareto_front[0]
+    else:
+        for pareto_individual in pareto_front[0]:
+            if pareto_individual not in pareto_unique:
+                pareto_unique.append(pareto_individual)
 
-    min_fitness_individual_abs = min(pareto_unique, key=lambda x: x.fitness.values[0])
+        min_fitness_individual_abs = min(pareto_unique, key=lambda x: x.fitness.values[0])
 
     pareto_plot = True
     if pareto_plot:

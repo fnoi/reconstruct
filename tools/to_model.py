@@ -1,14 +1,16 @@
 import math
 
 import ifcopenshell
+import ifcopenshell.geom as geom
 import numpy as np
 import pandas as pd
 
 import uuid
 import string
 
-from tools.IO import data_from_IFC
+from omegaconf import OmegaConf
 
+from tools.IO import data_from_IFC, config_io
 
 
 def newGUID():
@@ -52,8 +54,8 @@ def get_profile(profile_name, profiles):
     return iprofile[0]
 
 def model_builder(skeleton, config):
-    # settings = ifcopenshell.geom.settings()
-    # settings.set(settings.USE_PYTHON_OPENCASCADE, True)
+    settings = geom.settings()
+    settings.set(settings.USE_PYTHON_OPENCASCADE, True)
     # settings.set(settings.SEW_SHELLS, True)
     profile_dict = data_preprocessor(skeleton)
     model = ifcopenshell.file(schema="IFC4")
@@ -68,21 +70,35 @@ def model_builder(skeleton, config):
     frame = model.createIfcAxis2Placement3D(origin, zDir, xDir)
     placement = model.createIfcLocalPlacement(None, frame)
 
+    scale_fac = 1e3
+
     # for key value pair in profile_dict
     for bone_name, profile_properties in profile_dict.items():
         rot = profile_properties["rot_mat"]
         # Convert numpy values to float
         origin = model.createIfcCartesianPoint([float(x) for x in rot[:3, 3]])
-        z_axis = model.createIfcDirection([float(x) for x in rot[:3, 2]])
-        x_axis = model.createIfcDirection([float(x) for x in rot[:3, 0]])
+        z_axis = model.createIfcDirection([float(x) * scale_fac for x in rot[:3, 2]])
+        x_axis = model.createIfcDirection([float(x) * scale_fac for x in rot[:3, 0]])
         placement = model.createIfcLocalPlacement(
             None, model.createIfcAxis2Placement3D(origin, z_axis, x_axis))
 
         profile_name = profile_properties['cstype']
         ifc_profile = model.add(get_profile(profile_name, profiles))
         body = model.createIfcExtrudedAreaSolid(ifc_profile, None, z_axis, profile_properties['length'])
+        bodyRep = model.createIfcShapeRepresentation(ctx, 'Body', 'SweptSolid', [body])
+        prdDefShape = model.createIfcProductDefinitionShape(None, None, (bodyRep,))
 
-        # beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
+        guid_ = newGUID()
+        print(f'guid: {guid_}')
+        beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
+        
+        shape = geom.create_shape(settings, beam).geometry
+
+
+
+
+
+
 
 
     model.write("/Users/fnoic/Downloads/model.ifc")
@@ -97,6 +113,7 @@ def model_builder(skeleton, config):
 if __name__ == '__main__':
     with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/skeleton_cache.json', 'r') as f:
         skeleton = pd.read_json(f)
-    # print(skeleton)
+    config = OmegaConf.load('/Users/fnoic/PycharmProjects/reconstruct/config_0.yaml')
+    config = config_io(config)
 
-    model_builder(skeleton)
+    model_builder(skeleton, config)
