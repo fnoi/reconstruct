@@ -2,7 +2,6 @@ import math
 
 import ifcopenshell
 import ifcopenshell.geom as geom
-import numpy as np
 import pandas as pd
 
 import uuid
@@ -11,6 +10,17 @@ import string
 from omegaconf import OmegaConf
 
 from tools.IO import data_from_IFC, config_io
+
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.TopExp import TopExp_Explorer
+from OCC.Core.TopAbs import TopAbs_FACE
+from OCC.Core.BRep import BRep_Tool
+from OCC.Core.TopLoc import TopLoc_Location
+from OCC.Core.TopoDS import topods
+import open3d as o3d
+import numpy as np
+
+
 
 
 def newGUID():
@@ -91,22 +101,48 @@ def model_builder(skeleton, config):
         guid_ = newGUID()
         print(f'guid: {guid_}')
         beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
-        
+
         shape = geom.create_shape(settings, beam).geometry
 
+        mesh = BRepMesh_IncrementalMesh(shape, 0.1)
+        mesh.Perform()
 
+        vertices = []
+        triangles = []
+        explorer = TopExp_Explorer(shape, TopAbs_FACE)
 
+        while explorer.More():
+            face = topods.Face(explorer.Current())
+            location = TopLoc_Location()
+            tri = BRep_Tool.Triangulation(face, location)
+            if tri is not None:
+                # New API calls
+                nodes = tri.Node
+                tris = tri.Triangle
 
+                # Get vertices
+                for i in range(1, tri.NbNodes() + 1):
+                    pnt = nodes(i)
+                    vertices.append([pnt.X(), pnt.Y(), pnt.Z()])
+
+                # Get triangles
+                for i in range(1, tri.NbTriangles() + 1):
+                    triangle = tris(i)
+                    triangles.append([triangle.Value(1) - 1, triangle.Value(2) - 1, triangle.Value(3) - 1])
+
+            explorer.Next()
+
+        vertices = np.array(vertices)
+        triangles = np.array(triangles)
+
+        mesh = o3d.geometry.TriangleMesh(vertices=o3d.utility.Vector3dVector(vertices),
+                                         triangles=o3d.utility.Vector3iVector(triangles))
+        o3d.io.write_triangle_mesh(f"/Users/fnoic/Downloads/{bone_name}.ply", mesh)
 
 
 
 
     model.write("/Users/fnoic/Downloads/model.ifc")
-
-
-
-
-
 
 
 
