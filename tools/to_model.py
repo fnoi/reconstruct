@@ -1,6 +1,7 @@
 import math
 
 import ifcopenshell
+import ifcopenshell.api.root
 import ifcopenshell.geom as geom
 import pandas as pd
 
@@ -19,6 +20,10 @@ from OCC.Core.TopLoc import TopLoc_Location
 from OCC.Core.TopoDS import topods
 import open3d as o3d
 import numpy as np
+
+from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+from OCC.Core.StlAPI import StlAPI_Writer
+from OCC.Core.IMeshTools import IMeshTools_Parameters
 
 
 
@@ -69,77 +74,73 @@ def model_builder(skeleton, config):
     # settings.set(settings.SEW_SHELLS, True)
     profile_dict = data_preprocessor(skeleton)
     model = ifcopenshell.file(schema="IFC4")
-    origin = model.createIfcCartesianPoint((0.0, 0.0, 0.0))
-    gcf = model.createIfcAxis2Placement3D(origin, None, None)
+
+    # Create units and context
+    units = model.createIfcUnitAssignment([model.createIfcSIUnit(None, "LENGTHUNIT", "MILLI", "METRE")])
+    origin = model.createIfcAxis2Placement3D(model.createIfcCartesianPoint((0.0, 0.0, 0.0)), model.createIfcDirection((0.0, 0.0, 1.0)), model.createIfcDirection((1.0, 0.0, 0.0)))
+    context = model.createIfcGeometricRepresentationContext(None, "Model", 3, 1.0e-05, origin)
+
+    origin_local = model.createIfcCartesianPoint((0.0, 0.0, 0.0))
+    gcf = model.createIfcAxis2Placement3D(origin_local, None, None)
     ctx = model.createIfcGeometricRepresentationContext(None, "Model", 3, 1e-5, gcf, None)
 
     profiles = data_from_IFC(config.cs_fit.ifc_cs_path, direct=True)
 
     zDir = model.createIfcDirection((0.0, 0.0, 1.0))
     xDir = model.createIfcDirection((1.0, 0.0, 0.0))
-    frame = model.createIfcAxis2Placement3D(origin, zDir, xDir)
-    placement = model.createIfcLocalPlacement(None, frame)
+    frame = model.createIfcAxis2Placement3D(origin_local, zDir, xDir)
+    placement_local = model.createIfcLocalPlacement(None, frame)
 
     scale_fac = 1e3
 
     # for key value pair in profile_dict
     for bone_name, profile_properties in profile_dict.items():
         rot = profile_properties["rot_mat"]
+        # fourth column * scale_fac
+        rot = rot.T
+        rot[:, 3] = rot[:, 3] * scale_fac
         # Convert numpy values to float
-        origin = model.createIfcCartesianPoint([float(x) for x in rot[:3, 3]])
-        z_axis = model.createIfcDirection([float(x) * scale_fac for x in rot[:3, 2]])
-        x_axis = model.createIfcDirection([float(x) * scale_fac for x in rot[:3, 0]])
-        placement = model.createIfcLocalPlacement(
-            None, model.createIfcAxis2Placement3D(origin, z_axis, x_axis))
+        origin_global = model.createIfcCartesianPoint([0.0, 0.0, 0.0])
+        z_axis_global = model.createIfcDirection([0.0, 0.0, 1.0])
+        x_axis_global = model.createIfcDirection([1.0, 0.0, 0.0])
+        placement_global = model.createIfcLocalPlacement(
+            None, model.createIfcAxis2Placement3D(origin_global, z_axis_global, x_axis_global))
+
+        # origin_local = model.createIfcCartesianPoint([float(x) for x in rot[:3, 3]])
+        # z_axis_local = model.createIfcDirection([float(x) for x in rot[:3, 2]])
+        # x_axis_local = model.createIfcDirection([float(x) for x in rot[:3, 0]])
+        # placement_local = model.createIfcLocalPlacement(
+        #     None, model.createIfcAxis2Placement3D(origin_local, z_axis_local, x_axis_local))
 
         profile_name = profile_properties['cstype']
         ifc_profile = model.add(get_profile(profile_name, profiles))
-        body = model.createIfcExtrudedAreaSolid(ifc_profile, None, z_axis, profile_properties['length'])
+        body = model.createIfcExtrudedAreaSolid(ifc_profile, None, z_axis_global, profile_properties['length'] * scale_fac)
         bodyRep = model.createIfcShapeRepresentation(ctx, 'Body', 'SweptSolid', [body])
         prdDefShape = model.createIfcProductDefinitionShape(None, None, (bodyRep,))
 
         guid_ = newGUID()
         print(f'guid: {guid_}')
-        beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement, prdDefShape, None, None)
+
+        beam = model.createIfcBeam(guid_, None, bone_name, None, None, placement_global, prdDefShape, None, None)
+        ifcopenshell.api.geometry.edit_object_placement(model, product=beam, matrix=rot)
 
         shape = geom.create_shape(settings, beam).geometry
 
-        mesh = BRepMesh_IncrementalMesh(shape, 0.1)
+        params = IMeshTools_Parameters()
+        params.Deflection = 0.01
+        params.Angle = 0.1
+        params.Relative = False
+        params.InParallel = True
+        params.MinSize = 0.01
+        params.InternalVerticesMode = True
+        params.ControlSurfaceDeflection = True
+
+        mesh = BRepMesh_IncrementalMesh(shape, params)
         mesh.Perform()
 
-        vertices = []
-        triangles = []
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
-
-        while explorer.More():
-            face = topods.Face(explorer.Current())
-            location = TopLoc_Location()
-            tri = BRep_Tool.Triangulation(face, location)
-            if tri is not None:
-                # New API calls
-                nodes = tri.Node
-                tris = tri.Triangle
-
-                # Get vertices
-                for i in range(1, tri.NbNodes() + 1):
-                    pnt = nodes(i)
-                    vertices.append([pnt.X(), pnt.Y(), pnt.Z()])
-
-                # Get triangles
-                for i in range(1, tri.NbTriangles() + 1):
-                    triangle = tris(i)
-                    triangles.append([triangle.Value(1) - 1, triangle.Value(2) - 1, triangle.Value(3) - 1])
-
-            explorer.Next()
-
-        vertices = np.array(vertices)
-        triangles = np.array(triangles)
-
-        mesh = o3d.geometry.TriangleMesh(vertices=o3d.utility.Vector3dVector(vertices),
-                                         triangles=o3d.utility.Vector3iVector(triangles))
-        o3d.io.write_triangle_mesh(f"/Users/fnoic/Downloads/{bone_name}.ply", mesh)
-
-
+        # Export directly to STL
+        writer = StlAPI_Writer()
+        writer.Write(shape, f"/Users/fnoic/Downloads/{bone_name}.stl")
 
 
     model.write("/Users/fnoic/Downloads/model.ifc")
