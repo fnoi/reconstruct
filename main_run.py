@@ -19,7 +19,7 @@ from tools.IO import cache_io, config_io
 from tools.local import calculate_supernormals_rev, ransac_patches, patch_context_supernormals
 from tools.metrics import calculate_metrics, supernormal_evaluation, calculate_purity
 from tools.model_eval import model_evaluation
-from tools.to_model import model_builder
+# from tools.to_model import model_builder
 
 if __name__ == '__main__':
     config = OmegaConf.load('config_0.yaml')
@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 6
     single_step = False
     ##########
     ##########
@@ -262,7 +262,7 @@ if __name__ == '__main__':
         if single_step:
             raise ValueError('stop here, single step')
 
-    raise ValueError('stop here, anyway')
+    raise ValueError('stop here, anyway') # currently blender works but not integrated
     if cache_flag <= 8:
         meth = 'blender'
         if meth == 'blender':

@@ -295,9 +295,15 @@ class Segment(object):
             # not implemented
             raise NotImplementedError(f'CS fitting method {self.config.cs_fit.method} not implemented')
 
+        # cog is offset from origin
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
 
+        # fix cog updating from here!
+        # source_vec_center = np.array([0.0, 0.0])
+        # source_vec_left = source_vec_center + self.source_angle[0]
+        # source_vec_right = source_vec_center + self.source_angle[2]
+        # self.source_angle = (source_vec_left, source_vec_center, source_vec_right)
         # update COG / left in 2D and 3D
         self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, cog_x, cog_y)
         self.right_3D = geom.calculate_shifted_source_pt(self.source_angle, cog_x, cog_y, third_pt=self.right_3D)

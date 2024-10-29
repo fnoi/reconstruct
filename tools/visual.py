@@ -548,7 +548,7 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False,
         ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
     if points is not None:
         try:
-            ax.scatter(points[:, 0], points[:, 1], s=0.05, color='grey')
+            ax.scatter(points[:, 0], points[:, 1], s=0.15, color='grey', marker=',')
         # except e as error print
         except Exception as e:
             print(e)

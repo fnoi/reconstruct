@@ -2,6 +2,7 @@ import copy
 import pickle
 import random
 import time
+from random import gauss
 
 import numpy as np
 from deap import creator, base, tools, algorithms
@@ -48,7 +49,7 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
     toolbox.register("evaluate", cost_combined, data_points=points, data_normals=normals, data_frame=cs_dataframe)
-    toolbox.register("mate", tools.cxTwoPoint)
+    toolbox.register("mate", tools.cxOnePoint)
     toolbox.register("mutate", custom_mutate, indpb=0.2, parameter_set=cs_data, x_range=x_range, y_range=y_range)
     # toolbox.register("select", tools.selTournament, tournsize=3)
 
@@ -90,9 +91,10 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
 
     # Extract the Pareto front # final pop or all??
 
-    pareto_front = tools.sortNondominated(hof, len(hof), first_front_only=True)
+    # pareto_front = tools.sortNondominated(hof, len(hof), first_front_only=True)
     pareto_front = tools.selNSGA3(hof, len(hof), ref_points=ref_points)
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
+    # pareto_front = tools.selNSGA3(all_individuals, len(all_individuals), ref_points=ref_points)
     # pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
 
     pareto_unique = []
@@ -217,20 +219,24 @@ def point_segment_distance(points, p1, p2):
 
 
 def custom_mutate(individual, indpb, parameter_set, x_range, y_range):
-    # Mutate the part from parameter set
+    gauss_std = 0.2
+    # Mutate parameter set index with local search
     if random.random() < indpb:
-        new_id = random.randint(0, len(parameter_set) - 1)
-        individual[0] = new_id
-        # new_values = random.choice(parameter_set)
-        # individual[:4] = new_values  # Assuming the first 4 are from parameter set
+        current_id = individual[0]
+        std_dev = max(1, len(parameter_set) * gauss_std)  # 10% of parameter set size
+        new_id = int(round(random.gauss(current_id, std_dev)))
+        individual[0] = max(0, min(len(parameter_set) - 1, new_id))
 
-    # Mutate x_offset
+    # Mutate offsets with normal distribution
     if random.random() < indpb:
-        individual[1] = random.uniform(*x_range)
+        x_std = (x_range[1] - x_range[0]) * gauss_std  # 10% of range
+        individual[1] = max(x_range[0], min(x_range[1],
+            random.gauss(individual[1], x_std)))
 
-    # Mutate y_offset
     if random.random() < indpb:
-        individual[2] = random.uniform(*y_range)
+        y_std = (y_range[1] - y_range[0]) * gauss_std
+        individual[2] = max(y_range[0], min(y_range[1],
+            random.gauss(individual[2], y_std)))
 
     return individual,
 
