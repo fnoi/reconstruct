@@ -8,7 +8,7 @@ import numpy as np
 from deap import creator, base, tools, algorithms
 from numpy.lib.npyio import savez
 
-from tools.fitting_1 import params2verts, verts2edges
+from tools.fitting_1 import params2verts, verts2edges, subdivide_edges, get_solution_edge_normals
 
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -92,17 +92,20 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     # Extract the Pareto front # final pop or all??
 
     # pareto_front = tools.sortNondominated(hof, len(hof), first_front_only=True)
-    pareto_front = tools.selNSGA3(hof, len(hof), ref_points=ref_points)
+    pareto_front = tools.selNSGA3(final_pop, len(final_pop), ref_points=ref_points)
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)
     # pareto_front = tools.selNSGA3(all_individuals, len(all_individuals), ref_points=ref_points)
-    # pareto_front = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
+    # pareto_front_2 = tools.sortNondominated(final_pop, len(final_pop), first_front_only=True)
 
     pareto_unique = []
     if len(pareto_front) == 1:
-        pareto_unique.append(pareto_front[0])
-        min_fitness_individual_abs = pareto_front[0]
+        if len(pareto_front[0]) == 1:
+            pareto_unique.append(pareto_front[0][0])
+        else:
+            pareto_unique.append(pareto_front[0])
+            min_fitness_individual_abs = pareto_front[0]
     else:
-        for pareto_individual in pareto_front[0]:
+        for pareto_individual in pareto_front:
             if pareto_individual not in pareto_unique:
                 pareto_unique.append(pareto_individual)
 
@@ -148,26 +151,26 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
                 filename=f'pareto_{pareto_individual[0]}',
                 iter=store_iter)
 
-    # calculate inliers for all in pareto and identify solution with max inliers
-    inliers_all = []
-    for pareto_individual in pareto_unique:
-        params = pareto_individual[1:] + cs_data[pareto_individual[0]]
-        verts = params2verts(params, from_cog=False)
-        edges = verts2edges(verts)
-        dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
-        inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
-        inliers_all.append(inliers)
-    max_inliers = max(inliers_all)
-    max_inliers_idx = inliers_all.index(max_inliers)
-
-    params = pareto_unique[max_inliers_idx][1:] + cs_data[pareto_unique[max_inliers_idx][0]]
-    verts = params2verts(params, from_cog=False)
-    edges = verts2edges(verts)
-    inliers = max_inliers / len(points)
-    cs_plot(vertices=verts,
-            points=all_points,
-            normals=all_normals,
-            headline=f'best solution: {max_inliers_idx}\ninliers: inliers cutoff, relative: {inliers:.2f}')
+    # # calculate inliers for all in pareto and identify solution with max inliers
+    # inliers_all = []
+    # for pareto_individual in pareto_unique:
+    #     params = pareto_individual[1:] + cs_data[pareto_individual[0]]
+    #     verts = params2verts(params, from_cog=False)
+    #     edges = verts2edges(verts)
+    #     dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
+    #     inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
+    #     inliers_all.append(inliers)
+    # max_inliers = max(inliers_all)
+    # max_inliers_idx = inliers_all.index(max_inliers)
+    #
+    # params = pareto_unique[max_inliers_idx][1:] + cs_data[pareto_unique[max_inliers_idx][0]]
+    # verts = params2verts(params, from_cog=False)
+    # edges = verts2edges(verts)
+    # inliers = max_inliers / len(points)
+    # cs_plot(vertices=verts,
+    #         points=all_points,
+    #         normals=all_normals,
+    #         headline=f'best solution: {max_inliers_idx}\ninliers: inliers cutoff, relative: {inliers:.2f}')
 
 
 
@@ -318,19 +321,14 @@ def cost_combined(solution_params, data_points, data_normals, data_frame, weight
     solution_verts = params2verts(solution_params, from_cog=False)
     solution_edges = verts2edges(solution_verts)
 
-    n_up = [0, 1]
-    n_down = [0, -1]
-    n_left = [-1, 0]
-    n_right = [1, 0]
+    solution_edge_normals = get_solution_edge_normals()
 
-    polygon_edge_normals = np.array(
-        [n_left, n_up, n_left, n_down, n_left, n_up, n_right, n_down, n_right, n_up, n_right, n_down]
-    )
+    solution_edges, solution_edge_normals = subdivide_edges(edges=solution_edges, edge_normals=solution_edge_normals, lmax=0.02)
 
     # Pre-compute all cosine similarities
     all_similarities = np.array([
         cosine_similarity(normal.reshape(1, -1), data_normals)[0]
-        for normal in polygon_edge_normals
+        for normal in solution_edge_normals
     ])
     if weights is not None:
         all_similarities = all_similarities * weights
