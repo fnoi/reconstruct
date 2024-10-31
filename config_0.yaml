@@ -60,10 +60,10 @@ skeleton_visual:
 cs_fit:
   method: nsga3
   grid_size: 0.01
-  n_downsample: 500
-  n_pop: 500
-  n_lambda: 500
-  n_mu: 500
-  n_gen: 2
+  n_downsample: 100
+  n_pop: 100
+  n_lambda: 100
+  n_mu: 100
+  n_gen: 50
   inlier_thresh: 0.005
   ifc_cs_path: /Users/fnoic/PycharmProjects/IfcOpenShell/src/bonsai/bonsai/bim/data/libraries/IFC4 EU Steel.ifc

@@ -225,9 +225,7 @@ class Segment(object):
             transformation_tracer(self.points, target_points, source_angle=self.source_angle, target_angle=self.target_angle)
 
         self.points_2D = target_points[:, :2]
-        # calculate center of gravity of points_2D to keep track of offset during fitting
-        self.ref_offset_2D = np.mean(self.points_2D, axis=0)
-        
+
         self.normals_2D = target_normals[:, :2] / np.linalg.norm(target_normals[:, :2])
 
         ransac_data = (inliers_0, inliers_1)
@@ -252,7 +250,7 @@ class Segment(object):
 
         if self.config.cs_fit.method == 'nsga3':
             # cross-section fitting with NSGA-III (multi-objective optimization)
-            self.h_beam_params, self.h_beam_verts, self.cstype = solve_w_nsga(
+            self.h_beam_params, self.h_beam_verts, self.cstype, offset = solve_w_nsga(
                 points=self.points_2D_fitting,
                 normals=self.normals_2D_fitting,
                 config=config,
@@ -265,25 +263,20 @@ class Segment(object):
             )
         elif self.config.cs_fit.method == 'pso':
             # cross-section fitting with PSO (single-objective optimization)
-            self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost = fitting_pso.fitting_fct(
+            self.h_beam_params, self.h_beam_verts, self.h_beam_fit_cost, offset = fitting_pso.fitting_fct(
                 self.points_2D_fitting)
         else:
             # not implemented
             raise NotImplementedError(f'CS fitting method {self.config.cs_fit.method} not implemented')
 
-        # use cog to calculate offset and update COG
-        cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
-        cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
-        print(f'cog_x: {cog_x}, cog_y: {cog_y}')
-
-        offset_x = self.ref_offset_2D[0] - cog_x
-        offset_y = self.ref_offset_2D[1] - cog_y
-
-        print(f'offset_x: {offset_x}, offset_y: {offset_y}')
+        self.points_2D = self.points_2D - offset
+        self.h_beam_verts = self.h_beam_verts - offset
+        self.h_beam_params[0] = self.h_beam_params[0] - offset[0]
+        self.h_beam_params[1] = self.h_beam_params[1] - offset[1]
 
         # update COG / left in 2D and 3D
-        self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, offset_x, offset_y)
-        self.right_3D = geom.calculate_shifted_source_pt(self.source_angle, offset_x, offset_y, third_pt=self.right_3D)
+        self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, offset[0], offset[1])
+        self.right_3D = geom.calculate_shifted_source_pt(self.source_angle, offset[0], offset[1], third_pt=self.right_3D)
         direction = self.right_3D - self.left_3D
         self.vector_3D = direction / np.linalg.norm(direction)
         self.vector_3D = self.right_3D - self.left_3D
@@ -296,10 +289,10 @@ class Segment(object):
         self.source_angle = (source_vec_center + source_vec_left, source_vec_center, source_vec_center + source_vec_right)
         self.transformation_matrix = simplified_transform_lines(self.source_angle, self.target_angle)
 
-        left_3D_hom = np.append(self.left_3D, 1)
-        self.left_2D = np.dot(self.transformation_matrix, left_3D_hom)[:2]
+        # left_3D_hom = np.append(self.left_3D, 1)
+        # self.left_2D = np.dot(self.transformation_matrix, left_3D_hom)[:2]
 
-        self.h_beam_verts = params2verts(self.h_beam_params, from_cog=False)
+        # self.h_beam_verts = params2verts(self.h_beam_params, from_cog=False)
 
 
     def downsample_dbscan_rand(self, points_after_sampling):

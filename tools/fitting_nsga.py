@@ -231,8 +231,12 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     print(f"GA time: {perf_counter() - t_pop:.2f}s")
     # print(f"generation times: {np.mean(gen_times):.2f}s")
 
+    cs_cog_x = h_beam_verts[0][0] + (h_beam_verts[6][0] - h_beam_verts[0][0]) / 2
+    cs_cog_y = h_beam_verts[0][1] + (h_beam_verts[6][1] - h_beam_verts[0][1]) / 2
 
-    return h_beam_params, h_beam_verts, cstype
+    offset = [cs_cog_x, cs_cog_y]
+
+    return h_beam_params, h_beam_verts, cstype, offset
 
 
 

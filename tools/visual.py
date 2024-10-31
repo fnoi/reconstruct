@@ -571,7 +571,7 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False,
 
     if points is not None:
         try:
-            ax.scatter(points[:, 0], points[:, 1], s=0.4, color='grey', marker=',')
+            ax.scatter(points[:, 0], points[:, 1], s=0.8, color='grey', marker=',')
         except Exception as e:
             print(e)
 
@@ -579,7 +579,7 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False,
         for i in range(points.shape[0]):
             ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.5],
                     [points[i][1], points[i][1] + normals[i][1] * 0.5],
-                    color='grey', linewidth=0.04)
+                    color='grey', linewidth=0.3)
 
     if headline is not None:
         ax.set_title(headline, fontname='Times New Roman')
