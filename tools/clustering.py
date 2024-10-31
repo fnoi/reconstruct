@@ -3,7 +3,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from tqdm import tqdm
 
-from tools.local import neighborhood_search, angular_deviation, supernormal_svd
+from tools.local import neighborhood_search, angular_deviation, supernormal_svd_s1
 
 
 def region_growing(cloud, config):
@@ -122,7 +122,7 @@ def region_growing(cloud, config):
                 cluster_normals = potential_cloud.loc[potential_cloud['id'].isin(active_point_ids), ['nx', 'ny', 'nz']].to_numpy()
                 # cluster_normals = cloud.loc[active_point_ids, ['nx', 'ny', 'nz']].to_numpy()
                 print('in')
-                cluster_sn = supernormal_svd(cluster_normals)
+                cluster_sn = supernormal_svd_s1(cluster_normals)
                 print('out')
                 cluster_sn /= np.linalg.norm(cluster_sn)
                 # find the most confident % of cluster points per config

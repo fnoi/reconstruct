@@ -18,7 +18,7 @@ from tqdm import tqdm
 from sklearn.cluster import DBSCAN
 
 import tools.geometry
-from tools.local import supernormal_svd, supernormal_confidence, angular_deviation
+from tools.local import supernormal_svd_s1, supernormal_confidence, angular_deviation
 from tools.utils import find_random_id
 
 
@@ -395,7 +395,7 @@ def calc_supernormals(point_coords_arr, point_normals_arr, point_ids_all, point_
         coords_neighbors = point_coords_arr[ids_neighbors]
         arrowheads = coords_neighbors + normals_neighbors
 
-        supernormal, sig_1, sig_2, sig_3 = supernormal_svd(normals_patch, full_return=True)
+        supernormal, sig_1, sig_2, sig_3 = supernormal_svd_s1(normals_patch, full_return=True)
         confidence = supernormal_confidence(supernormal, normals_patch, sig_1, sig_3)
         confidences.append(confidence)
 
@@ -542,7 +542,7 @@ if __name__ == "__main__":
                 continue
             else:
                 segment_array = cloud_frame[cloud_frame['pi'] == pi].to_numpy()
-                dirs[str(pi)] = tools.geometry.orientation_estimation(segment_array)
+                dirs[str(pi)] = tools.geometry.orientation_estimation_s2(segment_array)
 
 
         # store the dir dict using pickle

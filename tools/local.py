@@ -15,28 +15,23 @@ from sklearn.cluster import DBSCAN
 from tools.utils import plot_patch
 
 
-def supernormal_svd(normals, full_return=False):
+def supernormal_svd_s1(normals, full_return=False):
     if np.isnan(normals).any():
-        print('nan in normals')
-    normal_src = np.copy(normals)
+        raise ValueError('normals contain nan')
     normals = consistency_flip(normals)
     # check if normals contain nan
     if np.isnan(normals).any():
-        print('nan in normals')
+        raise ValueError('normals contain nan')
 
     U, S, Vt = svd(normals, full_matrices=False)
     sig_1 = S[0]
     sig_2 = S[1]
     sig_3 = S[2]
 
-    # U, S, Vt = np.linalg.svd(normals)
     if full_return:
         return Vt[-1, :], sig_1, sig_2, sig_3
     else:
         return Vt[-1, :]
-
-
-import numpy as np
 
 
 def consistency_flip(vectors):
@@ -194,7 +189,7 @@ def neighborhood_calculations(cloud=None, cloud_tree=None, seed_id=None, config=
         neighbor_normals = cloud[cloud['id'].isin(neighbor_ids)][['nx', 'ny', 'nz']].values
 
 
-    seed_supernormal, sig_1, sig_2, sig_3 = supernormal_svd(neighbor_normals, full_return=True)
+    seed_supernormal, sig_1, sig_2, sig_3 = supernormal_svd_s1(neighbor_normals, full_return=True)
     seed_supernormal /= np.linalg.norm(seed_supernormal)
 
     cloud.loc[cloud['id'] == seed_id, 'snx'] = seed_supernormal[0]
@@ -1026,7 +1021,7 @@ def patch_context_supernormals(cloud, config):
         point_ids = point_ids.tolist()
         context_ids, _ = subset_cluster_neighbor_search(cloud, point_ids, config)
         context_normals = cloud.loc[context_ids, ['nx', 'ny', 'nz']].values.astype(np.float32)
-        patch_context_sn, sig1, sig2, sig3 = supernormal_svd(context_normals, full_return=True)
+        patch_context_sn, sig1, sig2, sig3 = supernormal_svd_s1(context_normals, full_return=True)
         csn_confidence = supernormal_confidence(patch_context_sn, context_normals, sig1, sig2, sig3)
 
         cloud.loc[cloud['ransac_patch'] == patch_id, 'csnx'] = patch_context_sn[0]

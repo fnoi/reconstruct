@@ -35,6 +35,8 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.normals_hom = None
+        self.points_hom = None
         self.filter_backmap = None
         self.filter_weights = None
         self.normals_2D = None
@@ -128,7 +130,7 @@ class Segment(object):
         points = self.points
         try:
             normals = self.points_data[['nx', 'ny', 'nz']].values
-        except TypeError:  # normals inavailable if called in skeleton aggregation
+        except TypeError:  # normals unavailable if called in skeleton aggregation
             # calculate normals real quick
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points)
@@ -137,7 +139,7 @@ class Segment(object):
             normals = np.asarray(pcd.normals)
 
         # find the two best planes and their line of intersection
-        planes, direction, origin, inliers_0, inliers_1 = geom.orientation_estimation(
+        planes, direction, origin, inliers_0, inliers_1 = geom.orientation_estimation_s2(
             np.concatenate((points, normals), axis=1),
             config=self.config,
             step="skeleton"
@@ -233,41 +235,11 @@ class Segment(object):
             # vis.segment_projection_3D(proj_points_plane, proj_lines)
 
 
-
-    def update_axes(self):  # still needed?
-        """bring back center of gravity cog (from lookup) to its correct position in the original coordinate system"""
-        cog_flat = rotate_points_2D(self.cog_2D, - self.angle_2D)
-
-        cog_lifted = np.array([cog_flat[0], cog_flat[1], self.z_delta])
-
-        cog_left_maybe = np.dot(cog_lifted, self.mat_rotation_xy)
-
-        projected, _ = project_points_to_line(
-            points=self.points,
-            point_on_line=cog_left_maybe,
-            direction=self.line_raw_dir
-        )
-
-        ref_x = -100000
-        ref_t = (ref_x - cog_left_maybe[0]) / self.line_raw_dir[0]
-        ref_pt = cog_left_maybe + ref_t * self.line_raw_dir
-        vecs = projected - ref_pt
-        dists = np.linalg.norm(vecs, axis=1)
-        l_ind = np.argmin(dists)
-        r_ind = np.argmax(dists)
-
-        self.line_cog_left = projected[l_ind]
-        self.line_cog_right = projected[r_ind]
-        self.line_cog_center = (self.line_cog_left + self.line_cog_right) / 2
-
-
     def fit_cs_rev(self, config=None):
         if self.config.cs_fit.n_downsample != 0 and self.config.cs_fit.n_downsample < self.points_2D.shape[0]:
             self.points_2D_fitting, self.normals_2D_fitting, self.filter_weights, self.filter_backmap = kmeans_points_normals_2D(
                 self.points_2D, self.normals_2D, self.config.cs_fit.n_downsample)
-            # self.downsample_dbscan_rand(config.cs_fit.n_downsample)  # TODO: avoid downsampling if possible (check method limitations, mitigate risk, investigate weighting)
-
-            # TODO: consider normals for downsampling / filter from segment normals
+            # self.downsample_dbscan_rand(config.cs_fit.n_downsample)
         else:
             self.points_2D_fitting = self.points_2D
             self.normals_2D_fitting = self.normals_2D
@@ -354,6 +326,7 @@ class Segment(object):
 
         print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')
 
+
     def downsample_dbscan_grid(self, resolution, points_after_sampling):
         init_count = self.points_2D.shape[0]
         points = self.points_2D
@@ -394,140 +367,3 @@ class Segment(object):
 
         print(f'downsampling from {init_count} to {filtered_points.shape[0]} points')
 
-    def cs_lookup(self, path=None):
-        if path is None:
-            path = '/data/beams/aisc-shapes-database-v15.0.csv'
-            # combine current path with path
-            path = os.getcwd() + path
-        with open(path, 'r', newline='\n') as f:
-            beams = pd.read_csv(f, header=0, sep=';')
-            # retrieve name of first column
-            uno = beams.columns[0]
-            beams_frame = beams[[uno, 'AISC_Manual_Label', 'tw.1', 'tf.1', 'bf.1', 'd.1']]
-            # rename columns
-            beams_frame.columns = ['type', 'label', 'tw', 'tf', 'bf', 'd']
-            # remove all "â€“", replace with nan
-            beams_frame = beams_frame.replace('â€“', np.nan, regex=True)
-            # replace all , with . for tw tf bf and d
-            beams_frame = beams_frame.replace(',', '.', regex=True)
-            # drop all rows with –
-            beams_frame = beams_frame.replace('–', np.nan, regex=True)
-            # convert to numeric in column tw
-            beams_frame[['tw', 'tf', 'bf', 'd']] = beams_frame[['tw', 'tf', 'bf', 'd']].apply(pd.to_numeric)
-            # beams_frame = beams_frame.apply(pd.to_numeric)
-
-        # divide the selected columns by 1000 to convert to mm
-        beams_frame[['tw', 'tf', 'bf', 'd']] = beams_frame[['tw', 'tf', 'bf', 'd']] / 1e3
-
-        # find the closest beam
-        tw_fit = self.h_beam_params[2]
-        tf_fit = self.h_beam_params[3]
-        bf_fit = self.h_beam_params[4]
-        d_fit = self.h_beam_params[5]
-
-        # find best fit row in beams_frame with Huber Loss
-        delta = 1.0  # TODO: include in config
-        beams_frame['HuberLoss'] = (
-                beams_frame.apply(lambda row: huber_loss(row['tw'] - tw_fit, delta), axis=1) +
-                beams_frame.apply(lambda row: huber_loss(row['tf'] - tf_fit, delta), axis=1) +
-                beams_frame.apply(lambda row: huber_loss(row['bf'] - bf_fit, delta), axis=1) +
-                beams_frame.apply(lambda row: huber_loss(row['d'] - d_fit, delta), axis=1)
-        )
-        beams_frame = beams_frame.sort_values(by='HuberLoss', ascending=True)
-
-        # beams_frame['RMSE'] = np.sqrt(
-        #     (beams_frame['tw'] - tw_fit) ** 2 +
-        #     (beams_frame['tf'] - tf_fit) ** 2 +
-        #     (beams_frame['bf'] - bf_fit) ** 2 +
-        #     (beams_frame['d'] - d_fit) ** 2)
-        # beams_frame = beams_frame.sort_values(by='RMSE', ascending=True)
-        tw_lookup = beams_frame['tw'].iloc[0]
-        tf_lookup = beams_frame['tf'].iloc[0]
-        bf_lookup = beams_frame['bf'].iloc[0]
-        d_lookup = beams_frame['d'].iloc[0]
-        type_lookup = beams_frame['type'].iloc[0]
-        label_lookup = beams_frame['label'].iloc[0]
-
-        improve_xy = False
-        if improve_xy:
-            # optimize location / improve x0, y0 after param lookup
-            delta_xy = 0.01
-            range_x = np.linspace(self.h_beam_params[0] - delta_xy,
-                                  self.h_beam_params[0] + delta_xy,
-                                  10)
-            range_y = np.linspace(self.h_beam_params[1] - delta_xy,
-                                  self.h_beam_params[1] + delta_xy,
-                                  10)
-            range_x = np.append(range_x, self.h_beam_params[0])
-            range_y = np.append(range_y, self.h_beam_params[1])
-
-            # all combinations of x, y
-            xy_combinations = list(itertools.product(range_x, range_y))
-            err = np.zeros(len(xy_combinations))
-            for i, xy in enumerate(xy_combinations):
-                params = [xy[0], xy[1], tw_fit, tf_fit, bf_fit, d_fit]
-                err[i] = cost_fct_1(params, self.points_2D, debug_plot=False)
-
-            min_ind = np.argmin(err)
-            new_x = xy_combinations[min_ind][0]
-            new_y = xy_combinations[min_ind][1]
-
-            # x changed?
-            if new_x != self.h_beam_params[0]:
-                print(f'changed x from {self.h_beam_params[0]} to {new_x}')
-                self.h_beam_params[0] = new_x
-            else:
-                print(f'x unchanged at {self.h_beam_params[0]}')
-            # y changed?
-            if new_y != self.h_beam_params[1]:
-                print(f'changed y from {self.h_beam_params[1]} to {new_y}')
-                self.h_beam_params[1] = new_y
-            else:
-                print(f'y unchanged at {self.h_beam_params[1]}')
-
-            # plot cs with points
-            cs_plot(self.h_beam_verts, self.points_2D)
-            # plot new cs
-            self.h_beam_verts = params2verts(self.h_beam_params)
-            cs_plot(self.h_beam_verts, self.points_2D)
-
-        cog_2D_lookup = (
-            self.h_beam_params[0] + bf_lookup / 2,
-            self.h_beam_params[1] + d_lookup / 2
-        )
-
-        self.cog_2D = cog_2D_lookup
-        self.cog_3D = 0     # TODO FIX
-
-        delta_d = self.h_beam_params[5] - d_lookup
-        delta_bf = self.h_beam_params[4] - bf_lookup
-
-        self.h_beam_params[0] = self.h_beam_params[0] + delta_bf / 2
-        self.h_beam_params[1] = self.h_beam_params[1] + delta_d / 2
-
-        self.h_beam_params = { # TODO: double check overwrite correctness... also it is messy af to not preserve structure
-            'x0': self.h_beam_params[0],
-            'y0': self.h_beam_params[1],
-            'type': type_lookup,
-            'label': label_lookup,
-            'tw': tw_lookup,
-            'tf': tf_lookup,
-            'bf': bf_lookup,
-            'd': d_lookup
-        }
-
-        self.h_beam_verts = params2verts(
-            [self.h_beam_params['x0'],
-             self.h_beam_params['y0'],
-             self.h_beam_params['tw'],
-             self.h_beam_params['tf'],
-             self.h_beam_params['bf'],
-             self.h_beam_params['d']]
-        )
-
-        # TODO: identify bf and d deltas and move x0/y0 accordingly (to avoid the overall movement)
-
-        tools.visual.cs_plot(self.h_beam_verts, self.points_2D)
-
-        return
-        # return beams_frame

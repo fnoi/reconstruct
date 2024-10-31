@@ -12,7 +12,7 @@ pd.options.mode.copy_on_write = True
 
 from tqdm import tqdm
 
-from tools.local import neighborhood_search, supernormal_svd, consistency_flip, angular_deviation, supernormal_confidence, subset_cluster_neighbor_search
+from tools.local import neighborhood_search, supernormal_svd_s1, consistency_flip, angular_deviation, supernormal_confidence, subset_cluster_neighbor_search
 
 
 def region_growing_rev(cloud, config):
@@ -112,7 +112,7 @@ def region_growing_rev(cloud, config):
                 # add a check for supernormal quality to decide if to use the cluster_sn or to recalculate
                 # cluster_sn = supernormal_svd(_normals)
 
-                cluster_sn, _s1, _s2, _s3 = supernormal_svd(__normals, full_return=True)
+                cluster_sn, _s1, _s2, _s3 = supernormal_svd_s1(__normals, full_return=True)
                 cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
 
                 # cluster_csn = cloud.loc[seed_point_id, ['csnx', 'csny', 'csnz']].values

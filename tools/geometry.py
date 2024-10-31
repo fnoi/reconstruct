@@ -567,8 +567,7 @@ def rotation_matrix_from_vectors(vec1, vec2):
     return np.identity(3) + np.sin(angle) * kmat + (1 - np.cos(angle)) * np.dot(kmat, kmat)
 
 
-
-def orientation_estimation(cluster_ptx_array, config=None, step=None):
+def orientation_estimation_s2(cluster_ptx_array, config=None, step=None):
     """takes in xyz array of points, performs ransac until 2 non-planar planes are found
     then returns vector describing the line of intersection between the two planes"""
 
@@ -629,36 +628,6 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
                     print('fail')
                     return None, None, None, None, None
 
-
-    elif case == "pyransac":
-        plane = pyrsc.Plane()
-        planes = []
-        points = copy.deepcopy(cluster_ptx_array[:, :3])
-        while True:
-            ransac_result = plane.fit(pts=points,
-                                      thresh=config.skeleton.ransac_dist_thresh,
-                                      minPoints=config.skeleton.ransac_min_count_rel * len(points),
-                                      maxIteration=config.skeleton.ransac_iterations)
-            planes.append(ransac_result[0])
-            points = np.delete(points, ransac_result[1], axis=0)
-            if len(planes) > 1:
-                plane_combinations = itertools.combinations(range(len(planes)), 2)
-                for combination in plane_combinations:
-                    f_0 = planes[combination[0]]
-                    f_1 = planes[combination[1]]
-
-                    angle = np.rad2deg(
-                        np.arccos(
-                            np.dot(
-                                f_0[:3],
-                                f_1[:3]
-                            )
-                        )
-                    )
-                    if 45 < angle % 180 < 135:
-                        break
-                raise Exception('planes found are not "perpendicular" enough, cannot retry ...')
-
     else:
         raise Exception('ransac_method not recognized')
 
@@ -675,36 +644,6 @@ def orientation_estimation(cluster_ptx_array, config=None, step=None):
         return (f_0, f_1), orientation, point_on_line, inliers_0, inliers_1
     else:
         return orientation
-
-
-def orientation_2D(cloud):
-    coords = copy.deepcopy(cloud.points_flat_raw)
-    active_mask = np.ones(len(coords), dtype=bool)
-    lines = []
-    # perform ransac in 2D to find all lines using scipy
-    while True:
-        # ransac for line with pyrsc
-        line = pyrsc.Line()
-        ransac_result = line.fit(pts=coords[active_mask],
-                                 thresh=0.01,
-                                 maxIteration=100000)
-        lines.append(ransac_result[0])
-        # remove inliers from point cloud
-        inliers = ransac_result[1]
-        active_mask[inliers] = False
-
-        fig, ax = plt.subplots()
-        ax.scatter(coords[:, 0], coords[:, 1], s=1)
-        for line in lines:
-            x = np.linspace(np.min(coords[:, 0]), np.max(coords[:, 0]), 3)
-            y = (-line[0] * x - line[2]) / line[1]
-            ax.plot(x, y, color='red')
-        plt.show()
-
-        a = 0
-
-        if len(coords[active_mask]) < 0.1 * len(coords):
-            break
 
 
 def rotate_xy2xyz(point_2D, rot_matrix, xy_angle):
