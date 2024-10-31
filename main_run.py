@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 6
     single_step = False
     ##########
     ##########
@@ -190,8 +190,7 @@ if __name__ == '__main__':
 
         metrics_report = True
         if metrics_report:
-            miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
-
+            calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton, store=False)
         if single_step:
             raise ValueError('stop here, single step')
 
@@ -208,7 +207,7 @@ if __name__ == '__main__':
         if metrics_report:
             with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
                 cloud = pd.read_pickle(f)
-            miou_weighted, miou_unweighted = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton)
+            calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton, store=False)
 
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.plot_cog_skeleton(headline='skeleton aggregation')

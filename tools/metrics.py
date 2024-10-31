@@ -294,7 +294,7 @@ def huber_loss(residual, delta):
         return delta * (abs(residual) - 0.5 * delta)
 
 
-def calculate_metrics(df_cloud, base='cloud', skeleton=None):
+def calculate_metrics(df_cloud, base='cloud', skeleton=None, store=False):
     """
     base: 'cloud' or 'skeleton'
     """
@@ -342,7 +342,8 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None):
 
     greedy_compare = False
     if not greedy_compare:
-        return metrics
+        if store:
+            return metrics
     else:
         print('greedy_gt matching')
         id_map = find_pairs(pred=inst_pred, gt=inst_gt, method='greedy_gt')

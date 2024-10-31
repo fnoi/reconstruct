@@ -35,6 +35,7 @@ except ImportError as e:
 
 class Segment(object):
     def __init__(self, name: str = None, config=None):
+        self.ref_offset_2D = None
         self.normals_hom = None
         self.points_hom = None
         self.filter_backmap = None
@@ -127,20 +128,20 @@ class Segment(object):
         """
         self.points_hom = np.hstack((self.points, np.ones((self.points.shape[0], 1))))
         self.normals_hom = np.hstack((self.normals, np.zeros((self.normals.shape[0], 1))))
-        points = self.points
+        
         try:
             normals = self.points_data[['nx', 'ny', 'nz']].values
         except TypeError:  # normals unavailable if called in skeleton aggregation
             # calculate normals real quick
             pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(points)
+            pcd.points = o3d.utility.Vector3dVector(self.points)
             pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
                 radius=self.config.preprocess.normals_radius, max_nn=self.config.preprocess.normals_max_nn))
             normals = np.asarray(pcd.normals)
 
         # find the two best planes and their line of intersection
         planes, direction, origin, inliers_0, inliers_1 = geom.orientation_estimation_s2(
-            np.concatenate((points, normals), axis=1),
+            np.concatenate((self.points, normals), axis=1),
             config=self.config,
             step="skeleton"
         )
@@ -151,7 +152,7 @@ class Segment(object):
 
         n_0 = np.array(planes[0][:3], dtype=np.float64)  # normal of plane 0
 
-        points_on_line, closest_ind = geom.project_points_to_line(points, origin, direction)
+        points_on_line, closest_ind = geom.project_points_to_line(self.points, origin, direction)
 
         ref_x = -100000
         ref_t = (ref_x - origin[0]) / direction[0]
@@ -195,7 +196,7 @@ class Segment(object):
               self.left_3D[2] + (proj_dir_1[2] * len_proj)]])
         proj_lines = [proj_dir_0, proj_dir_1]
 
-        proj_points_plane = geom.points_to_actual_plane(points, self.vector_3D, self.left_3D)
+        proj_points_plane = geom.points_to_actual_plane(self.points, self.vector_3D, self.left_3D)
 
         origin = np.array([0, 0, 0])
         target_axis_s = np.array([0, 0, 1])  # Z AXIS
@@ -224,6 +225,9 @@ class Segment(object):
             transformation_tracer(self.points, target_points, source_angle=self.source_angle, target_angle=self.target_angle)
 
         self.points_2D = target_points[:, :2]
+        # calculate center of gravity of points_2D to keep track of offset during fitting
+        self.ref_offset_2D = np.mean(self.points_2D, axis=0)
+        
         self.normals_2D = target_normals[:, :2] / np.linalg.norm(target_normals[:, :2])
 
         ransac_data = (inliers_0, inliers_1)
@@ -270,9 +274,12 @@ class Segment(object):
         # use cog to calculate offset and update COG
         cog_x = (self.h_beam_verts[11][0] + self.h_beam_verts[0][0]) / 2
         cog_y = (self.h_beam_verts[5][1] + self.h_beam_verts[0][1]) / 2
+        print(f'cog_x: {cog_x}, cog_y: {cog_y}')
 
-        offset_x = self.h_beam_verts[0][0] - cog_x
-        offset_y = self.h_beam_verts[0][1] - cog_y
+        offset_x = self.ref_offset_2D[0] - cog_x
+        offset_y = self.ref_offset_2D[1] - cog_y
+
+        print(f'offset_x: {offset_x}, offset_y: {offset_y}')
 
         # update COG / left in 2D and 3D
         self.left_3D = geom.calculate_shifted_source_pt(self.source_angle, offset_x, offset_y)
