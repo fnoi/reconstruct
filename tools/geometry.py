@@ -897,7 +897,7 @@ def calculate_shifted_source_pt(angle_source, shift_x, shift_y, third_pt=None):
     else:
         common = third_pt
 
-    shifted_pt = common - shift_x * vec_x - shift_y * vec_y
+    shifted_pt = common + shift_x * vec_x + shift_y * vec_y
 
     return shifted_pt
 

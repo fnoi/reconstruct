@@ -153,7 +153,8 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
             points=points,
             normals=normals,
             # headline=f'best solution: {inliers}\ninliers: log only, relative: {rel_inliers:.2f}',
-            info_dict=fit_dict)
+            info_dict=fit_dict,
+            weights=filter_weights)
 
     # for each solution in pareto_unique, plot to file with headline indicating all fitness values
     store_all = False
@@ -172,10 +173,8 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
                 id = pareto_individual[0]
             fit_dict = {
                 "solution_id": id,
-                # "relative_inliers": rel_inliers,
                 "log_distance": pareto_individual.fitness.values[0],
                 "active_edge_length": pareto_individual.fitness.values[1],
-                # "activation_distance": pareto_individual.fitness.values[2],
                 "cosine_similarity": pareto_individual.fitness.values[2]
             }
             cs_plot(vertices=verts,
@@ -187,28 +186,6 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
                     filename=f'pareto_{pareto_individual[0]}',
                     iter=store_iter,
                     info_dict=fit_dict)
-
-    # # calculate inliers for all in pareto and identify solution with max inliers
-    # inliers_all = []
-    # for pareto_individual in pareto_unique:
-    #     params = pareto_individual[1:] + cs_data[pareto_individual[0]]
-    #     verts = params2verts(params, from_cog=False)
-    #     edges = verts2edges(verts)
-    #     dists = np.array([point_segment_distance(points_array, edge[0], edge[1]) for edge in edges])
-    #     inliers = np.sum(np.min(dists, axis=0) < config.cs_fit.inlier_thresh)
-    #     inliers_all.append(inliers)
-    # max_inliers = max(inliers_all)
-    # max_inliers_idx = inliers_all.index(max_inliers)
-    #
-    # params = pareto_unique[max_inliers_idx][1:] + cs_data[pareto_unique[max_inliers_idx][0]]
-    # verts = params2verts(params, from_cog=False)
-    # edges = verts2edges(verts)
-    # inliers = max_inliers / len(points)
-    # cs_plot(vertices=verts,
-    #         points=all_points,
-    #         normals=all_normals,
-    #         headline=f'best solution: {max_inliers_idx}\ninliers: inliers cutoff, relative: {inliers:.2f}')
-
 
 
     # delete Individual and FitnessMin

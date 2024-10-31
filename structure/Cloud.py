@@ -270,6 +270,7 @@ class Segment(object):
             raise NotImplementedError(f'CS fitting method {self.config.cs_fit.method} not implemented')
 
         self.points_2D = self.points_2D - offset
+        self.points_2D_fitting = self.points_2D_fitting - offset
         self.h_beam_verts = self.h_beam_verts - offset
         self.h_beam_params[0] = self.h_beam_params[0] - offset[0]
         self.h_beam_params[1] = self.h_beam_params[1] - offset[1]
@@ -289,10 +290,12 @@ class Segment(object):
         self.source_angle = (source_vec_center + source_vec_left, source_vec_center, source_vec_center + source_vec_right)
         self.transformation_matrix = simplified_transform_lines(self.source_angle, self.target_angle)
 
-        # left_3D_hom = np.append(self.left_3D, 1)
-        # self.left_2D = np.dot(self.transformation_matrix, left_3D_hom)[:2]
+        left_3D_hom = np.append(self.left_3D, 1)
+        self.left_2D = np.dot(self.transformation_matrix, left_3D_hom)[:2]
 
         # self.h_beam_verts = params2verts(self.h_beam_params, from_cog=False)
+        # if you want to plot here: make sure weights have right size
+        cs_plot(vertices=self.h_beam_verts, points=self.points_2D_fitting, normals=self.normals_2D_fitting, weights=self.filter_weights)
 
 
     def downsample_dbscan_rand(self, points_after_sampling):

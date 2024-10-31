@@ -528,7 +528,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_
     return fig
 
 
-def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False, filename=None, iter=None, info_dict=None):
+def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False, filename=None, iter=None, info_dict=None, weights=None):
     normals = np.asarray(normals)
     norms = np.linalg.norm(normals, axis=1, keepdims=True)
     norms = np.where(norms == 0, np.finfo(float).eps, norms) * 20
@@ -569,17 +569,33 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False,
         ax.plot([vertices[11][0], vertices[0][0]],
                 [vertices[11][1], vertices[0][1]], color=color)
 
-    if points is not None:
+    if points is not None and weights is None:
         try:
             ax.scatter(points[:, 0], points[:, 1], s=0.8, color='grey', marker=',')
         except Exception as e:
             print(e)
+    elif points is not None and weights is not None:
+        # scatter as above but color with weights / viridis
+        try:
+            ax.scatter(points[:, 0], points[:, 1], s=0.9, c=weights, cmap='viridis', marker=',')
+        except Exception as e:
+            print(e)
 
-    if normals is not None:
+    if normals is not None and weights is None:
         for i in range(points.shape[0]):
             ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.5],
                     [points[i][1], points[i][1] + normals[i][1] * 0.5],
                     color='grey', linewidth=0.3)
+    elif normals is not None and weights is not None:
+        # normals as above but color with weights / viridis
+        for i in range(points.shape[0]):
+            cmap = plt.cm.viridis
+            norm = plt.Normalize(min(weights), max(weights))
+
+            ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.5],
+                    [points[i][1], points[i][1] + normals[i][1] * 0.5],
+                    c=cmap(norm(weights[i])),
+                    linewidth=0.5)
 
     if headline is not None:
         ax.set_title(headline, fontname='Times New Roman')
