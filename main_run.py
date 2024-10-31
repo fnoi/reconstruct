@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
+    cache_flag = 4
     single_step = False
     ##########
     ##########
@@ -262,8 +262,8 @@ if __name__ == '__main__':
         if single_step:
             raise ValueError('stop here, single step')
 
-    raise ValueError('stop here, anyway') # currently blender works but not integrated
     if cache_flag <= 8:
+        raise ValueError('stop here, anyway')  # currently blender works but not integrated
         meth = 'blender'
         if meth == 'blender':
             # run two scripts subsequently in blender

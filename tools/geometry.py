@@ -949,7 +949,7 @@ def simplified_transform_lines(source_angle, target_angle):
 def calculate_shifted_source_pt(angle_source, shift_x, shift_y, third_pt=None):
     # calculate global direction of y as cross product of source angle vectors
     vec_y = angle_source[0] - angle_source[1]  # local y direction
-    vec_z = angle_source[2] - angle_source[1] # local z direction
+    vec_z = angle_source[2] - angle_source[1]  # local z direction
     vec_x = np.cross(vec_y, vec_z)  # local x direction
     vec_x = vec_x / np.linalg.norm(vec_x)  # normalize
 

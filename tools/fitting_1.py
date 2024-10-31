@@ -201,71 +201,55 @@ def subdivide_edges(edges, edge_normals=None, num=None, lmax=None):
     if edge_normals is None or lmax is None:
         return edges, edge_normals
 
-    n_splits = []
-    split_points = []
-    total_new_points = 0
+    # Vectorized edge length calculation
+    edge_lengths = np.linalg.norm(edges[:, 1] - edges[:, 0], axis=1)
+    needs_split = edge_lengths > lmax
+    n_splits = np.ceil(edge_lengths[needs_split] / lmax).astype(int) - 1
 
-    # Calculate splits needed
-    for i, edge in enumerate(edges):
-        edge_length = np.linalg.norm(edge[1] - edge[0])
-        if edge_length > lmax:
-            n = int(np.ceil(edge_length / lmax)) - 1
-            total_new_points += n
-            n_splits.append(n)
-            points = []
-            for j in range(1, n + 1):
-                point = edge[0] + (j / (n + 1)) * (edge[1] - edge[0])
-                points.append(point)
-            split_points.append(points)
-        else:
-            n_splits.append(0)
-            split_points.append([])
-
-    # Create new arrays with correct size
+    # Pre-calculate total size
+    total_new_points = np.sum(n_splits)
     new_size = len(edges) + total_new_points
+
     edges_new = np.zeros((new_size, 2, 2))
-    normals_new = np.zeros((new_size, 2, 2))
+    normals_new = np.zeros((new_size, 2))
 
-    # Normalize normals
-    normalized_normals = edge_normals.copy()
-    for i in range(len(edge_normals)):
-        norm = np.linalg.norm(edge_normals[i][0])
-        if norm > 0:
-            normalized_normals[i] = edge_normals[i] / norm
+    # Normalize all normals at once
+    normalized_normals = edge_normals / np.linalg.norm(edge_normals, axis=1)[:, np.newaxis]
 
-    # Fill new arrays
+    # Process edges
     idx = 0
+    split_idx = 0
     for i in range(len(edges)):
-        if n_splits[i] == 0:
+        if not needs_split[i]:
             edges_new[idx] = edges[i]
             normals_new[idx] = normalized_normals[i]
             idx += 1
         else:
-            edges_new[idx] = np.array([edges[i][0], split_points[i][0]])
-            normals_new[idx] = normalized_normals[i]
-            idx += 1
+            n = n_splits[split_idx]
+            # Vectorized point calculation
+            ratios = np.linspace(0, 1, n + 2)
+            points = edges[i][0] + np.outer(ratios, (edges[i][1] - edges[i][0]))
 
-            for j in range(len(split_points[i]) - 1):
-                edges_new[idx] = np.array([split_points[i][j], split_points[i][j + 1]])
+            # Assign edges
+            for j in range(len(points) - 1):
+                edges_new[idx] = np.array([points[j], points[j + 1]])
                 normals_new[idx] = normalized_normals[i]
                 idx += 1
+            split_idx += 1
 
-            edges_new[idx] = np.array([split_points[i][-1], edges[i][1]])
-            normals_new[idx] = normalized_normals[i]
-            idx += 1
-
-
-    # plot edges with normals at center
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    n_len = 0.02
-    for edge, normal in zip(edges_new, normals_new):
-        ax.plot([edge[0][0], edge[1][0]], [edge[0][1], edge[1][1]])
-        center = (edge[0] + edge[1]) / 2
-        ax.plot([center[0], center[0] + normal[0][0] * n_len], [center[1], center[1] + normal[0][1] * n_len])
-    # equal aspect ratio
-    ax.set_aspect('equal')
-    plt.show()
+    debug = False
+    if debug:
+        # plot edges with normals at center
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        n_len = 0.02
+        for edge, normal in zip(edges_new, normals_new):
+            ax.plot([edge[0][0], edge[1][0]], [edge[0][1], edge[1][1]])
+            center = (edge[0] + edge[1]) / 2
+            ax.plot([center[0], center[0] + normal[0][0] * n_len], [center[1], center[1] + normal[0][1] * n_len])
+        # equal aspect ratio
+        ax.set_aspect('equal')
+        plt.show()
 
 
     # subdivide edges into num segments

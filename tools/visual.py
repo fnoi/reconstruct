@@ -396,7 +396,7 @@ def transformation_tracer(points_source=None, points_target=None, points_inter_1
     fig.show()
 
 
-def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front, objective_names, plot_pareto_surface=True):
+def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_front=None, objective_names=None, plot_pareto_surface=False):
     """
     Plot all solutions from all generations, highlight the Hall of Fame,
     show the true Pareto front, and optionally plot a Pareto surface using Plotly.
@@ -439,23 +439,23 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
         name='all Solutions'
     ))
 
-    # # Add Hall of Fame solutions
-    # fig.add_trace(go.Scatter3d(
-    #     x=hof_fitness_values[:, 0],
-    #     y=hof_fitness_values[:, 1],
-    #     z=hof_fitness_values[:, 2],
-    #     mode='markers',
-    #     marker=dict(
-    #         size=5,
-    #         color='yellow',
-    #         symbol='diamond',
-    #         line=dict(color='black', width=1)
-    #     ),
-    #     text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
-    #           for i, v in enumerate(hof_fitness_values)],
-    #     hoverinfo='text',
-    #     name='Hall of Fame'
-    # ))
+    # Add Hall of Fame solutions
+    fig.add_trace(go.Scatter3d(
+        x=hof_fitness_values[:, 0],
+        y=hof_fitness_values[:, 1],
+        z=hof_fitness_values[:, 2],
+        mode='markers',
+        marker=dict(
+            size=5,
+            color='yellow',
+            symbol='diamond',
+            line=dict(color='black', width=1)
+        ),
+        text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+              for i, v in enumerate(hof_fitness_values)],
+        hoverinfo='text',
+        name='Hall of Fame'
+    ))
 
     # Add true Pareto front solutions
     fig.add_trace(go.Scatter3d(
@@ -528,54 +528,72 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof, pareto_front
     return fig
 
 
-def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False, filename=None, iter=None):
-    # plot lines in 2D iterate 0 - 11 and 0
+def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False, filename=None, iter=None, info_dict=None):
     normals = np.asarray(normals)
-    # normalize
     norms = np.linalg.norm(normals, axis=1, keepdims=True)
     norms = np.where(norms == 0, np.finfo(float).eps, norms) * 20
     normals = normals / norms
-    ########
     points = np.asarray(points)
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
+
+    # Create figure and adjust size if table exists
+    fig = plt.figure(figsize=(4, 6 if info_dict else 6))
+
+    if info_dict:
+        # Table subplot
+        ax_table = plt.subplot2grid((5, 1), (0, 0), rowspan=1)
+        ax_table.axis('off')
+
+        # Create table data
+        cells = [[k, f"{v:.4f}" if isinstance(v, float) else str(v)]
+                 for k, v in info_dict.items()]
+
+        table = ax_table.table(cellText=cells,
+                               colLabels=['Parameter', 'Value'],
+                               cellLoc='left',
+                               loc='center',
+                               bbox=[0.1, 0, 0.8, 0.8])
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+
+        # Main plot
+        ax = plt.subplot2grid((5, 1), (1, 0), rowspan=4)
+    else:
+        ax = fig.add_subplot(111)
+
+    # Original plotting code
     color = 'purple'
     if vertices is not None:
         for i in range(11):
-            ax.plot([vertices[i][0], vertices[i + 1][0]], [vertices[i][1], vertices[i + 1][1]], color=color)
-            # plot vertex id as text
-            # ax.text(vertices[i][0], vertices[i][1], str(i))
-        ax.plot([vertices[11][0], vertices[0][0]], [vertices[11][1], vertices[0][1]], color=color)
+            ax.plot([vertices[i][0], vertices[i + 1][0]],
+                    [vertices[i][1], vertices[i + 1][1]], color=color)
+        ax.plot([vertices[11][0], vertices[0][0]],
+                [vertices[11][1], vertices[0][1]], color=color)
+
     if points is not None:
         try:
-            ax.scatter(points[:, 0], points[:, 1], s=0.15, color='grey', marker=',')
-        # except e as error print
+            ax.scatter(points[:, 0], points[:, 1], s=0.4, color='grey', marker=',')
         except Exception as e:
             print(e)
 
     if normals is not None:
-        # for each point plot a normal with length 0.1
         for i in range(points.shape[0]):
-            # ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.1],
-            #         [points[i][1], points[i][1] + normals[i][1] * 0.1], color='grey'
-            #         )
-            # # plot line with arrow head, width 0.2, len 0.5
             ax.plot([points[i][0], points[i][0] + normals[i][0] * 0.5],
-                    [points[i][1], points[i][1] + normals[i][1] * 0.5], color='grey', linewidth=0.02,
-                    )
-            # ax.arrow(points[i][0], points[i][1], normals[i][0] * 0.5, normals[i][1] * 0.5, head_width=0.003,
-            #          fc='grey', ec='grey')
+                    [points[i][1], points[i][1] + normals[i][1] * 0.5],
+                    color='grey', linewidth=0.04)
+
     if headline is not None:
-        # title in times new roman
         ax.set_title(headline, fontname='Times New Roman')
+
     ax.set_aspect('equal')
-    # axis font tnr
+
     for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
                  ax.get_xticklabels() + ax.get_yticklabels()):
         item.set_fontsize(12)
         item.set_fontname('Times New Roman')
-    # set figure size
-    fig.set_dpi(300)
+
+    # fig.set_dpi(300)
+    plt.tight_layout()
+
     if save:
         dir = f'/Users/fnoic/Downloads/tracer/{iter}/'
         if not os.path.exists(dir):
@@ -585,3 +603,4 @@ def cs_plot(vertices=None, points=None, normals=None, headline=None, save=False,
         plt.close()
     else:
         plt.show()
+        plt.close()
