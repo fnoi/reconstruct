@@ -1,3 +1,4 @@
+import copy
 import subprocess
 
 import os
@@ -41,8 +42,8 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 6
-    single_step = False
+    cache_flag = 2
+    single_step = True
     ##########
     ##########
 
@@ -160,6 +161,12 @@ if __name__ == '__main__':
         # save to trial.ply in parking
         o3d.io.write_point_cloud(f'{config.project.parking_path}/cloud_supernormals_trial.ply', cloud_o3d)
         print(f'saved to {config.project.parking_path}/cloud_supernormals_trial.ply')
+        # store x-y-z-confidence to txt
+        cloud_store = copy.deepcopy(cloud)
+        # drop the rest first
+        cloud_store = cloud_store[['x', 'y', 'z', 'confidence']]
+        cloud_store.to_csv(f'{config.project.parking_path}/cloud_supernormals_trial.txt', sep=' ', index=False)
+
         if single_step:
             raise ValueError('stop here, single step')
 

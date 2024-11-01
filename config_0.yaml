@@ -29,7 +29,7 @@ local_neighborhood:
   context_radius: 0.05
 
 supernormal:
-  radius: 0.3
+  radius: 0.35
   input: no ransac
 
 region_growing:
