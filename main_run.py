@@ -42,7 +42,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 2
+    cache_flag = 3
     single_step = True
     ##########
     ##########
@@ -165,7 +165,11 @@ if __name__ == '__main__':
         cloud_store = copy.deepcopy(cloud)
         # drop the rest first
         cloud_store = cloud_store[['x', 'y', 'z', 'confidence']]
-        cloud_store.to_csv(f'{config.project.parking_path}/cloud_supernormals_trial.txt', sep=' ', index=False)
+        cloud_store.to_csv(f'{config.project.parking_path}/cloud_supernormals_confidence.txt', sep=' ', index=False)
+
+        cloud_store_2 = copy.deepcopy(cloud)
+        cloud_store_2 = cloud_store_2[['x', 'y', 'z', 'csn_confidence']]
+        cloud_store_2.to_csv(f'{config.project.parking_path}/cloud_supernormals_confidence_csn.txt', sep=' ', index=False)
 
         if single_step:
             raise ValueError('stop here, single step')

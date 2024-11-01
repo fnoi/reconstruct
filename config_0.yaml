@@ -33,7 +33,7 @@ supernormal:
   input: no ransac
 
 region_growing:
-  min_patch_size: 200
+  min_patch_size: 100
   neighborhood_shape: sphere
   neighborhood_radius: 0.3
   leftover_relative: 0.02

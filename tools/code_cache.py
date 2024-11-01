@@ -54,7 +54,8 @@ def region_growing_rev(cloud, config):
         # get seed point by row value 'id'
         source_cloud = cloud[cloud['id'].isin(source_point_ids)]
         # source_cloud = cloud.loc[source_point_ids]
-        source_cloud.sort_values(by='csn_confidence', ascending=False, inplace=True)
+        source_cloud.sort_values(by='confidence', ascending=True, inplace=True)
+        # source_cloud.sort_values(by='csn_confidence', ascending=False, inplace=True)
         for i, row in source_cloud.iterrows():
             if (
                     row['ransac_patch'] != 0 and
