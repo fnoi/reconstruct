@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 9
+    cache_flag = 6
     single_step = False
     ##########
     ##########
@@ -171,7 +171,7 @@ if __name__ == '__main__':
         del f
         cloud = region_growing_rev(cloud, config)
         # cloud = region_growing(cloud, config)
-        miou_weighted, miou_unweighted = calculate_metrics(cloud, base='cloud')
+        calculate_metrics(cloud, base='cloud')
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt

@@ -396,7 +396,8 @@ def transformation_tracer(points_source=None, points_target=None, points_inter_1
     fig.show()
 
 
-def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_front=None, objective_names=None, plot_pareto_surface=False):
+def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_front=None, objective_names=None,
+                                              plot_pareto_surface=False, ngen=None):
     """
     Plot all solutions from all generations, highlight the Hall of Fame,
     show the true Pareto front, and optionally plot a Pareto surface using Plotly.
@@ -414,11 +415,19 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_
     all_fitness_values = np.array([ind.fitness.values for ind in all_individuals])
 
     # Extract fitness values for Hall of Fame
-    hof_fitness_values = np.array([ind.fitness.values for ind in hof])
+    if hof is not None:
+        hof_fitness_values = np.array([ind.fitness.values for ind in hof])
 
     # Extract the true Pareto front
     # pareto_front = tools.sortNondominated(all_individuals, len(all_individuals), first_front_only=True)[0]
     pareto_fitness_values = np.array([ind.fitness.values for ind in pareto_front])
+
+    if ngen is not None:
+        fitness_values = np.array([ind.fitness.values for ind in all_individuals])
+        pop_size = len(fitness_values) // ngen
+        cc_content = np.repeat(np.arange(ngen), pop_size)[:len(fitness_values)]
+    else:
+        cc_content = all_fitness_values[:, 0]
 
     # Create the scatter plot for all solutions
     fig = go.Figure(data=go.Scatter3d(
@@ -428,7 +437,7 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_
         mode='markers',
         marker=dict(
             size=2,
-            color=all_fitness_values[:, 0],  # Color by the first objective
+            color=cc_content,
             colorscale='Viridis',
             opacity=0.6,
             colorbar=dict(title="fitness (objective 1)")
@@ -440,22 +449,23 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_
     ))
 
     # Add Hall of Fame solutions
-    fig.add_trace(go.Scatter3d(
-        x=hof_fitness_values[:, 0],
-        y=hof_fitness_values[:, 1],
-        z=hof_fitness_values[:, 2],
-        mode='markers',
-        marker=dict(
-            size=5,
-            color='yellow',
-            symbol='diamond',
-            line=dict(color='black', width=1)
-        ),
-        text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
-              for i, v in enumerate(hof_fitness_values)],
-        hoverinfo='text',
-        name='Hall of Fame'
-    ))
+    if hof is not None:
+        fig.add_trace(go.Scatter3d(
+            x=hof_fitness_values[:, 0],
+            y=hof_fitness_values[:, 1],
+            z=hof_fitness_values[:, 2],
+            mode='markers',
+            marker=dict(
+                size=5,
+                color='yellow',
+                symbol='diamond',
+                line=dict(color='black', width=1)
+            ),
+            text=[f"HoF Solution {i}<br>Obj1: {v[0]:.4f}<br>Obj2: {v[1]:.4f}<br>Obj3: {v[2]:.4f}"
+                  for i, v in enumerate(hof_fitness_values)],
+            hoverinfo='text',
+            name='Hall of Fame'
+        ))
 
     # Add true Pareto front solutions
     fig.add_trace(go.Scatter3d(

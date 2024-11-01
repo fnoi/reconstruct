@@ -20,7 +20,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from tools.visual import plot_all_generations_hof_and_pareto_front, cs_plot
 
 
-
 def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_dataframe,
                  filter_weights=None, filter_map=None):
     t_start = perf_counter()
@@ -83,11 +82,19 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
     #     ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
     # )
 
+    # final_pop, log, all_individuals = eaMuPlusLambda_history(
+    #     population, toolbox,
+    #     mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
+    #     ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
+    # )
+    mu = config.cs_fit.n_pop // 7
+    lam = config.cs_fit.n_pop - mu
     final_pop, log, all_individuals = eaMuPlusLambda_history(
         population, toolbox,
-        mu=config.cs_fit.n_mu, lambda_=config.cs_fit.n_lambda, cxpb=0.5, mutpb=0.2,
+        mu=mu, lambda_=lam, cxpb=0.5, mutpb=0.2,
         ngen=config.cs_fit.n_gen, stats=stats, halloffame=hof, verbose=True
     )
+
 
     # Save final population
     with open('final_population.txt', 'w') as f:
@@ -125,11 +132,12 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
 
     pareto_plot = True
     if pareto_plot:
-        fig = plot_all_generations_hof_and_pareto_front(all_individuals,
-                                                        hof,
-                                                        pareto_unique,
-                                                        ["Log Distance", "Active Edge Length", "Cosine Similarity"],
-                                                        plot_pareto_surface=False
+        fig = plot_all_generations_hof_and_pareto_front(all_individuals=all_individuals,
+                                                        hof=None,
+                                                        pareto_front=pareto_unique,
+                                                        objective_names=["Log Distance", "Active Edge Length", "Cosine Similarity"],
+                                                        plot_pareto_surface=False,
+                                                        ngen=config.cs_fit.n_gen
                                                         )
         fig.show()
 
@@ -384,13 +392,33 @@ def cost_combined(solution_params, data_points, data_normals, data_frame, weight
     # lin_distance = np.sum(min_distances_per_point) / len(data_points)
 
     edge_activity = np.zeros(len(solution_edges))
-    edge_activation_dist = np.zeros(len(solution_edges))
+    edge_attribute_no = np.zeros(len(solution_edges))
 
     for edge in range(len(solution_edges)):
         if edge in best_edge_per_point:
             edge_activity[edge] = 1
-    edge_activity_log = copy.deepcopy(edge_activity)
-    edge_quality = 0
+            edge_attribute_no[edge] = np.sum(best_edge_per_point == edge)
+    ref_no = np.max(edge_attribute_no)
+    edge_activity_raw = copy.deepcopy(edge_activity)
+    # edge_activity 1 if no > 0.1 * ref_no
+    # l0 = np.count_nonzero(edge_activity)
+    edge_activity = edge_attribute_no > 0.0 * ref_no  # 0.2 is yes 0 is no
+    # l1 = np.count_nonzero(edge_activity)
+    # print(f'edges before: {l0}, edges after: {l1}')
+
+    orientation_quality = 0
+
+    # revised, simplified version
+    for edge_id in range(len(solution_edges)):
+        if edge_activity_raw[edge_id]:
+            activating_points = np.where(best_edge_per_point == edge_id)[0]
+            orientation_quality += np.sum(all_similarities[edge_id][activating_points])
+
+    cosine_quality = orientation_quality / len(data_points)
+
+    active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
+
+
 
     debug = False
     if debug:
@@ -409,64 +437,6 @@ def cost_combined(solution_params, data_points, data_normals, data_frame, weight
         # equal aspect ratio
         ax.set_aspect('equal', 'box')
         plt.show()
-
-    orientation_quality = 0
-
-    # revised, simplified version
-    for edge_id in range(len(solution_edges)):
-        if edge_activity_log[edge_id]:
-            activating_points = np.where(best_edge_per_point == edge_id)[0]
-            orientation_quality += np.sum(all_similarities[edge_id][activating_points])
-
-    cosine_quality = orientation_quality / len(data_points)
-
-
-
-    # # normal_cosine_similarity = 0
-    # for edge in range(len(solution_edges)):
-    #
-    #
-    #     if edge_activity_log[edge] == 1:
-    #         related_points = np.where(best_edge_per_point == edge)[0]
-    #         cosine_similarity_n_n = all_similarities[edge][related_points]
-    #
-    #         normal_cosine_similarity = np.sum(all_similarities[edge][related_points])
-    #
-    #         edge_quality += normal_cosine_similarity
-    #
-    #         neighbor_low = edge - 1 if edge - 1 >= 0 else len(solution_edges) - 1
-    #         neighbor_high = edge + 1 if edge + 1 < len(solution_edges) else 0
-    #         active_low = edge_activity_log[neighbor_low] == 0
-    #         active_high = edge_activity_log[neighbor_high] == 0
-    #
-    #         if active_low or active_high:
-    #             edge_activity[edge] = 1 # double check bc big change
-    #             if active_low:
-    #                 dist_low = np.min(edge_distances[neighbor_low])
-    #             else:
-    #                 dist_low = np.inf
-    #             if active_high:
-    #                 dist_high = np.min(edge_distances[neighbor_high])
-    #             else:
-    #                 dist_high = np.inf
-    #
-    #             if dist_low < dist_high:
-    #                 edge_activation_dist[edge] = dist_low
-    #             else:
-    #                 edge_activation_dist[edge] = dist_high
-    #
-    # # normal_cosine_similarity = normal_cosine_similarity / len(solution_edges)
-    # if weights is not None:
-    #     cosine_similarity_n_n = cosine_similarity_n_n * weights
-    # mean_cosines_similarity = np.mean(cosine_similarity_n_n)
-
-    active_edge_length_relative = np.sum(edge_activity * edge_lengths) / edge_length_total
-    # activation_distance = np.sum(edge_activation_dist)
-
-    # mean_edge_cosine_quality = np.mean(edge_quality)
-    # mean_edge_cosine_quality = edge_quality
-
-    # return log_distance, active_edge_length_relative, activation_distance, mean_cosines_similarity #mean_edge_cosine_quality #normal_cosine_similarity
 
     return log_distance, active_edge_length_relative, cosine_quality
 
