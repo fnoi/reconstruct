@@ -439,8 +439,8 @@ def plot_all_generations_hof_and_pareto_front(all_individuals, hof=None, pareto_
             size=2,
             color=cc_content,
             colorscale='Viridis',
-            opacity=0.6,
-            colorbar=dict(title="fitness (objective 1)")
+            opacity=0.8
+            # colorbar=dict(title="fitness (objective 1)")
         ),
         text=[f"solution {i}<br>obj1: {v[0]:.4f}<br>obj2: {v[1]:.4f}<br>obj3: {v[2]:.4f}"
               for i, v in enumerate(all_fitness_values)],

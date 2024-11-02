@@ -10,6 +10,14 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+
+import numpy as np
+import pandas as pd
+from scipy.spatial import ConvexHull, cKDTree
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
+import copy
+
 from scipy.spatial import ConvexHull
 from scipy.spatial.distance import cdist
 
@@ -52,8 +60,174 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
                 non_bone_segment_ids.append(int(segment.split('_')[1]))
 
         skeleton = allocate_unsegmented_elements(skeleton, non_bone_segment_ids, cloud_df, config)
-
+        # skeleton = allocate_unsegmented_elements_rev(skeleton, non_bone_segment_ids, cloud_df, config)
         return skeleton
+
+
+import numpy as np
+import pandas as pd
+from scipy.spatial import ConvexHull, cKDTree
+from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
+import copy
+
+
+def allocate_unsegmented_elements_rev(skeleton, non_bone_segments, cloud, config):
+    """
+    Unified allocation of unsegmented elements (patches and individual points) to skeleton segments
+    using batch processing and intelligent scoring.
+
+    Args:
+        skeleton: Skeleton object containing bones/segments
+        non_bone_segments: List of segment IDs that are not bones
+        cloud: Point cloud DataFrame
+        config: Configuration object
+
+    Returns:
+        Updated skeleton with allocated points
+    """
+    # Initialize spatial structures for segments
+    segment_hulls = {}
+    segment_kdtrees = {}
+    segment_directions = {}
+    bone_ids = []
+
+    # Precompute segment spatial structures
+    for bone in skeleton.bones:
+        bone_id = int(bone.name.split('_')[1])
+        if bone.break_flag is not None:
+            non_bone_segments.append(bone_id)
+        segment_hulls[bone_id] = ConvexHull(bone.points)
+        segment_kdtrees[bone_id] = cKDTree(bone.points)
+        segment_directions[bone_id] = bone.vector_3D
+        bone_ids.append(bone_id)
+
+    # Get unsegmented elements
+    cloud_nonseg = cloud.loc[cloud['instance_pr'].isin(non_bone_segments)]
+
+    # Create unified dataset of points to process
+    points_to_process = pd.DataFrame()
+
+    # Add patched points
+    patched_points = cloud_nonseg[cloud_nonseg['ransac_patch'] != 0].copy()
+    patched_points['is_patch'] = True
+    patched_points['patch_id'] = patched_points['ransac_patch']
+
+    # Add individual points
+    individual_points = cloud[cloud['ransac_patch'] == 0].copy()
+    individual_points['is_patch'] = False
+    individual_points['patch_id'] = -1
+
+    # Combine all points
+    points_to_process = pd.concat([patched_points, individual_points])
+
+    def compute_allocation_scores(chunk):
+        """Compute allocation scores for a chunk of points."""
+        scores = {}
+
+        for bone_id in bone_ids:
+            # Distance scores
+            distances, _ = segment_kdtrees[bone_id].query(chunk[['x', 'y', 'z']].values)
+            max_distance = config.skeleton.init_max_distance  # Using existing config parameter
+            distance_scores = 1 - np.clip(distances / max_distance, 0, 1)
+
+            # Angular scores
+            normals = chunk[['nx', 'ny', 'nz']].values
+            segment_dir = segment_directions[bone_id]
+
+            # Vectorized angle calculation
+            angles = np.arccos(np.clip(np.abs(np.dot(normals, segment_dir)), -1.0, 1.0))
+            angles = np.minimum(angles, np.pi / 2 - angles) * 180 / np.pi
+
+            # Use different angle thresholds based on whether points are patched or not
+            max_angles = np.where(
+                chunk['is_patch'],
+                config.skeleton.init_max_angle_rn_sn,  # For patches
+                config.skeleton.init_max_angle_n_sn  # For individual points
+            )
+            angle_scores = 1 - np.clip(angles / max_angles, 0, 1)
+
+            # Confidence scores
+            confidence_scores = chunk['confidence'].values
+
+            # Combine scores with weights
+            combined_scores = (
+                    0.4 * distance_scores +
+                    0.4 * angle_scores +
+                    0.2 * confidence_scores
+            )
+
+            scores[bone_id] = combined_scores
+
+        return scores
+
+    # Process in batches
+    batch_size = 1000
+    allocation_results = []
+
+    for batch_start in tqdm(range(0, len(points_to_process), batch_size), desc="Processing points"):
+        batch_end = min(batch_start + batch_size, len(points_to_process))
+        chunk = points_to_process.iloc[batch_start:batch_end]
+
+        # Compute scores for all segments
+        batch_scores = compute_allocation_scores(chunk)
+
+        # Find best segment for each point
+        best_segments = []
+        best_scores = []
+
+        for i in range(len(chunk)):
+            point_scores = {seg_id: scores[i] for seg_id, scores in batch_scores.items()}
+            best_segment = max(point_scores.items(), key=lambda x: x[1])
+
+            # Only allocate if score meets minimum threshold (0.5 means both distance and angle criteria are reasonably met)
+            if best_segment[1] > 0.5:  # Using fixed threshold instead of config
+                best_segments.append(best_segment[0])
+                best_scores.append(best_segment[1])
+            else:
+                best_segments.append(-1)  # Unallocated
+                best_scores.append(0)
+
+        # Store results
+        chunk_results = chunk.copy()
+        chunk_results['allocated_segment'] = best_segments
+        chunk_results['allocation_score'] = best_scores
+        allocation_results.append(chunk_results)
+
+    # Combine results
+    allocation_df = pd.concat(allocation_results)
+
+    # Update skeleton and cloud
+    for bone_id in bone_ids:
+        # Get points allocated to this segment
+        segment_points = allocation_df[allocation_df['allocated_segment'] == bone_id]
+
+        if len(segment_points) > 0:
+            bone = skeleton.get_bone(bone_id)
+
+            # Update bone with new points
+            bone.points = np.vstack((
+                bone.points,
+                segment_points[['x', 'y', 'z']].values.astype(np.float32)
+            ))
+            bone.normals = np.vstack((
+                bone.normals,
+                segment_points[['nx', 'ny', 'nz']].values.astype(np.float32)
+            ))
+            bone.points_data = pd.concat([bone.points_data, segment_points])
+
+            # Update cloud
+            cloud.loc[segment_points.index, 'instance_pr'] = bone_id
+
+            # Recalculate bone axes
+            bone.calc_axes(plot=False)
+
+    # Log allocation statistics
+    total_points = len(allocation_df)
+    allocated_points = len(allocation_df[allocation_df['allocated_segment'] != -1])
+    print(f"Allocated {allocated_points}/{total_points} points ({allocated_points / total_points * 100:.2f}%)")
+
+    return skeleton
 
 
 def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
@@ -93,14 +267,16 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
         ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config, step='patch')
         # test angle between point ransac normal and segment supernormal
         nonseg_patch_point_rn = cloud.loc[nonseg_patch_point, ['rnx', 'rny', 'rnz']].values
+        nonseg_patch_point_sn = cloud.loc[nonseg_patch_point, ['snx', 'sny', 'snz']].values
 
         if len(ranged_segments) != 0:
             for ranged_segment in ranged_segments:
                 # retrieve bone
                 segment = skeleton.get_bone(ranged_segment)
                 segment_direction = segment.vector_3D
-                angle = angular_deviation(nonseg_patch_point_rn, segment_direction) % 90
-                angle = min(angle, 90 - angle)
+                # angle = angular_deviation(nonseg_patch_point_rn, segment_direction) % 90
+                angle = angular_deviation(nonseg_patch_point_sn, segment_direction) % 180
+                angle = min(angle, 180 - angle)
 
                 if angle < config.skeleton.init_max_angle_rn_sn:
                     # patch is burnt
@@ -129,12 +305,14 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
             break
         ranged_segments = point_to_hull_dict(point_id, cloud, segment_hulls, config, step='single')
         point_normal = cloud.loc[point_id, ['nx', 'ny', 'nz']].values
+        point_supernormal = cloud.loc[point_id, ['snx', 'sny', 'snz']].values
         if len(ranged_segments) != 0:
             for ranged_segment in ranged_segments:
                 segment = skeleton.get_bone(ranged_segment)
                 segment_direction = segment.vector_3D
                 angle = angular_deviation(point_normal, segment_direction) % 90
-                angle = min(angle, 90 - angle)
+                angle = angular_deviation(point_supernormal, segment_direction) % 180
+                angle = min(angle, 180 - angle)
 
                 if angle < config.skeleton.init_max_angle_n_sn:
                     segment.points = np.vstack((segment.points, cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32)))

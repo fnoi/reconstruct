@@ -6,7 +6,7 @@ project:
   experiment_path: data/experiment/
 
 data:
-  cloud_path: /data/experiment/initial_2.txt
+  cloud_path: /data/experiment/initial_3.txt
   orientation_path: /data/in_full/orientation_list.yaml
 
 preprocess:
@@ -33,18 +33,18 @@ supernormal:
   input: no ransac
 
 region_growing:
-  min_patch_size: 10
+  min_patch_size: 20
   neighborhood_shape: sphere
   neighborhood_radius: 0.3
   leftover_relative: 0.02
-  supernormal_angle_deviation_patch: 10
-  ransacnormal_angle_deviation_patch: 8
-  supernormal_angle_deviation_point: 8
+  supernormal_angle_deviation_patch: 15
+  ransacnormal_angle_deviation_patch: 20
+  supernormal_angle_deviation_point: 20
 
 skeleton:
   init_min_count: 20
-  init_max_angle_rn_sn: 8
-  init_max_angle_n_sn: 8
+  init_max_angle_rn_sn: 5
+  init_max_angle_n_sn: 20
   allocate_max_dist_patch: 0.15
   allocate_max_dist_point: 0.05
   ransac_method: open3d
@@ -52,7 +52,7 @@ skeleton:
   ransac_num_iterations: 50000
   ransac_ransac_n: 3
   aggregate_distance_max: 0.5
-  aggregate_angle_max: 30
+  aggregate_angle_max: 15
 
 skeleton_visual:
   line_length_projection: 0.2
@@ -61,7 +61,7 @@ cs_fit:
   method: nsga3
   grid_size: 0.01
   n_downsample: 200
-  n_pop: 100
+  n_pop: 2000
   n_lambda: 100
   n_mu: 100
   n_gen: 50

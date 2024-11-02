@@ -135,7 +135,12 @@ def solve_w_nsga(points, normals, config, all_points, all_normals, cs_data, cs_d
         fig = plot_all_generations_hof_and_pareto_front(all_individuals=all_individuals,
                                                         hof=None,
                                                         pareto_front=pareto_unique,
-                                                        objective_names=["Log Distance", "Active Edge Length", "Cosine Similarity"],
+                                                        objective_names=[
+                                                            dict(text="d<sub>log</sub>"),
+                                                            dict(text="l<sub>a,rel</sub>"),
+                                                            dict(text="φ<sub>n</sub>")
+                                                        ],
+                                                        # objective_names=["Log Distance", "Active Edge Length", "Cosine Similarity"],
                                                         plot_pareto_surface=False,
                                                         ngen=config.cs_fit.n_gen
                                                         )

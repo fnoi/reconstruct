@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 3
+    cache_flag = 4
     single_step = False
     ##########
     ##########
@@ -59,6 +59,8 @@ if __name__ == '__main__':
             if config.data.cloud_path.endswith('initial_1.txt'):
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             elif config.data.cloud_path.endswith('initial_2.txt'):
+                cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
+            elif config.data.cloud_path.endswith('initial_3.txt'):
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
