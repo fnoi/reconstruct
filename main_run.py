@@ -14,7 +14,8 @@ from scipy.spatial import KDTree
 from tqdm import tqdm
 
 from seg2skeleton import inst2skeleton
-from tools.clustering import region_growing
+from tools.region_growing import region_growing_main
+# from tools.clustering import region_growing
 from tools.code_cache import region_growing_rev
 from tools.IO import cache_io, config_io
 from tools.local import calculate_supernormals_rev, ransac_patches, patch_context_supernormals
@@ -180,7 +181,8 @@ if __name__ == '__main__':
         with open(f'{config.project.parking_path}/cache_cloud_2.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
         del f
-        cloud = region_growing_rev(cloud, config)
+        cloud = region_growing_main(cloud, config)
+        # cloud = region_growing_rev(cloud, config)
         # cloud = region_growing(cloud, config)
         calculate_metrics(cloud, base='cloud')
 

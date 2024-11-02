@@ -8,6 +8,9 @@ from matplotlib import pyplot as plt
 from scipy.spatial import KDTree, ConvexHull, Delaunay
 
 import pandas as pd
+
+from tools.visual import rg_plot_active, rg_plot_what
+
 pd.options.mode.copy_on_write = True
 
 from tqdm import tqdm
@@ -54,8 +57,8 @@ def region_growing_rev(cloud, config):
         # get seed point by row value 'id'
         source_cloud = cloud[cloud['id'].isin(source_point_ids)]
         # source_cloud = cloud.loc[source_point_ids]
-        source_cloud.sort_values(by='confidence', ascending=True, inplace=True)
-        # source_cloud.sort_values(by='csn_confidence', ascending=False, inplace=True)
+        # source_cloud.sort_values(by='confidence', ascending=True, inplace=True)
+        source_cloud.sort_values(by='csn_confidence', ascending=True, inplace=True)
         for i, row in source_cloud.iterrows():
             if (
                     row['ransac_patch'] != 0 and
@@ -154,14 +157,7 @@ def region_growing_rev(cloud, config):
 
                 cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
                 # plot full cloud and highlight active
-                fig = plt.figure(figsize=(20, 20))
-                ax = fig.add_subplot(111, projection='3d')
-                # non-segment points
-                nonseg_ids = list(set(cloud['id'].to_list()) - set(active_point_ids))
-                ax.scatter(cloud.loc[nonseg_ids, 'x'], cloud.loc[nonseg_ids, 'y'], cloud.loc[nonseg_ids, 'z'], c='grey', s=0.1)
-                ax.scatter(cloud.loc[active_point_ids, 'x'], cloud.loc[active_point_ids, 'y'], cloud.loc[active_point_ids, 'z'], c='r', s=0.1)
-                fig.suptitle(f'Cluster {counter_patch}')
-                plt.show()
+                rg_plot_active(cloud, active_point_ids, counter_patch)
 
                 break
 
@@ -215,90 +211,18 @@ def region_growing_rev(cloud, config):
                         inactive_point_ids.extend(point_ids)
                         inactive_patch_ids.append(neighbor_patch)
 
-                    plot_all = True
+                    plot_all = False
                     if plot_all:
-                        fig = plt.figure(figsize=(20, 20))
-
-                        # Subplot 1: Original perspective
-                        ax1 = fig.add_subplot(221, projection='3d')
-                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
-                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax1, 30, 30)
-
-                        # Subplot 2: Top-down view
-                        ax2 = fig.add_subplot(222, projection='3d')
-                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
-                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax2, 90, 0)
-
-                        # Subplot 3: Side view (YZ plane)
-                        ax3 = fig.add_subplot(223, projection='3d')
-                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
-                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax3, 0, 0)
-
-                        # Subplot 4: Front view (XZ plane)
-                        ax4 = fig.add_subplot(224, projection='3d')
-                        create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
-                                        neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax4, 0, 90)
-
-                        fig.suptitle(f'supernormal with context (csn) deviation: {deviation_sn:.2f}°\n'
-                                     f'supernormal (sn) deviation: {deviation_sn_old:.2f}°\n'
-                                     f'ransac normal (rn) deviation: {deviation_rn:.2f}°\n'
-                                     f'cluster confidence: {cluster_confidence:.2f}\n')
-                        plt.tight_layout()
-                        plotpath = f'{config.project.basepath_macos}{config.project.project_path}plot/plot_{plot_count}.png'
-                        plot_count += 1
-                        plt.savefig(plotpath, dpi=300)
-                        plt.close()
+                        rg_plot_what(cloud=cloud, active_point_ids=active_point_ids,
+                                     point_ids=point_ids, cluster_sn=cluster_sn,
+                                     cluster_rn=cluster_rn, neighbor_patch_sn=neighbor_patch_sn,
+                                     neighbor_patch_rn=neighbor_patch_rn, neighbor_patch_csn=neighbor_patch_csn,
+                                     deviation_sn=deviation_sn, deviation_sn_old=deviation_sn_old,
+                                     deviation_rn=deviation_rn, cluster_confidence=cluster_confidence,
+                                     plot_count=plot_count, config=config)
 
                     print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_point_ids)}')
 
     return cloud
 
 
-def create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
-                   neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax, view_elev, view_azim):
-    rest_idx = list(set(cloud['id'].to_list()) - set(active_plot) - set(point_ids))
-    ax.scatter(cloud.loc[active_plot, 'x'], cloud.loc[active_plot, 'y'], cloud.loc[active_plot, 'z'], c='b', s=0.2)
-    ax.scatter(cloud.loc[point_ids, 'x'], cloud.loc[point_ids, 'y'], cloud.loc[point_ids, 'z'], c=color, s=0.2)
-    ax.scatter(cloud.loc[rest_idx, 'x'], cloud.loc[rest_idx, 'y'], cloud.loc[rest_idx, 'z'], c='grey', s=0.1, alpha=0.2)
-
-    # Calculate centroid of active points
-    centroid = cloud.loc[active_point_ids, ['x', 'y', 'z']].mean().values
-
-    # Create line representing cluster_sn
-    end_point = centroid + .5 * cluster_sn
-    ax.plot([centroid[0], end_point[0]],
-            [centroid[1], end_point[1]],
-            [centroid[2], end_point[2]],
-            color='b', linewidth=2)
-
-    # Create line representing cluster_rn, dashed
-    end_point = centroid + .5 * cluster_rn
-    ax.plot([centroid[0], end_point[0]],
-            [centroid[1], end_point[1]],
-            [centroid[2], end_point[2]],
-            color='b', linewidth=2, linestyle='dashed')
-
-    # create line representing neighbor_patch_sn
-    end_point = centroid + .5 * neighbor_patch_sn
-    ax.plot([centroid[0], end_point[0]],
-            [centroid[1], end_point[1]],
-            [centroid[2], end_point[2]],
-            color=color, linewidth=2)
-
-    # create line representing neighbor_patch_rn, dashed
-    end_point = centroid + .5 * neighbor_patch_rn
-    ax.plot([centroid[0], end_point[0]],
-            [centroid[1], end_point[1]],
-            [centroid[2], end_point[2]],
-            color=color, linewidth=2, linestyle='dashed')
-
-    # create line for cluster_csn, dotted, purple
-    end_point = centroid + .5 * neighbor_patch_csn
-    ax.plot([centroid[0], end_point[0]],
-            [centroid[1], end_point[1]],
-            [centroid[2], end_point[2]],
-            color='orange', linewidth=2, linestyle='dotted')
-
-    ax.view_init(elev=view_elev, azim=view_azim)
-
-    return ax
