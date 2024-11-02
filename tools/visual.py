@@ -679,6 +679,19 @@ def rg_plot_what(cloud, active_point_ids, active_plot, point_ids, cluster_sn, cl
     plt.savefig(plotpath, dpi=300)
     plt.close()
 
+def rg_plot_finished(cloud, active_points, inactive_points, source_points, sink_points_patch_ids):
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(cloud.loc[active_points, 'x'], cloud.loc[active_points, 'y'], cloud.loc[active_points, 'z'], c='green', s=0.1)
+    ax.scatter(cloud.loc[inactive_points, 'x'], cloud.loc[inactive_points, 'y'], cloud.loc[inactive_points, 'z'], c='red', s=0.1)
+    ax.scatter(cloud.loc[source_points, 'x'], cloud.loc[source_points, 'y'], cloud.loc[source_points, 'z'], c='black', s=0.1)
+    # find ids where patch id is in sink_points_patch_ids
+    sink_point_ids = cloud[cloud['ransac_patch'].isin(sink_points_patch_ids)].index
+    # remove active points from sink points
+    sink_point_ids = list(set(sink_point_ids) - set(active_points))
+    ax.scatter(cloud.loc[sink_point_ids, 'x'], cloud.loc[sink_point_ids, 'y'], cloud.loc[sink_point_ids, 'z'], c='grey', s=0.1)
+    plt.show()
+
 def create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,
                    neighbor_patch_sn, color, neighbor_patch_rn, neighbor_patch_csn, ax, view_elev, view_azim):
     rest_idx = list(set(cloud['id'].to_list()) - set(active_plot) - set(point_ids))

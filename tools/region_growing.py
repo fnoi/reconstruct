@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
 
 pd.options.mode.copy_on_write = True
 
@@ -12,7 +13,7 @@ from tools.local import (
     supernormal_confidence,
     subset_cluster_neighbor_search
 )
-from tools.visual import rg_plot_active, rg_plot_what
+from tools.visual import rg_plot_active, rg_plot_what, rg_plot_finished
 
 
 def get_seed_point(cloud, source_point_ids, sink_patch_ids, min_patch_size):
@@ -32,7 +33,8 @@ def get_seed_point(cloud, source_point_ids, sink_patch_ids, min_patch_size):
     return None, None, None, None
 
 
-def calculate_cluster_normals(cloud, reduced_cloud, ship_neighbors, seed_point_id, seed_sn, seed_confidence, active_point_ids):
+def calculate_cluster_normals(cloud, reduced_cloud, ship_neighbors, seed_point_id,
+                              seed_sn, seed_confidence, active_point_ids):
     """Calculate cluster normal vectors and confidence"""
     __normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(ship_neighbors)][['nx', 'ny', 'nz']])
     cluster_sn, _s1, _s2, _s3 = supernormal_svd_s1(__normals, full_return=True)
@@ -90,20 +92,20 @@ def region_growing_main(cloud, config):
         print(f'Cluster {counter_patch}')
 
         # Get seed point
-        seed_point_id, seed_patch_id, seed_confidence, seed_sn = get_seed_point(
+        seed_id_point, seed_id_patch, seed_confidence, seed_sn = get_seed_point(
             cloud, source_ids_point, sink_ids_patch, config.region_growing.min_patch_size)
-        if seed_point_id is None:
+        if seed_id_point is None:
             break
 
         # Initialize active and inactive sets
-        active_point_ids = cloud[cloud['ransac_patch'] == seed_patch_id]['id'].to_list()
-        active_patch_ids = [seed_patch_id]
+        active_point_ids = cloud[cloud['ransac_patch'] == seed_id_patch]['id'].to_list()
+        active_patch_ids = [seed_id_patch]
         inactive_point_ids = []
         inactive_patch_ids = []
 
         # Update source sets
-        source_ids_point = list(set(source_ids_point) - {seed_point_id})
-        source_ids_patch = list(set(source_ids_patch) - {seed_patch_id})
+        source_ids_point = list(set(source_ids_point) - {seed_id_point})
+        source_ids_patch = list(set(source_ids_patch) - {seed_id_patch})
 
         # Grow cluster
         segment_iter = 0
@@ -116,38 +118,44 @@ def region_growing_main(cloud, config):
             print(f'growth iter {segment_iter}')
 
             # Find neighbors
-            cluster_neighbors, reduced_cloud = subset_cluster_neighbor_search(cloud, active_point_ids, config)
-            if not cluster_neighbors:
-                break
-
-            cluster_neighbors = list(set(cluster_neighbors) - set(active_point_ids))
-
-            # Calculate normals
-            cluster_sn, cluster_rn, cluster_confidence = calculate_cluster_normals(
-                cloud, reduced_cloud, list(set(cluster_neighbors)),
-                seed_point_id, seed_sn, seed_confidence, active_point_ids)
-
-            # Process neighbors
-            neighbor_patch_ids = reduced_cloud.loc[reduced_cloud['id'].isin(cluster_neighbors)]['ransac_patch'].unique().tolist()
-            if 0 in neighbor_patch_ids:
-                neighbor_patch_ids.remove(0)
-            neighbor_unpatched_point_ids = reduced_cloud[reduced_cloud['ransac_patch'] == 0]['id'].to_list()
-
-            # Check for growth completion
-            chk_neighbors_0 = chk_log_patches == len(neighbor_patch_ids)
-            chk_log_patches = len(neighbor_patch_ids)
-            chk_neighbors_1 = chk_log_points == len(neighbor_unpatched_point_ids)
-            chk_log_points = len(neighbor_unpatched_point_ids)
-
-            if chk_neighbors_0 and chk_neighbors_1:
-                floating_points_dict[seed_patch_id] = neighbor_unpatched_point_ids
+            neighbor_ids_cluster, neighbor_cloud_cluster = subset_cluster_neighbor_search(cloud, active_point_ids, config)
+            if not neighbor_ids_cluster:
                 sink_ids_patch.extend(active_patch_ids)
                 cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
-                rg_plot_active(cloud, active_point_ids, counter_patch)
+                break
+
+            neighbor_ids_cluster = list(set(neighbor_ids_cluster) - set(active_point_ids))
+            if not neighbor_ids_cluster:
+                sink_ids_patch.extend(active_patch_ids)
+                cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
+                break
+
+        # Calculate normals
+            cluster_sn, cluster_rn, cluster_conf = calculate_cluster_normals(
+                cloud, neighbor_cloud_cluster, list(set(neighbor_ids_cluster)),
+                seed_id_point, seed_sn, seed_confidence, active_point_ids)
+
+            # Process neighbors
+            neighbor_ids_patch = neighbor_cloud_cluster.loc[neighbor_cloud_cluster['id'].isin(neighbor_ids_cluster)]['ransac_patch'].unique().tolist()
+            if 0 in neighbor_ids_patch:
+                neighbor_ids_patch.remove(0)
+            neighbor_ids_points_unpatched = neighbor_cloud_cluster[neighbor_cloud_cluster['ransac_patch'] == 0]['id'].to_list()
+
+            # Check for growth completion
+            chk_neighbors_0 = chk_log_patches == len(neighbor_ids_patch)
+            chk_log_patches = len(neighbor_ids_patch)
+            chk_neighbors_1 = chk_log_points == len(neighbor_ids_points_unpatched)
+            chk_log_points = len(neighbor_ids_points_unpatched)
+
+            if chk_neighbors_0 and chk_neighbors_1:
+                floating_points_dict[seed_id_patch] = neighbor_ids_points_unpatched
+                sink_ids_patch.extend(active_patch_ids)
+                cloud.loc[cloud['id'].isin(active_point_ids), 'instance_pr'] = counter_patch
+                # rg_plot_active(cloud, active_point_ids, counter_patch)
                 break
 
             # Evaluate neighbor patches
-            for neighbor_patch in neighbor_patch_ids:
+            for neighbor_patch in neighbor_ids_patch:
                 if (neighbor_patch in sink_ids_patch or
                         neighbor_patch in active_patch_ids or
                         neighbor_patch in inactive_patch_ids or
@@ -171,5 +179,12 @@ def region_growing_main(cloud, config):
                     inactive_patch_ids.append(neighbor_patch)
 
                 print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_ids_point)}')
+
+        # plot points: active green, inactive red, source yellow, sink grey
+        rg_plot_finished(cloud=cloud, active_points=active_point_ids, inactive_points=inactive_point_ids,
+                         source_points=source_ids_point, sink_points_patch_ids=sink_ids_patch)
+
+
+
 
     return cloud

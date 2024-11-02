@@ -4,6 +4,7 @@ import subprocess
 import os
 import pathlib
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import open3d as o3d
@@ -44,7 +45,7 @@ if __name__ == '__main__':
     ##########
     ##########
     cache_flag = 3
-    single_step = True
+    single_step = False
     ##########
     ##########
 
@@ -182,6 +183,13 @@ if __name__ == '__main__':
             cloud = pd.read_pickle(f)
         del f
         cloud = region_growing_main(cloud, config)
+        # scatter plot cloud with instance_gt and instance_pred next to each other
+        fig = plt.Figure()
+        ax = fig.add_subplot(121, projection='3d')
+        ax.scatter(cloud['x'], cloud['y'], cloud['z'], c=cloud['instance_gt'], cmap='tab20')
+        ax = fig.add_subplot(122, projection='3d')
+        ax.scatter(cloud['x'], cloud['y'], cloud['z'], c=cloud['instance_pr'], cmap='tab20')
+        plt.show()
         # cloud = region_growing_rev(cloud, config)
         # cloud = region_growing(cloud, config)
         calculate_metrics(cloud, base='cloud')
