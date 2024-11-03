@@ -29,7 +29,7 @@ local_neighborhood:
   context_radius: 0.05
 
 supernormal:
-  radius: 0.35
+  radius: 0.2
   input: no ransac
 
 region_growing:
@@ -61,7 +61,7 @@ cs_fit:
   method: nsga3
   grid_size: 0.01
   n_downsample: 200
-  n_pop: 2000
+  n_pop: 500
   n_lambda: 100
   n_mu: 100
   n_gen: 50
