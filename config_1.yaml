@@ -6,7 +6,7 @@ project:
   experiment_path: data/experiment/
 
 data:
-  cloud_path: /data/experiment/initial_3.txt
+  cloud_path: /data/in_full/full_30.txt
   orientation_path: /data/in_full/orientation_list.yaml
 
 preprocess:

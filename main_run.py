@@ -25,7 +25,7 @@ from tools.model_eval import model_evaluation
 # from tools.to_model import model_builder
 
 if __name__ == '__main__':
-    config = OmegaConf.load('config_0.yaml')
+    config = OmegaConf.load('config_1.yaml')
     config = config_io(config)
 
     ##########
@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 3
+    cache_flag = 0
     single_step = False
     ##########
     ##########
@@ -62,6 +62,8 @@ if __name__ == '__main__':
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
             elif config.data.cloud_path.endswith('initial_3.txt'):
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
+            elif config.data.cloud_path.endswith('full_30.txt'):
+                cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
 
@@ -90,9 +92,9 @@ if __name__ == '__main__':
 
         # if no normals, estimate and store to df
         if 'nx' not in cloud.columns:
-            cloud_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
+            o3d_cloud.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(
                 radius=config.preprocess.normals_radius, max_nn=config.preprocess.normals_max_nn))
-            normals = np.asarray(cloud_o3d.normals)
+            normals = np.asarray(o3d_cloud.normals)
             normals = normals / np.linalg.norm(normals, axis=1)[:, None]
             cloud['nx'] = normals[:, 0]
             cloud['ny'] = normals[:, 1]
