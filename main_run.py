@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 6
     single_step = False
     ##########
     ##########

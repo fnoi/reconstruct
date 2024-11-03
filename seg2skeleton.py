@@ -59,7 +59,8 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
                 print(f'segment {segment} benched due to initial size')
                 non_bone_segment_ids.append(int(segment.split('_')[1]))
 
-        skeleton = allocate_unsegmented_elements(skeleton, non_bone_segment_ids, cloud_df, config)
+        # skeleton = allocate_unsegmented_elements(skeleton, non_bone_segment_ids, cloud_df, config)
+        skeleton = allocate_unsegmented_elements_dual(skeleton, non_bone_segment_ids, cloud_df, config)
         # skeleton = allocate_unsegmented_elements_rev(skeleton, non_bone_segment_ids, cloud_df, config)
         return skeleton
 
@@ -330,6 +331,127 @@ def allocate_unsegmented_elements(skeleton, non_bone_segments, cloud, config):
         bone.calc_axes(plot=False)
 
     return skeleton
+
+
+def allocate_unsegmented_elements_dual(skeleton, non_bone_segments, cloud, config):
+    """
+    Modified version with dual criteria (supernormal AND ransac normal) for both patches and single points.
+    """
+    segment_hulls = {}
+    bone_ids = []
+    for bone in skeleton.bones:
+        bone_id = int(bone.name.split('_')[1])
+        if bone.break_flag is not None:
+            non_bone_segments.append(bone_id)
+        segment_hulls[bone_id] = ConvexHull(bone.points)
+        bone_ids.append(bone_id)
+
+    # identify non-segmented planar patches
+    cloud_nonseg = cloud.loc[cloud['instance_pr'].isin(non_bone_segments)]
+    cloud_nonseg_patched = cloud_nonseg[cloud_nonseg['ransac_patch'] != 0]
+    cloud_nonseg_patched_points = cloud_nonseg_patched['id'].tolist()
+    nonseg_patch_ids = cloud_nonseg_patched['ransac_patch'].unique().tolist()
+
+    cloud_nonseg_nopatch_points = cloud[cloud['ransac_patch'] == 0]
+    nonseg_point_ids = cloud_nonseg_nopatch_points['id'].tolist()
+
+    non_allocated = 0
+    to_do = copy.deepcopy(cloud_nonseg_patched_points)
+
+    # Process patches with dual criteria
+    for nonseg_patch_point in tqdm(cloud_nonseg_patched_points, desc='allocating non-segmented patch points', total=len(cloud_nonseg_patched_points)):
+        if nonseg_patch_point not in to_do:
+            continue
+
+        centerpoint = cloud.loc[nonseg_patch_point, ['x', 'y', 'z']].values.astype(np.float32)
+        centerpoint = np.reshape(centerpoint, (3, 1))
+        centerpoint = np.mean(centerpoint, axis=1)
+        ranged_segments = point_to_hull_dict(nonseg_patch_point, cloud, segment_hulls, config, step='patch')
+
+        # Get both normals for dual criteria
+        patch_rn = cloud.loc[nonseg_patch_point, ['rnx', 'rny', 'rnz']].values
+        patch_sn = cloud.loc[nonseg_patch_point, ['snx', 'sny', 'snz']].values
+
+        if len(ranged_segments) != 0:
+            for ranged_segment in ranged_segments:
+                segment = skeleton.get_bone(ranged_segment)
+                segment_direction = segment.vector_3D
+
+                # Calculate angles for both normals
+                angle_rn = angular_deviation(patch_rn, segment_direction) % 90
+                angle_rn = min(angle_rn, 90 - angle_rn)
+
+                angle_sn = angular_deviation(patch_sn, segment_direction) % 180
+                angle_sn = min(angle_sn, 180 - angle_sn)
+
+                # Check both criteria for patches
+                if (angle_rn < config.skeleton.init_max_angle_rn_sn and
+                        angle_sn < config.skeleton.init_max_angle_n_sn):  # Using n_sn threshold for supernormal
+
+                    # Patch meets both criteria
+                    patch_point_ids = cloud.loc[cloud['ransac_patch'] == cloud.loc[nonseg_patch_point, 'ransac_patch'], 'id'].tolist()
+
+                    # add points to segment
+                    patch_point_data = cloud.loc[cloud['id'].isin(patch_point_ids)]
+                    segment.points = np.vstack((segment.points, patch_point_data[['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.normals = np.vstack((segment.normals, patch_point_data[['nx', 'ny', 'nz']].values.astype(np.float32)))
+                    segment.points_data = pd.concat([segment.points_data, patch_point_data])
+                    segment.calc_axes(plot=False)
+                    cloud.loc[patch_point_ids, 'instance_pr'] = ranged_segment
+
+                    # remove points from to_do
+                    to_do = [x for x in to_do if x not in patch_point_ids]
+                    break
+
+        else:
+            non_allocated += 1
+
+    print(f'non-segmented patch points not allocated: {non_allocated}')
+
+    # Process individual points with dual criteria
+    added = 0
+    for point_id in tqdm(nonseg_point_ids, desc='allocating non-segmented points', total=len(nonseg_point_ids)):
+        if added == 100:  # TODO: release breaks for full test!
+            break
+
+        ranged_segments = point_to_hull_dict(point_id, cloud, segment_hulls, config, step='single')
+
+        # Get both normals for dual criteria
+        point_normal = cloud.loc[point_id, ['nx', 'ny', 'nz']].values
+        point_sn = cloud.loc[point_id, ['snx', 'sny', 'snz']].values
+
+        if len(ranged_segments) != 0:
+            for ranged_segment in ranged_segments:
+                segment = skeleton.get_bone(ranged_segment)
+                segment_direction = segment.vector_3D
+
+                # Calculate angles for both normals
+                angle_n = angular_deviation(point_normal, segment_direction) % 90
+                angle_n = min(angle_n, 90 - angle_n)
+
+                angle_sn = angular_deviation(point_sn, segment_direction) % 180
+                angle_sn = min(angle_sn, 180 - angle_sn)
+
+                # Check both criteria for single points
+                if (angle_n < config.skeleton.init_max_angle_n_sn and
+                        angle_sn < config.skeleton.init_max_angle_rn_sn):  # Using rn_sn threshold for supernormal
+
+                    # Point meets both criteria
+                    segment.points = np.vstack((segment.points, cloud.loc[point_id, ['x', 'y', 'z']].values.astype(np.float32)))
+                    segment.normals = np.vstack((segment.normals, point_normal))
+                    segment.points_data = pd.concat([segment.points_data, cloud.loc[cloud['id'] == point_id]])
+                    cloud.loc[point_id, 'instance_pr'] = ranged_segment
+                    added += 1
+                    break
+
+    print(f'non-segmented points allocated: {added}')
+
+    for i, bone in enumerate(skeleton.bones):
+        print(f'bone {bone.name} recalc axes')
+        bone.calc_axes(plot=False)
+
+    return skeleton
+
 
 
 def point_to_hull_dict(point_id, cloud, hull_dict, config, step='patch'):

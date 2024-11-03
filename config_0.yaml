@@ -38,13 +38,13 @@ region_growing:
   neighborhood_radius: 0.3
   leftover_relative: 0.02
   supernormal_angle_deviation_patch: 15
-  ransacnormal_angle_deviation_patch: 20
-  supernormal_angle_deviation_point: 20
+  ransacnormal_angle_deviation_patch: 12
+  supernormal_angle_deviation_point: 12
 
 skeleton:
   init_min_count: 20
-  init_max_angle_rn_sn: 5
-  init_max_angle_n_sn: 20
+  init_max_angle_rn_sn: 8
+  init_max_angle_n_sn: 8
   allocate_max_dist_patch: 0.15
   allocate_max_dist_point: 0.05
   ransac_method: open3d

@@ -373,7 +373,7 @@ def cost_combined(solution_params, data_points, data_normals, data_frame, weight
     solution_edge_normals = get_solution_edge_normals()
 
     if polygon_subdivision:
-        solution_edges, solution_edge_normals = subdivide_edges(edges=solution_edges, edge_normals=solution_edge_normals, lmax=0.02)
+        solution_edges, solution_edge_normals = subdivide_edges(edges=solution_edges, edge_normals=solution_edge_normals, lmax=0.01)
 
     # Pre-compute all cosine similarities
     all_similarities = np.array([
