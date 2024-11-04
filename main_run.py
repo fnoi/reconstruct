@@ -62,7 +62,7 @@ if __name__ == '__main__':
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
             elif config.data.cloud_path.endswith('initial_3.txt'):
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt', 'nx', 'ny', 'nz'])
-            elif config.data.cloud_path.endswith('full_30.txt'):
+            elif config.data.cloud_path.endswith('full_30.txt') or config.data.cloud_path.endswith('full_30_1.txt'):
                 cloud = pd.DataFrame(cloud, columns=['x', 'y', 'z', 'instance_gt'])
             cloud['instance_gt'] = cloud['instance_gt'].astype(int)
         del f
