@@ -38,10 +38,14 @@ def calculate_cluster_normals(cloud, reduced_cloud, ship_neighbors, seed_point_i
     """Calculate cluster normal vectors and confidence"""
     __normals = np.asarray(reduced_cloud.loc[reduced_cloud['id'].isin(ship_neighbors)][['nx', 'ny', 'nz']])
     cluster_sn, _s1, _s2, _s3 = supernormal_svd_s1(__normals, full_return=True)
-    cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
+    if cluster_sn is not None:
+        cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
 
-    if seed_confidence > cluster_confidence:
-        cluster_sn = seed_sn
+        if seed_confidence > cluster_confidence:
+            cluster_sn = seed_sn
+            cluster_confidence = seed_confidence
+
+    else:
         cluster_confidence = seed_confidence
 
     _cloud = cloud.loc[cloud['id'].isin(active_point_ids)]

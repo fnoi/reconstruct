@@ -690,6 +690,7 @@ def rg_plot_finished(cloud, active_points, inactive_points, source_points, sink_
     # remove active points from sink points
     sink_point_ids = list(set(sink_point_ids) - set(active_points))
     ax.scatter(cloud.loc[sink_point_ids, 'x'], cloud.loc[sink_point_ids, 'y'], cloud.loc[sink_point_ids, 'z'], c='grey', s=0.1)
+    ax.set_aspect('equal')
     plt.show()
 
 def create_scatter(cloud, active_plot, point_ids, cluster_sn, active_point_ids, cluster_rn,

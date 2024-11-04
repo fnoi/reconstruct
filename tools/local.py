@@ -16,22 +16,39 @@ from tools.utils import plot_patch
 
 
 def supernormal_svd_s1(normals, full_return=False):
-    if np.isnan(normals).any():
-        raise ValueError('normals contain nan')
-    normals = consistency_flip(normals)
-    # check if normals contain nan
-    if np.isnan(normals).any():
-        raise ValueError('normals contain nan')
+    """
+    Compute supernormal using SVD, returns None values if computation fails.
 
-    U, S, Vt = svd(normals, full_matrices=False)
-    sig_1 = S[0]
-    sig_2 = S[1]
-    sig_3 = S[2]
+    Args:
+        normals: Nx3 array of normal vectors
+        full_return: If True, return additional SVD values
+    """
+    try:
+        if np.isnan(normals).any():
+            return (None, None, None, None) if full_return else None
 
-    if full_return:
-        return Vt[-1, :], sig_1, sig_2, sig_3
-    else:
-        return Vt[-1, :]
+        normals = consistency_flip(normals)
+
+        if np.isnan(normals).any():
+            return (None, None, None, None) if full_return else None
+
+        U, S, Vt = svd(normals, full_matrices=False)
+
+        # Check if we have less than 3 singular values
+        if len(S) < 3:
+            return (None, None, None, None) if full_return else None
+
+        sig_1 = S[0]
+        sig_2 = S[1]
+        sig_3 = S[2]
+
+        if full_return:
+            return Vt[-1, :], sig_1, sig_2, sig_3
+        else:
+            return Vt[-1, :]
+
+    except:
+        return (None, None, None, None) if full_return else None
 
 
 def consistency_flip(vectors):
@@ -211,7 +228,7 @@ def calculate_supernormals_rev(cloud=None, cloud_tree=None, config=None):
     cloud['confidence'] = None
 
     plot_flag = True
-    plot_ind = 42000
+    plot_ind = 'a'
     if plot_flag:
         print(f'point {plot_ind} will be used for neighborhood plot')
 
