@@ -597,6 +597,10 @@ def orientation_estimation_s2(cluster_ptx_array, config=None, step=None):
         )
         # remove inliers from point cloud
         point_cloud = point_cloud.select_by_index(inliers_0, invert=True)
+        # if not enough points left, break and return None
+        if len(point_cloud.points) < 0.1 * len(cluster_ptx_array):
+            print('fail')
+            return None, None, None, None, None
         while True:
             # perform ransac again
             f_1, inliers_1 = point_cloud.segment_plane(

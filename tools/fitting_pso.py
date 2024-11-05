@@ -4,7 +4,7 @@ import sys
 import numpy as np
 from matplotlib import pyplot as plt
 
-from pyswarm import pso
+# from pyswarm import pso
 
 from tools.fitting_1 import cost_fct_1, params2verts
 from tools.visual import cs_plot

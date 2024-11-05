@@ -5,6 +5,7 @@ import random
 import numpy as np
 import open3d as o3d
 import pandas as pd
+from ifcopenshell.api.cost import add_cost_item
 from matplotlib import pyplot as plt
 import matplotlib.colors as mcolors
 from tqdm import tqdm
@@ -1047,6 +1048,40 @@ def patch_context_supernormals(cloud, config):
         cloud.loc[cloud['ransac_patch'] == patch_id, 'csn_confidence'] = csn_confidence
 
     return cloud
+
+
+def subset_cluster_neighbor_search_one_tree(cloud, active_point_ids, radius, full_tree):
+    """Optimized approach: Use pre-built KDTree and filter results"""
+    active_point_ids = list(active_point_ids)
+    # Get bounding box of active points
+    active_limits = [
+        np.min(cloud.loc[active_point_ids, 'x']),
+        np.max(cloud.loc[active_point_ids, 'x']),
+        np.min(cloud.loc[active_point_ids, 'y']),
+        np.max(cloud.loc[active_point_ids, 'y']),
+        np.min(cloud.loc[active_point_ids, 'z']),
+        np.max(cloud.loc[active_point_ids, 'z'])
+    ]
+
+    # Find neighbors using full tree
+    neighbors = []
+    for point_id in active_point_ids:
+        point = cloud.loc[point_id, ['x', 'y', 'z']].values
+        idx = full_tree.query_ball_point(point, radius)
+        neighbors.extend(idx)
+
+    # Filter points within bounding box
+    neighbor_points = cloud.iloc[list(set(neighbors))]
+    mask = ((neighbor_points['x'] >= active_limits[0] - radius) &
+            (neighbor_points['x'] <= active_limits[1] + radius) &
+            (neighbor_points['y'] >= active_limits[2] - radius) &
+            (neighbor_points['y'] <= active_limits[3] + radius) &
+            (neighbor_points['z'] >= active_limits[4] - radius) &
+            (neighbor_points['z'] <= active_limits[5] + radius))
+
+    reduced_cloud = neighbor_points[mask]
+    return reduced_cloud.index.tolist(), reduced_cloud
+
 
 
 def subset_cluster_neighbor_search(cloud, active_point_ids, config):

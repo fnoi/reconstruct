@@ -36,7 +36,7 @@ region_growing:
   min_patch_size: 20
   neighborhood_shape: sphere
   neighborhood_radius: 0.3
-  leftover_relative: 0.02
+  leftover_relative: 0.1
   supernormal_angle_deviation_patch: 15
   ransacnormal_angle_deviation_patch: 12
   supernormal_angle_deviation_point: 12

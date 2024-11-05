@@ -1,36 +1,15 @@
-import copy
-import itertools
 import os
-import time
-
-from ifcopenshell.express.rules.IFC4X3 import marker
-from open3d.examples.pipelines.colored_icp_registration import source
-
-import tools.fitting_nsga
-import tools.visual
 from tools.fitting_nsga import solve_w_nsga
-from tools.geometry import calculate_shifted_point, transform_shifted_point, simplified_transform_lines, kmeans_points_normals_2D
-from tools.metrics import huber_loss
+from tools.geometry import simplified_transform_lines, kmeans_points_normals_2D
 from tools.visual import transformation_tracer, cs_plot
 
-try:
-    import numpy as np
-    import open3d as o3d
-    import pandas as pd
-    import pyransac3d as pyrsc
-    import matplotlib.pyplot as plt
-    import plotly.graph_objects as go
+import numpy as np
+import open3d as o3d
+from sklearn.cluster import DBSCAN
 
-    from pyswarm import pso
-    from sklearn.cluster import DBSCAN
-
-    from tools.IO import points2txt, lines2obj, cache_meta, data_from_IFC
-    from tools.fitting_1 import params2verts
-    from tools.fitting_pso import plot_2D_points_bbox, cost_fct_1
-    from tools import geometry as geom
-    from tools import visual as vis, fitting_pso
-except ImportError as e:
-    print(f'Import Error: {e}')
+from tools.IO import data_from_IFC
+from tools import geometry as geom
+from tools import visual as vis, fitting_pso
 
 
 class Segment(object):

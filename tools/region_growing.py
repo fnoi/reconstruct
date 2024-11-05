@@ -3,7 +3,6 @@ from time import perf_counter
 
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 
 pd.options.mode.copy_on_write = True
 
@@ -15,7 +14,6 @@ from tools.local import (
     supernormal_confidence,
     subset_cluster_neighbor_search
 )
-from tools.visual import rg_plot_active, rg_plot_what, rg_plot_finished
 
 
 def get_seed_point(cloud, source_point_ids, sink_patch_ids, min_patch_size):
@@ -42,12 +40,11 @@ def calculate_cluster_normals(cloud, reduced_cloud, ship_neighbors, seed_point_i
     cluster_sn, _s1, _s2, _s3 = supernormal_svd_s1(__normals, full_return=True)
     if cluster_sn is not None:
         cluster_confidence = supernormal_confidence(cluster_sn, __normals, _s1, _s2, _s3)
-
         if seed_confidence > cluster_confidence:
             cluster_sn = seed_sn
             cluster_confidence = seed_confidence
-
     else:
+        cluster_sn = seed_sn
         cluster_confidence = seed_confidence
 
     _cloud = cloud.loc[cloud['id'].isin(active_point_ids)]
@@ -79,59 +76,20 @@ def evaluate_neighbor_patch(cloud, neighbor_patch, cluster_sn, cluster_rn, confi
         should_add = (deviation_sn < config.region_growing.supernormal_angle_deviation_patch and
                       deviation_rn < config.region_growing.ransacnormal_angle_deviation_patch)
 
-    return (should_add, neighbor_patch_sn, neighbor_patch_rn, neighbor_patch_csn,
-            deviation_sn, deviation_rn if not high_confidence_mode else None)
-
-
-def evaluate_neighbor_point(cloud, point_id, cluster_sn, config):
-    """Evaluate if a single point should be added in high confidence mode"""
-    point_csn = cloud.loc[point_id, ['csnx', 'csny', 'csnz']].values
-    deviation_sn = min(angular_deviation(cluster_sn, point_csn) % 180,
-                       180 - (angular_deviation(cluster_sn, point_csn) % 180))
-    return deviation_sn < config.region_growing.supernormal_angle_deviation_point
-
-
-def process_high_confidence_neighbors(cloud, neighbor_ids, cluster_sn, config, source_ids_point, source_ids_patch):
-    """Process neighbors in high confidence mode with memory efficiency"""
-    # Convert to list for pandas indexing
-    neighbor_patches = set(cloud.loc[list(neighbor_ids), 'ransac_patch'].unique()) - {0}
-    neighbor_patches &= set(source_ids_patch)  # Intersection with source patches
-
-    added_point_ids = set()
-    added_patch_ids = set()
-
-    for patch_id in neighbor_patches:
-        patch_mask = cloud['ransac_patch'] == patch_id
-        patch_points = cloud.loc[patch_mask]
-
-        # Check point normals without storing all points
-        qualifying_count = 0
-        total_points = 0
-
-        for _, point in patch_points.iterrows():
-            if point['id'] not in source_ids_point:
-                continue
-            total_points += 1
-            point_csn = point[['csnx', 'csny', 'csnz']].values
-            deviation_sn = min(angular_deviation(cluster_sn, point_csn) % 180,
-                               180 - (angular_deviation(cluster_sn, point_csn) % 180))
-            if deviation_sn < config.region_growing.supernormal_angle_deviation_point:
-                qualifying_count += 1
-
-        if total_points > 0 and qualifying_count / total_points > 0.75:
-            # Get point IDs efficiently using boolean indexing
-            valid_points = set(patch_points['id']) & set(source_ids_point)
-            added_point_ids.update(valid_points)
-            added_patch_ids.add(patch_id)
-
-    return list(added_point_ids), list(added_patch_ids)
+    return should_add, deviation_sn
 
 
 def region_growing_main(cloud, config):
-    """Memory-optimized main region growing function"""
+    """Memory-optimized main region growing function with source point reduction"""
+    # Keep original cloud for final labeling
+    original_cloud = cloud.copy()
+
     if 'id' not in cloud.columns:
         cloud['id'] = range(len(cloud))
+        original_cloud['id'] = range(len(original_cloud))
+
     cloud['instance_pr'] = 0
+    original_cloud['instance_pr'] = 0
 
     # Use sets for operations but convert to list for pandas indexing
     source_ids_point = set(cloud['id'])
@@ -139,87 +97,62 @@ def region_growing_main(cloud, config):
     sink_ids_patch = set()
 
     counter_patch = 0
+    end_threshold = int(config.region_growing.leftover_relative * len(cloud))
 
-    while len(source_ids_point) > config.region_growing.leftover_relative * len(cloud):
+    print(f'ending threshold: {end_threshold}')
+
+    while len(source_ids_point) > end_threshold:
         counter_patch += 1
         timer = perf_counter()
 
-        print(f'Cluster {counter_patch}')
-
-        # Get seed point
+        # Get seed point from reduced cloud
         seed_result = get_seed_point(cloud, list(source_ids_point), sink_ids_patch, config.region_growing.min_patch_size)
         if seed_result is None:
             break
         seed_id_point, seed_id_patch, seed_confidence, seed_sn = seed_result
+        if seed_confidence is None:
+            break
 
         # Check if seed point has high confidence
         high_confidence_mode = seed_confidence > 5
         if high_confidence_mode:
-            print(f"High confidence seed point (confidence: {seed_confidence})")
+            print(f"High confidence seed point (confidence: {seed_confidence:.2f})")
 
-        # Initialize active and inactive sets as sets
+        # Initialize active sets
         active_point_ids = set(cloud[cloud['ransac_patch'] == seed_id_patch]['id'])
         active_patch_ids = {seed_id_patch}
-        inactive_point_ids = set()
-        inactive_patch_ids = set()
 
         # Update source sets efficiently
         source_ids_point -= active_point_ids
         source_ids_patch.remove(seed_id_patch)
 
-        # Process high confidence seeds
-        if high_confidence_mode:
-            initial_neighbors, initial_cloud = subset_cluster_neighbor_search(
-                cloud, list(active_point_ids), config)  # Convert to list for indexing
-            if initial_neighbors:
-                cluster_sn, _, _ = calculate_cluster_normals(
-                    cloud, initial_cloud, initial_neighbors,
-                    seed_id_point, seed_sn, seed_confidence, list(active_point_ids))  # Convert to list
-
-                new_points, new_patches = process_high_confidence_neighbors(
-                    cloud, initial_neighbors, cluster_sn, config, source_ids_point, source_ids_patch
-                )
-
-                if new_points:
-                    active_point_ids.update(new_points)
-                    active_patch_ids.update(new_patches)
-                    source_ids_point -= set(new_points)
-                    source_ids_patch -= set(new_patches)
-
-        # Regular growth phase
+        # Growth phase
         segment_iter = 0
         prev_patches_count = 0
         prev_points_count = 0
 
         while True:
             segment_iter += 1
-            # print(f'growth iter {segment_iter}')
 
-            # Find neighbors efficiently (convert to list for indexing)
+            # Find neighbors using reduced cloud
             neighbor_ids_cluster, neighbor_cloud_cluster = subset_cluster_neighbor_search(
                 cloud, list(active_point_ids), config)
 
             if not neighbor_ids_cluster:
-                sink_ids_patch.update(active_patch_ids)
-                # Convert to list for pandas indexing
-                cloud.loc[list(active_point_ids), 'instance_pr'] = counter_patch
                 break
 
             neighbor_ids_cluster = set(neighbor_ids_cluster) - active_point_ids
             if not neighbor_ids_cluster:
-                sink_ids_patch.update(active_patch_ids)
-                # Convert to list for pandas indexing
-                cloud.loc[list(active_point_ids), 'instance_pr'] = counter_patch
                 break
 
-            # Calculate normals (convert to list for indexing)
+            # Calculate normals
             cluster_sn, cluster_rn, cluster_conf = calculate_cluster_normals(
                 cloud, neighbor_cloud_cluster, list(neighbor_ids_cluster),
                 seed_id_point, seed_sn, seed_confidence, list(active_point_ids))
 
             # Process neighbors efficiently
             neighbor_ids_patch = set(neighbor_cloud_cluster.loc[
-                                         neighbor_cloud_cluster['id'].isin(list(neighbor_ids_cluster))  # Convert to list
+                                         neighbor_cloud_cluster['id'].isin(list(neighbor_ids_cluster))
                                      ]['ransac_patch'].unique()) - {0}
 
             neighbor_ids_points_unpatched = set(
@@ -229,9 +162,6 @@ def region_growing_main(cloud, config):
             # Check for growth completion
             if (len(neighbor_ids_patch) == prev_patches_count and
                     len(neighbor_ids_points_unpatched) == prev_points_count):
-                sink_ids_patch.update(active_patch_ids)
-                # Convert to list for pandas indexing
-                cloud.loc[list(active_point_ids), 'instance_pr'] = counter_patch
                 break
 
             prev_patches_count = len(neighbor_ids_patch)
@@ -241,36 +171,30 @@ def region_growing_main(cloud, config):
             for neighbor_patch in neighbor_ids_patch:
                 if (neighbor_patch in sink_ids_patch or
                         neighbor_patch in active_patch_ids or
-                        neighbor_patch in inactive_patch_ids or
                         neighbor_patch not in source_ids_patch):
                     continue
 
-                should_add, *_ = evaluate_neighbor_patch(
-                    cloud, neighbor_patch, cluster_sn, cluster_rn, config)
-
-                point_ids = set(cloud[cloud['ransac_patch'] == neighbor_patch]['id'])
+                should_add, deviation_sn = evaluate_neighbor_patch(
+                    cloud, neighbor_patch, cluster_sn, cluster_rn, config, high_confidence_mode)
 
                 if should_add:
+                    point_ids = set(cloud[cloud['ransac_patch'] == neighbor_patch]['id'])
                     active_point_ids.update(point_ids)
                     active_patch_ids.add(neighbor_patch)
                     source_ids_point -= point_ids
                     source_ids_patch.remove(neighbor_patch)
-                else:
-                    inactive_point_ids.update(point_ids)
-                    inactive_patch_ids.add(neighbor_patch)
 
-            # print(f'active: {len(active_point_ids)}, inactive: {len(inactive_point_ids)}, source: {len(source_ids_point)}')
+        # Label points in both clouds
+        cloud.loc[list(active_point_ids), 'instance_pr'] = counter_patch
+        original_cloud.loc[list(active_point_ids), 'instance_pr'] = counter_patch
+        sink_ids_patch.update(active_patch_ids)
 
-        # Convert sets to lists for plotting
+        # Reduce cloud to only source points for next iteration
+        cloud = cloud[cloud['id'].isin(source_ids_point)].copy()
+
         elapsed = round(perf_counter() - timer, 2)
         elapsed_rel = round(len(active_point_ids) / elapsed, 2)
-        print(f'cluster finished after {elapsed}s at {elapsed_rel}p/s with {len(active_point_ids)} points')
-        # rg_plot_finished(
-        #     cloud=cloud,
-        #     active_points=list(active_point_ids),
-        #     inactive_points=list(inactive_point_ids),
-        #     source_points=list(source_ids_point),
-        #     sink_points_patch_ids=list(sink_ids_patch)
-        # )
+        print(f'cluster {counter_patch} finished after {elapsed}s with {len(active_point_ids)} points at {elapsed_rel}p/s    ::'
+              f'source: {len(source_ids_point)}')
 
-    return cloud
+    return original_cloud
