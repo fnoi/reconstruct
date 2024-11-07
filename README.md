@@ -1,5 +1,9 @@
 # reconstruct
 
+
+info: code is under revision for usability in a test scenario and better documentation.
+
+
 goal:
 * point cluster enrichment (pca, ransac, metaheur.)
 * cluster to system graph
