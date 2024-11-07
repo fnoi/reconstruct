@@ -788,3 +788,14 @@ class Skeleton:
                 return bone
 
         raise ValueError(f'No bone with name "beam_{i}" found')
+
+    def eval_bone_orientation(self):
+        a = 0
+        with open(f'{self.path}/bone_orientation.txt', 'w') as f:
+            for i, bone in enumerate(self.bones):
+                f.write(f'bone_{i} \n')
+                f.write(f'left: {bone.left_3D} \n')
+                f.write(f'right: {bone.right_3D} \n')
+                f.write(f'pca: {bone.pca} \n')
+                f.write(f'angle: {bone.angle} \n')
+                f.write(f'--- \n')

@@ -294,7 +294,7 @@ def huber_loss(residual, delta):
         return delta * (abs(residual) - 0.5 * delta)
 
 
-def calculate_metrics(df_cloud, base='cloud', skeleton=None, store=False):
+def calculate_metrics(df_cloud, base='cloud', skeleton=None, store=False, store_cloud=None):
     """
     base: 'cloud' or 'skeleton'
     """
@@ -310,6 +310,9 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None, store=False):
         inst_gt = inst_gt.astype(int)
         inst_pred = np.zeros_like(inst_gt)
         pred_label = 0
+        if store_cloud is not None:
+            if 'instance_pr' not in store_cloud.columns:
+                store_cloud['instance_pr'] = 0
         for bone in tqdm(skeleton.bones, desc='retrieving gt from cloud bone by bone'):
             pred_label += 1
             for point in bone.points:
@@ -319,13 +322,18 @@ def calculate_metrics(df_cloud, base='cloud', skeleton=None, store=False):
                     (df_cloud['z'] == point[2])
                 )
                 matching_rows = df_cloud[mask]
-                if len(matching_rows) == 0:
-                    raise ValueError('no matching points in cloud, go look why')
-                elif len(matching_rows) == 1:
-                    inst_pred[matching_rows.index] = int(pred_label)
+                if store_cloud is not None:
+                    # add 'instance_pr' to store_cloud if not present
+                    store_cloud.iloc[matching_rows.index, store_cloud.columns.get_loc('instance_pr')] = pred_label
                 else:
-                    raise ValueError('multiple matching points in cloud, go look why')
-
+                    if len(matching_rows) == 0:
+                        raise ValueError('no matching points in cloud, go look why')
+                    elif len(matching_rows) == 1:
+                        inst_pred[matching_rows.index] = int(pred_label)
+                    else:
+                        raise ValueError('multiple matching points in cloud, go look why')
+        if store_cloud is not None:
+            return store_cloud
     else:
         raise ValueError(f"Invalid base: {base}")
 

@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     ##########
     ##########
-    cache_flag = 4
+    cache_flag = 5
     single_step = False
     ##########
     ##########
@@ -200,7 +200,7 @@ if __name__ == '__main__':
 
         cache_io(cloud=cloud, path=config.project.parking_path, cache_flag=3)
         # store cloud to  .txt
-        cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev.txt', sep=' ', index=False)
+        cloud.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_rev_store.txt', sep=' ', index=False)
         if single_step:
             raise ValueError('stop here, single step')
 
@@ -209,9 +209,31 @@ if __name__ == '__main__':
         print('\n- initiate skeleton, aggregate skeleton (incl. orientation and projection)')
         with open(f'{config.project.parking_path}/cache_cloud_3.pickle', 'rb') as f:
             cloud = pd.read_pickle(f)
+
+
+        temporary = True
+        if temporary:
+            columns = cloud.columns
+            with open('/Users/fnoic/PycharmProjects/reconstruct/data/parking/cloud_instance_predictions_skeleton_aggr_yik.txt', 'r') as f:
+                cloud = pd.read_csv(f, sep=' ')
+            del f
+            cloud.columns = columns
+            cloud['ransac_patch'] = cloud['ransac_patch'].astype(int)
+            cloud['instance_gt'] = cloud['instance_gt'].astype(int)
+            cloud['instance_pr'] = cloud['instance_pr'].astype(int)
+            cloud['id'] = cloud['id'].astype(int)
+            # sort by id
+            cloud = cloud.sort_values('id')
+            # drop all nan rows
+            cloud = cloud.dropna()
+
+
         skeleton = inst2skeleton(cloud, config, df_cloud_flag=True, plot=False)
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.plot_cog_skeleton(headline='skeleton initiation')
+
+        pred_cloud_skeleton = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton, store_cloud=cloud)
+        pred_cloud_skeleton.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_skeleton_init.txt', sep=' ', index=False)
 
         metrics_report = True
         if metrics_report:
@@ -227,6 +249,22 @@ if __name__ == '__main__':
 
         skeleton.aggregate_bones()
         skeleton.update_bone_ids()
+
+
+        ##### all this nasty
+        with open(f'/Users/fnoic/PycharmProjects/reconstruct/data/parking/cloud_instance_predictions_skeleton_init.txt', 'r') as f:
+            cloud = pd.read_csv(f, sep=' ')
+        del f
+        # set column names
+        cloud.columns = ['x', 'y', 'z', 'instance_gt', '5', '6', '7', '8', '9', '10', '11', '12', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', 'instance_pr']
+        # drop instance_pr
+        cloud.drop('instance_pr', axis=1, inplace=True)
+        pred_cloud_skeleton_aggr = calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton, store_cloud=cloud)
+        pred_cloud_skeleton_aggr.to_csv(f'{config.project.parking_path}/cloud_instance_predictions_skeleton_aggr.txt', sep=' ', index=False)
+
+        #####
+
+        calculate_metrics(df_cloud=cloud, base='skeleton', skeleton=skeleton, store=False, store_cloud=cloud)
 
         metrics_report = True
         if metrics_report:
@@ -280,6 +318,9 @@ if __name__ == '__main__':
         skeleton.plot_cog_skeleton()
         skeleton.join_on_passing_v2()
         skeleton.plot_cog_skeleton()
+
+        # evaluate bone orientation
+        skeleton.eval_bone_orientation()
 
         skeleton.cache_pickle(config.project.parking_path)
         skeleton.cache_json(config.project.parking_path)

@@ -60,7 +60,9 @@ def inst2skeleton(cloud_df, config, df_cloud_flag=False, plot=True):
                 non_bone_segment_ids.append(int(segment.split('_')[1]))
 
         # skeleton = allocate_unsegmented_elements(skeleton, non_bone_segment_ids, cloud_df, config)
-        skeleton = allocate_unsegmented_elements_dual(skeleton, non_bone_segment_ids, cloud_df, config)
+
+        # skeleton = allocate_unsegmented_elements_dual(skeleton, non_bone_segment_ids, cloud_df, config)
+
         # skeleton = allocate_unsegmented_elements_rev(skeleton, non_bone_segment_ids, cloud_df, config)
         return skeleton
 
@@ -400,7 +402,9 @@ def allocate_unsegmented_elements_dual(skeleton, non_bone_segments, cloud, confi
                     cloud.loc[patch_point_ids, 'instance_pr'] = ranged_segment
 
                     # remove points from to_do
-                    to_do = [x for x in to_do if x not in patch_point_ids]
+                    to_do_set = set(to_do)
+                    to_do_set.difference_update(patch_point_ids)
+                    to_do = list(to_do_set)
                     break
 
         else:
