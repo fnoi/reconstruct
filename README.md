@@ -1,5 +1,12 @@
 # reconstruct
 
+cleanup goal
+* small dummy data
+* segmentation (lean)
+* cs fit from catalog (store catalog with project)
+* visualization and ifc export
+
+
 goal:
 * point cluster enrichment (pca, ransac, metaheur.)
 * cluster to system graph
