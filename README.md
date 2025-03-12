@@ -1,5 +1,7 @@
 # reconstruct
 
+### working on a revision of this code to improve usability --> [https://github.com/fnoi/pc2beam](https://github.com/fnoi/pc2beam/tree/dev)
+
 cleanup goal
 * small dummy data
 * segmentation (lean)
